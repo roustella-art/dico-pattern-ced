@@ -1,0 +1,2908 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="Dico Pattern">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" sizes="180x180" href="icon-180.png">
+<link rel="apple-touch-icon-precomposed" sizes="180x180" href="icon-180.png">
+<title>Dico Pattern</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;touch-action:manipulation}
+  :root{
+    /* Palette warm vintage studio — teal profond + sienna brûlée sur parchemin */
+    --blue:#0F4C5C;--blue-light:#D9E5E9;
+    --green:#56864A;--green-light:#E2EBD9;
+    --red:#B0413E;--orange:#D4622E;--orange-light:#FAEDDC;
+    --bg:#F4EEE2;--card:#FFFFFF;
+    --text:#1B1815;--text2:#5C5250;--text3:#7E746A;
+    --border:#E8DFD0;--radius:12px;
+    --header-bg:#1F2D33;--header-text:#F4EEE2;
+    --nav-h:64px;--header-h:56px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      /* Dark mode — fond sombre, accents inchangés */
+      --blue:#0F4C5C;--blue-light:#D9E5E9;
+      --green:#56864A;--green-light:#E2EBD9;
+      --red:#B0413E;--orange:#D4622E;--orange-light:#FAEDDC;
+      --bg:#1E1E1E;--card:#2A2A2A;
+      --text:#F0EDE8;--text2:#A8A29C;--text3:#78726E;
+      --border:#3C3C3C;--radius:12px;
+      --header-bg:#1F2D33;--header-text:#F4EEE2;
+    }
+  }
+
+  /* Dark mode manual toggle */
+  html.dark-mode{
+    --blue:#0F4C5C;--blue-light:#D9E5E9;
+    --green:#56864A;--green-light:#E2EBD9;
+    --red:#B0413E;--orange:#D4622E;--orange-light:#FAEDDC;
+    --bg:#1E1E1E;--card:#2A2A2A;
+    --text:#F0EDE8;--text2:#A8A29C;--text3:#78726E;
+    --border:#3C3C3C;--radius:12px;
+    --header-bg:#1F2D33;--header-text:#F4EEE2;
+  }
+
+  /* Light mode manual toggle — applique les mêmes variables CSS que :root pour forcer le light mode */
+  html.light-mode{
+    --blue:#0F4C5C;--blue-light:#D9E5E9;
+    --green:#56864A;--green-light:#E2EBD9;
+    --red:#B0413E;--orange:#D4622E;--orange-light:#FAEDDC;
+    --bg:#F4EEE2;--card:#FFFFFF;
+    --text:#1B1815;--text2:#5C5250;--text3:#7E746A;
+    --border:#E8DFD0;--radius:12px;
+    --header-bg:#1F2D33;--header-text:#F4EEE2;
+  }
+  html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text)}
+  #app{display:flex;flex-direction:column;height:100dvh;max-width:640px;margin:0 auto}
+
+  /* Landscape mode: only on tablet/iPad — hauteur > 500px en paysage */
+  /* iPhone 12 landscape = ~390px height → exclus. iPad landscape = 768px+ → inclus */
+  @media (orientation: landscape) and (min-height: 500px) {
+    #app{max-width:100%;padding:0}
+  }
+
+  /* Force portrait layout on smartphone in landscape (small height ≤ 500px) */
+  @media (orientation: landscape) and (max-height: 500px) {
+    #app{max-width:640px;height:auto;min-height:100dvh}
+  }
+
+  /* HEADER — dark warm teal */
+  header{background:var(--header-bg);color:var(--header-text);padding:10px 14px 4px;display:flex;flex-direction:column;flex-shrink:0;border-top:3px solid transparent;transition:border-color .2s;overflow:hidden}
+  @keyframes shuffle-pulse{0%,100%{border-top-color:#FF6B35;box-shadow:0 0 0 rgba(255,107,53,.3)}50%{border-top-color:#FF6B35;box-shadow:0 0 8px rgba(255,107,53,.5)}}
+  @keyframes shuffle-pulse-badge{0%,100%{opacity:.8}50%{opacity:1}}
+  header.header-shuffle{animation:shuffle-pulse 2s ease-in-out infinite}
+  header.header-shuffle h1,
+  header.header-shuffle .brand-sub,
+  header.header-shuffle svg:not(button svg),
+  header.header-shuffle #header-stats,
+  header.header-shuffle .metro-pulse,
+  header.header-shuffle #header-pulse{filter:grayscale(100%);transition:filter .2s}
+  header h1{font-size:18px;font-weight:700;letter-spacing:-.3px;line-height:1.1;color:var(--header-text)}
+  .brand-sub{font-size:10.5px;color:rgba(244,238,226,.55);font-weight:400;font-style:italic;margin-top:2px;letter-spacing:.1px}
+
+  /* Header pill — chrono compact */
+  .h-pill{display:flex;align-items:center;gap:6px;background:rgba(244,238,226,.08);border:1px solid rgba(244,238,226,.12);border-radius:10px;padding:5px 9px;color:var(--header-text);transition:background .12s}
+  .h-pill:active{background:rgba(244,238,226,.16)}
+  .h-icon-btn{background:rgba(244,238,226,.08);border:1px solid rgba(244,238,226,.12);color:var(--header-text);border-radius:10px;width:30px;height:30px;font-size:13px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .12s;flex-shrink:0;padding:0}
+  .h-icon-btn:active{background:rgba(244,238,226,.22)}
+  .h-icon-btn.active{background:var(--orange);border-color:var(--orange);color:#fff;font-weight:700}
+  .h-icon-btn.hidden{display:none}
+  .hidden{display:none!important}
+  .h-icon-btn.large{width:auto;min-width:32px;height:32px;padding:0 7px}
+  .h-time{font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:.3px;color:var(--header-text);transition:color .3s}
+
+  /* Metro row — clean stepper */
+  .metro-row{display:flex;align-items:center;gap:7px;padding:4px 0 6px;border-top:1px solid rgba(244,238,226,.08);margin-top:6px;padding-top:8px;overflow:hidden}
+  .metro-pulse{width:8px;height:8px;border-radius:50%;background:rgba(244,238,226,.25);flex-shrink:0;transition:background .05s,box-shadow .05s}
+  .metro-pulse.flash{background:var(--orange);box-shadow:0 0 8px rgba(212,98,46,.55)}
+  .metro-pulse.flash-metro{background:#4dd0e1;box-shadow:0 0 8px rgba(77,208,225,.6)}
+  .metro-label{font-size:10px;font-weight:700;letter-spacing:.7px;color:rgba(244,238,226,.55);text-transform:uppercase}
+  .metro-stepper{display:flex;align-items:center;background:rgba(244,238,226,.08);border-radius:8px;overflow:hidden;flex-shrink:0}
+  .metro-stepper button{background:transparent;border:none;color:var(--header-text);font-size:14px;font-weight:600;width:32px;height:32px;cursor:pointer;line-height:1;padding:0;display:flex;align-items:center;justify-content:center}
+  .metro-stepper button:active{background:rgba(244,238,226,.16)}
+  .metro-stepper input{width:34px;background:transparent;border:none;color:var(--header-text);font-size:13px;font-weight:700;text-align:center;font-variant-numeric:tabular-nums;letter-spacing:.3px;padding:0;outline:none;-moz-appearance:textfield}
+  .metro-stepper input::-webkit-inner-spin-button,.metro-stepper input::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+  .metro-bpm-suffix{font-size:10px;font-weight:600;letter-spacing:.4px;color:rgba(244,238,226,.45)}
+  .metro-start{background:var(--orange);border:none;color:#fff;font-size:11.5px;font-weight:700;padding:6px 12px;border-radius:8px;cursor:pointer;letter-spacing:.2px;display:flex;align-items:center;justify-content:center;gap:5px;flex-shrink:0;transition:background .12s,transform .08s;min-width:32px;min-height:28px}
+  .metro-start:active{transform:scale(.96)}
+  .metro-start.running{background:var(--red)}
+  /* Dual range slider — mode entraînement */
+  .dual-range{position:relative;height:32px;margin:6px 0}
+  .dual-range input[type=range]{position:absolute;left:0;top:0;width:100%;height:32px;background:transparent;-webkit-appearance:none;appearance:none;margin:0;outline:none}
+  .dual-range input[type=range]::-webkit-slider-runnable-track{height:0;background:transparent}
+  .dual-range input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:22px;height:22px;border-radius:50%;cursor:pointer;border:2px solid #fff;box-shadow:0 1px 5px rgba(0,0,0,.28);pointer-events:auto;margin-top:-11px}
+  .dual-range #train-range-start::-webkit-slider-thumb{background:var(--green)}
+  .dual-range #train-range-max::-webkit-slider-thumb{background:var(--red)}
+
+  /* Toggles header (Décompte / Clic / Train.) */
+  .h-toggle{font-size:10px;font-weight:600;padding:6px 8px;border-radius:7px;border:1px solid rgba(244,238,226,.18);background:rgba(244,238,226,.06);color:rgba(244,238,226,.7);cursor:pointer;white-space:nowrap;transition:font-size .2s,padding .2s,min-height .2s,background .12s;letter-spacing:.2px;flex:1 1 0;min-height:32px;display:flex;align-items:center;justify-content:center}
+  .h-toggle:active{background:rgba(244,238,226,.16)}
+  .h-toggle.on{background:rgba(244,238,226,.92);border-color:rgba(244,238,226,.92);color:var(--header-bg);font-weight:700}
+
+  /* ── Paliers adaptatifs de la metro-row ────────────────────────────────── */
+  /* large (0-1 boutons texte visibles) */
+  .metro-row.hd-large .h-toggle{font-size:12px;padding:6px 14px;min-height:36px}
+  .metro-row.hd-large .h-icon-btn.large{height:36px;font-size:13px}
+  .metro-row.hd-large{gap:9px}
+  /* normal (2 boutons texte visibles) — tailles actuelles */
+  .metro-row.hd-normal .h-toggle{font-size:10px;padding:6px 8px;min-height:32px}
+  .metro-row.hd-normal .h-icon-btn.large{height:32px;font-size:12px}
+  .metro-row.hd-normal{gap:7px}
+  /* compact (3+ boutons texte visibles) */
+  .metro-row.hd-compact .h-toggle{font-size:9px;padding:4px 6px;min-height:28px;letter-spacing:.1px}
+  .metro-row.hd-compact .h-icon-btn.large{height:28px;font-size:11px}
+  .metro-row.hd-compact{gap:5px}
+
+  /* MAIN CONTENT */
+  main{flex:1;overflow-y:auto;padding:12px}
+
+  /* BOTTOM NAV */
+  nav{flex-shrink:0;width:100%;height:calc(var(--nav-h) + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--border);display:flex;padding-bottom:env(safe-area-inset-bottom)}
+  nav button{flex:1;border:none;background:none;font-size:10px;color:var(--text2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;transition:all .15s;border-bottom:3px solid transparent}
+  nav button .ico{font-size:22px;line-height:1}
+  nav button.active{color:var(--blue);font-weight:600;background:var(--blue-light);border-bottom-color:var(--blue);border-radius:8px 8px 0 0}
+
+  /* CARDS */
+  .card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:10px;overflow:hidden}
+  .card.card-penta{border-left:4px solid var(--blue-light)}
+  .card.card-consolidated{border-left:4px solid #7c6aad}
+  .card-head{padding:13px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
+  .card-head h2{font-size:15px;font-weight:700}
+  .card-head .badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--blue-light);color:var(--blue)}
+  .card-body{padding:0 14px 14px;display:none}
+  .card-body.open{display:block}
+
+  /* FILTER BAR — catégories */
+  .filter-bar{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:8px;scrollbar-width:none}
+  .filter-bar::-webkit-scrollbar{display:none}
+  .filter-bar button{flex-shrink:0;border:1px solid var(--border);background:transparent;border-radius:20px;padding:4px 13px;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .15s}
+  .filter-bar button.active{background:var(--blue);color:#fff;border-color:var(--blue)}
+
+  /* FILTER DIFF — contrôle segmenté */
+  .filter-seg{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:14px}
+  .filter-seg button{flex:1;border:none;border-right:1px solid var(--border);background:transparent;padding:6px 4px;font-size:11px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .15s}
+  .filter-seg button:last-child{border-right:none}
+  .filter-seg button.active{background:var(--blue);color:#fff;font-weight:600}
+  .filter-seg button.active.diff-deb{background:#4a9e6b}
+  .filter-seg button.active.diff-int{background:#c07830}
+  .filter-seg button.active.diff-adv{background:#a03030}
+
+
+  /* TAB DISPLAY */
+  .tab-wrap{overflow-x:auto;margin:10px 0;background:#1a1a2e;border-radius:8px;padding:10px 12px;position:relative;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  .tab-wrap:active{opacity:.88}
+  .tab-wrap pre{font-family:'Courier New',Courier,monospace;font-size:var(--tab-size,13px);color:var(--tab-color,#fff);line-height:1.6;white-space:pre;position:relative;z-index:1;pointer-events:none;user-select:none;will-change:transform}
+  .tab-play-badge{position:absolute;top:7px;right:8px;width:26px;height:26px;background:rgba(255,255,255,.10);border-radius:50%;display:flex;align-items:center;justify-content:center;pointer-events:none;transition:background .15s;z-index:3}
+  .tab-play-badge.playing{background:rgba(212,98,46,.35)}
+  /* CURSEUR TAB — top/height fixés dynamiquement en JS par section */
+  .tab-cursor-bar{position:absolute;width:2px;background:rgba(255,165,46,.55);box-shadow:0 0 8px rgba(255,165,46,.4);pointer-events:none;display:none;transform:translateX(-50%);z-index:2;border-radius:1px;transition:left 0s}
+  .tag-row{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}
+  .tag{font-size:11px;padding:2px 8px;border-radius:10px;font-weight:600}
+  .tag.diff-deb{background:#E2EFDA;color:#375623}
+  .tag.diff-int{background:#FFF2CC;color:#7F6000}
+  .tag.diff-adv{background:#FCE4D6;color:#833C00}
+  .desc{font-size:13px;color:var(--text2);margin:6px 0}
+  .tip{font-size:12px;background:#FFF9E6;border-left:3px solid var(--orange);padding:7px 10px;border-radius:0 6px 6px 0;margin-top:8px;color:#5a4000}
+
+  .progress-bar-wrap{background:var(--border);border-radius:3px;height:3px;margin-top:8px}
+  .progress-bar{background:var(--green);border-radius:3px;height:100%;transition:width .3s}
+
+  /* PROGRESSION */
+  .pat-selector{width:100%;padding:9px 12px;border:1px solid var(--border);border-radius:8px;font-size:14px;background:var(--card);margin-bottom:12px;appearance:none;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23595959' fill='none' stroke-width='2'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center}
+  .fing-row{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;margin-bottom:12px}
+  .fing-row button{flex:1;padding:8px 4px;border:none;border-right:1px solid var(--border);background:var(--card);font-size:11px;font-weight:500;cursor:pointer;transition:all .15s;line-height:1.4;color:var(--text)}
+  .fing-row button:last-child{border-right:none}
+  .fing-row button.active{background:var(--blue);color:#fff;font-weight:600}
+  .grid-label{font-size:11px;font-weight:600;color:var(--text2);margin:12px 0 6px;letter-spacing:.3px}
+  .prog-grid{border-radius:8px;overflow:hidden;border:1px solid var(--border)}
+  .prog-grid table{width:100%;border-collapse:collapse}
+  .prog-grid th{background:var(--blue);color:#fff;font-size:11px;padding:7px 4px;text-align:center;font-weight:500}
+  .prog-grid th.mode-head{background:var(--blue);font-size:12px;text-align:left;padding-left:12px}
+  .prog-grid td{border:1px solid var(--border);text-align:center;padding:4px 2px}
+  .prog-grid td.tempo{font-size:11px;font-weight:600;color:var(--text2);background:var(--bg);white-space:nowrap;padding:0 8px}
+  .prog-grid tr:hover td{background:var(--border)}
+  .cell-btn{width:28px;height:28px;border:2px solid var(--border);background:var(--card);cursor:pointer;font-size:14px;border-radius:6px;transition:all .15s;display:flex;align-items:center;justify-content:center;margin:0 auto;color:transparent}
+  .cell-btn.checked{background:var(--green);border-color:var(--green);color:transparent}
+  .cell-btn:not(.checked):hover{border-color:var(--green);background:var(--bg)}
+  .pct-card{background:var(--card);border-radius:var(--radius);padding:14px;margin-bottom:10px;border:1px solid var(--border)}
+  .pct-card h3{font-size:13px;color:var(--text2);margin-bottom:8px}
+  .pct-big{font-size:36px;font-weight:800;color:var(--blue)}
+  .pct-sub{font-size:12px;color:var(--text2);margin-top:2px}
+
+  /* SECTION TITLE */
+  .section-title{font-size:12px;font-weight:600;color:var(--text2);margin:16px 0 8px 2px;letter-spacing:.2px}
+
+  /* TOGGLE ARROW */
+  .arrow{transition:transform .2s;font-size:11px;color:var(--text2);opacity:.6}
+  .arrow.open{transform:rotate(90deg)}
+
+  /* METRONOME */
+  .metro-wrap{display:flex;align-items:center;gap:6px;margin-top:10px;padding:8px 10px;background:#f8f7f4;border-radius:8px;border:1px solid var(--border);flex-wrap:wrap}
+  .metro-dot{width:10px;height:10px;border-radius:50%;background:var(--border);transition:background .05s;flex-shrink:0}
+  .metro-dot.flash{background:var(--green)}
+  .metro-adj{width:30px;height:30px;border:1px solid var(--border);background:var(--card);border-radius:6px;font-size:17px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;line-height:1;flex-shrink:0}
+  .metro-bpm{width:52px;text-align:center;font-size:16px;font-weight:700;border:1px solid var(--border);border-radius:6px;padding:4px 2px;background:var(--card);-moz-appearance:textfield}
+  .metro-bpm::-webkit-inner-spin-button,.metro-bpm::-webkit-outer-spin-button{-webkit-appearance:none}
+  .metro-target{font-size:11px;color:var(--text2);flex:1;white-space:nowrap}
+  .metro-btn{font-size:12px;font-weight:700;padding:6px 12px;border:none;border-radius:8px;cursor:pointer;color:#fff;flex-shrink:0}
+
+  /* DETAILS accordéon */
+  details summary::-webkit-details-marker{display:none}
+  details[open] summary span:last-child{transform:rotate(180deg)}
+  details[open] summary{border-radius:8px 8px 0 0}
+
+  /* SPD CUSTOM INPUT (preview BPM libre) */
+  .spd-custom::-webkit-outer-spin-button,
+  .spd-custom::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  #metro-bpm-global::-webkit-inner-spin-button,#metro-bpm-global::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
+  .spd-custom{-moz-appearance:textfield}
+
+  /* CHRONO */
+  .chrono-wrap{display:flex;align-items:center;gap:6px}
+  .chrono-btn{background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:7px;padding:4px 9px;font-size:13px;cursor:pointer;line-height:1.4;transition:background .1s}
+  .chrono-btn:active{background:rgba(255,255,255,.38)}
+
+  /* NAV ICONS */
+  nav button .ico{width:24px;height:24px;display:flex;align-items:center;justify-content:center}
+
+  /* HEADER GEAR — legacy, kept for compat (utilise .h-icon-btn) */
+
+  /* SETTINGS MODAL */
+  .settings-overlay{position:fixed;inset:0;z-index:1000;background:rgba(15,25,55,.85);display:flex;align-items:flex-start;justify-content:center;padding:24px 14px;overflow-y:auto;animation:fadeIn .18s ease}
+  @keyframes fadeIn{from{opacity:0}to{opacity:1}}
+  @keyframes fadeInDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+  @keyframes fadeInOut{0%{opacity:0;transform:scale(.9)};20%{opacity:1;transform:scale(1)};80%{opacity:1;transform:scale(1)};100%{opacity:0;transform:scale(.9)}}
+  .settings-modal{background:var(--card);border-radius:18px;padding:18px 20px 22px;max-width:420px;width:100%;box-shadow:0 8px 40px rgba(0,0,0,.25);position:relative}
+  .settings-modal .modal-head{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px}
+  .settings-modal h2{font-size:18px;font-weight:800;color:var(--blue);letter-spacing:-.2px}
+  .settings-modal .sub{font-size:12px;color:var(--text2);margin-top:2px}
+  .settings-close{background:transparent;border:none;font-size:22px;color:var(--text2);cursor:pointer;line-height:1;padding:0 4px;margin-top:-2px}
+  .settings-close:active{color:var(--text)}
+  .settings-modal .group{margin-bottom:18px}
+  .settings-modal .group-label{font-size:11px;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.4px;margin-bottom:6px;display:block}
+  .settings-modal .seg{display:flex;border:1px solid var(--border);border-radius:8px;overflow:hidden}
+  .settings-modal .seg button{flex:1;border:none;border-right:1px solid var(--border);background:var(--card);font-size:12px;font-weight:600;color:var(--text2);padding:9px 6px;cursor:pointer;transition:all .12s;text-align:center}
+  .settings-modal .seg button:last-child{border-right:none}
+  .settings-modal .seg button.active{background:var(--blue);color:#fff}
+  .settings-modal .seg.tabs-settings button.active{background:var(--orange);color:#fff}
+
+  /* Dark mode: onglets plus lisibles en blanc sur fond sombre */
+  html.dark-mode .settings-modal .seg button{color:#fff}
+  html.dark-mode .settings-modal .seg button:not(.active){background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12)}
+
+  .settings-modal .hint{font-size:11px;color:var(--text2);margin-top:5px;line-height:1.4}
+  /* Footer modale — actions secondaires */
+  .settings-footer{margin-top:18px;padding-top:14px;border-top:1px solid var(--border)}
+  .sf-actions{display:flex;gap:8px}
+  .sf-btn{flex:1;padding:9px 4px;background:var(--bg);color:var(--text2);border:1px solid var(--border);border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;transition:all .12s}
+  .sf-btn:active{background:var(--blue-light);border-color:var(--blue);color:var(--blue)}
+  .sf-reset{width:100%;margin-top:8px;padding:8px;background:transparent;color:var(--red);border:1px solid transparent;border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;transition:all .12s;opacity:.75}
+  .sf-reset:active{background:rgba(176,65,62,.08);border-color:rgba(176,65,62,.25);opacity:1}
+  .sf-version{text-align:center;font-size:10px;color:var(--text3);margin-top:10px;letter-spacing:.3px}
+  /* Boutons +/- pour réglages (volumes, tempos, presets) */
+  .control-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:10px}
+  .control-label{font-size:13px;font-weight:600;color:var(--text);flex:1;display:flex;align-items:center;gap:8px}
+  .control-label svg{flex-shrink:0;width:20px;height:20px}
+  .control-value{font-size:16px;font-weight:700;min-width:48px;text-align:center;padding:2px 6px;border-radius:6px;background:rgba(15,76,92,.06)}
+  .control-buttons{display:flex;align-items:center;gap:6px}
+  .control-btn{width:40px;height:40px;padding:0;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);font-size:20px;font-weight:600;color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:all .12s;user-select:none}
+  .control-btn:active{background:var(--blue-light);border-color:var(--blue);color:var(--blue);transform:scale(.94)}
+  .control-btn.cb-sm{width:34px;height:34px;font-size:18px;border-radius:8px}
+
+  /* VOLUME — label+valeur en haut, barre de niveau + steppers en bas */
+  .vol-ctrl{margin-bottom:16px}
+  .vol-ctrl:last-child{margin-bottom:0}
+  .vol-head{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:7px}
+  .vol-label{font-size:13px;font-weight:600;color:var(--text)}
+  .vol-val{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.2px}
+  .vol-body{display:flex;align-items:center;gap:9px}
+  .vol-bar{flex:1;height:9px;border-radius:5px;background:var(--border);overflow:hidden}
+  .vol-bar-fill{height:100%;border-radius:5px;transition:width .15s ease}
+
+  /* STEPPER GROUPÉ — bloc connecté − valeur + (presets tempo) */
+  .stepper-grp{display:flex;align-items:center;border:1.5px solid var(--border);border-radius:9px;overflow:hidden;flex-shrink:0;background:var(--bg)}
+  .stepper-grp button{width:38px;height:38px;border:none;background:transparent;font-size:19px;font-weight:600;color:var(--text2);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .12s;padding:0}
+  .stepper-grp button:first-child{border-right:1.5px solid var(--border)}
+  .stepper-grp button:last-child{border-left:1.5px solid var(--border)}
+  .stepper-grp button:active{background:var(--blue-light);color:var(--blue)}
+  .stepper-grp .sg-val{min-width:46px;text-align:center;font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;padding:0 4px}
+
+  /* TOGGLE SWITCH — composant on/off unifié (remplace checkboxes natives + pills) */
+  .toggle-switch{position:relative;flex-shrink:0;width:44px;height:26px;border-radius:13px;border:none;background:var(--border);cursor:pointer;padding:0;transition:background .18s ease}
+  .toggle-switch::after{content:"";position:absolute;top:3px;left:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.25);transition:transform .18s ease}
+  .toggle-switch.on{background:var(--blue)}
+  .toggle-switch.on::after{transform:translateX(18px)}
+  .toggle-switch.on.tog-green{background:var(--green)}
+  .toggle-switch.on.tog-orange{background:var(--orange)}
+  .toggle-switch:active::after{width:23px}
+  /* Rangée de réglage on/off : libellé + sous-texte à gauche, switch à droite */
+  .switch-row{display:flex;align-items:center;gap:12px;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
+  .switch-row:last-child{border-bottom:none}
+  .switch-row .sr-label{font-size:13px;color:var(--text);font-weight:600}
+  .switch-row .sr-hint{font-size:11px;color:var(--text3);margin-top:2px;line-height:1.35}
+
+  /* PROGRESSION ACCORDION */
+  .prog-acc{border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:10px;background:var(--card)}
+  .prog-acc > summary{display:flex;align-items:center;gap:6px;padding:13px 14px;cursor:pointer;user-select:none;font-size:14px;font-weight:700;list-style:none;color:var(--text)}
+  .prog-acc > summary::-webkit-details-marker{display:none}
+  .prog-acc > summary::after{content:'›';font-size:18px;color:var(--text2);transition:transform .2s;display:inline-block;font-weight:400;flex-shrink:0}
+  .prog-acc[open] > summary::after{transform:rotate(90deg)}
+  .pimt > summary .pimt-arrow{transition:transform .2s;display:inline-block}
+  .pimt[open] > summary .pimt-arrow{transform:rotate(90deg)}
+  @keyframes drawerOpen{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
+  .info-drawer[open] > div{animation:drawerOpen .22s ease}
+  .prog-acc-body{padding:0 14px 14px}
+  .prog-sum-stat{margin-left:auto;font-size:11px;font-weight:600;color:var(--text2);white-space:nowrap;margin-right:4px}
+  /* Empêche le span de stats de se retourner quand l'accordéon s'ouvre */
+  .prog-acc > summary span{transform:none !important;display:inline}
+
+  /* NAV — masquée via long-press sur le logo (portrait ET paysage) */
+  #landscape-block{display:none}
+  body.nav-hidden nav{display:none !important}
+
+  /* CHRONO POPUP */
+  .chrono-popup{position:fixed;bottom:76px;left:50%;transform:translateX(-50%) translateY(12px);background:var(--header-bg);color:var(--header-text);border-radius:14px;padding:13px 18px;font-size:13px;font-weight:600;text-align:center;max-width:290px;width:90%;z-index:500;opacity:0;transition:opacity .35s,transform .35s;pointer-events:none;box-shadow:0 4px 24px rgba(0,0,0,.35);line-height:1.5}
+  .chrono-popup.visible{opacity:1;transform:translateX(-50%) translateY(0)}
+
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <!-- ROW 1 : logo + brand + gear -->
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <div id="brand-logo-area" style="display:flex;align-items:center;gap:10px;min-width:0;cursor:default;-webkit-user-select:none;user-select:none"
+        ontouchstart="navHidePressStart(event)" ontouchend="navHidePressEnd(event)"
+        ontouchcancel="navHidePressCancel()" ontouchmove="navHidePressCancel()"
+        onmousedown="navHidePressStart(event)" onmouseup="navHidePressEnd(event)" onmouseleave="navHidePressCancel()"
+        title="Maintenir pour masquer/afficher les onglets">
+        <!-- LOGO : 4 dots ascendants -->
+        <svg width="32" height="32" viewBox="0 0 32 32" style="flex-shrink:0" aria-label="Dico Pattern">
+          <rect width="32" height="32" rx="8" fill="#0F4C5C"/>
+          <circle cx="8"  cy="23" r="2"   fill="#F4EEE2" opacity=".45"/>
+          <circle cx="14" cy="19" r="2"   fill="#F4EEE2" opacity=".65"/>
+          <circle cx="20" cy="13" r="2"   fill="#F4EEE2" opacity=".85"/>
+          <circle cx="25" cy="9"  r="2.5" fill="#D4622E"/>
+        </svg>
+        <div id="brand-text" style="min-width:0">
+          <h1>Dico Pattern</h1>
+          <div class="brand-sub">le dictionnaire de patterns</div>
+        </div>
+      </div>
+      <div id="header-shuffle-badge" style="display:none;align-items:center;gap:6px;padding:4px 10px;background:rgba(255,107,53,.15);border:1.5px solid #FF6B35;border-radius:8px;font-size:11px;font-weight:700;color:#FF6B35;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0;animation:shuffle-pulse-badge .8s ease-in-out infinite">♩ Shuffle</div>
+      <div style="flex:1"></div>
+      <div id="header-stats" style="display:none;align-items:center;gap:6px;padding:0 8px;flex-shrink:0;font-size:12px;font-weight:700">
+        <div style="display:flex;align-items:center;gap:3px;color:#FF6B35">
+          <span>🔥</span>
+          <span id="stats-streak"></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:3px;color:#FFB703">
+          <span>⚡</span>
+          <span id="stats-record"></span>
+        </div>
+        <div style="display:flex;align-items:center;gap:3px;color:#4ECDC4">
+          <span>📅</span>
+          <span id="stats-total"></span>
+        </div>
+      </div>
+      <button id="shuffle-toggle-btn" class="h-icon-btn" onclick="toggleShuffleMode()" title="Mode shuffle/swing" style="font-size:10px;font-weight:700;letter-spacing:.3px">SH</button>
+      <button id="string-group-btn" class="h-icon-btn" onclick="cycleStringGroup()" title="Groupe de cordes — DGBE · ADGB · EADG" style="font-size:9px;font-weight:700;letter-spacing:.3px;min-width:34px">DGBE</button>
+      <button id="neck-toggle-btn" class="h-icon-btn" onclick="toggleNeckPosition()" title="Basculer mid/high neck" style="font-size:10px;font-weight:700">mid</button>
+      <button class="h-icon-btn" id="gear-btn"
+        onclick="openSettings()"
+        aria-label="Réglages" title="Réglages">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
+
+    <!-- ROW 2 : BPM + toggles + metro solo -->
+    <div class="metro-row">
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <button id="header-train-btn" onclick="trainBtnClick()" style="font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;flex-shrink:0;cursor:pointer;padding:0 6px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:5px;border:1.5px solid rgba(77,208,225,.4);background:transparent;color:rgba(244,238,226,.45);-webkit-tap-highlight-color:transparent;transition:all .15s" title="1 clic = mode entraînement · 2 clics = mode pyramide">Train.</button>
+        <div class="metro-stepper">
+          <button onclick="headerBpmChange(-5)" aria-label="−5 BPM">−</button>
+          <span id="header-bpm-val"
+          ondblclick="bpmEditStart()"
+          ontouchstart="bpmValTouchStart(event)" ontouchend="bpmValTouchEnd()" ontouchmove="bpmValTouchEnd()"
+          style="min-width:30px;text-align:center;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.3px;color:var(--header-text);padding:0 4px;transition:color .2s;cursor:pointer" title="Double-tap → saisir BPM">60</span>
+          <input type="number" id="bpm-edit-input" min="20" max="240" inputmode="numeric" pattern="[0-9]*"
+          aria-label="Tempo en BPM (20-240)"
+          onkeydown="bpmEditKeydown(event)" onblur="bpmEditCommit()"
+          style="display:none;width:46px;font-size:13px;font-weight:700;text-align:center;background:transparent;border:none;border-bottom:1.5px solid #4dd0e1;color:var(--header-text);font-variant-numeric:tabular-nums;outline:none;padding:0 2px;margin:0;-moz-appearance:textfield;-webkit-appearance:none;appearance:none">
+          <button onclick="headerBpmChange(+5)" aria-label="+5 BPM">+</button>
+        </div>
+        <div id="header-pulse" class="metro-pulse"></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:6px">
+      </div>
+      <div style="flex:1"></div>
+      <button id="header-countin-btn" class="countin-btn h-toggle" onclick="toggleCountIn()" title="Décompte 4 temps avant la lecture">-4</button>
+      <button id="header-click-btn" class="click-btn h-toggle"
+        onclick="togglePreviewClick()"
+        title="Clic métronomique">Clic</button>
+      <button id="subdiv-cycle-btn" class="h-icon-btn large" onclick="cycleClickSubdiv()" title="Subdivision rythmique — 8 croche · 3:8 triolet · 16 double croche · 6:16 sextolet" style="font-size:10px;font-weight:700;letter-spacing:.3px;min-width:34px">16</button>
+      <button id="header-metro-solo-btn" class="h-icon-btn large" onclick="headerMetroSolo()" title="Métronome solo" aria-label="Métronome solo">
+        <svg width="12" height="13" viewBox="0 0 20 22" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="10,2 18,20 2,20"/><line x1="10" y1="7" x2="14.5" y2="17"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+  <main id="content"></main>
+  <nav>
+    <button class="active" onclick="showTab('patterns')" id="nav-patterns">
+      <span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>Patterns
+    </button>
+    <button onclick="showTab('gammes')" id="nav-gammes">
+      <span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><path d="M2 13 C5 5 9 5 12 13 C15 21 19 21 22 13"/></svg></span>Gammes
+    </button>
+    <button onclick="showTab('arpeges')" id="nav-arpeges">
+      <span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="5" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="18" r="2"/><path d="M12 7 L6.5 16 M13 7 L17.5 16 M7 18 L17 18"/></svg></span>Arpèges
+    </button>
+    <button onclick="showTab('journal')" id="nav-journal">
+      <span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/><polyline points="16 2 16 8 8 8 8 2"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg></span>Journal
+    </button>
+  </nav>
+</div>
+
+<script src="data.js"></script>
+<script src="state.js"></script>
+<script src="onboarding.js"></script>
+<script src="audio.js"></script>
+<script src="render.js"></script>
+<script>
+// ─── LOGIQUE PRINCIPALE ───────────────────────────────────────────────────────
+// Les données (PATTERNS, MODES, TEMPOS…)     → data.js
+// L'état et la persistence (state, SETTINGS) → state.js
+// Audio (METRO, PREVIEW, previewPlay…)       → audio.js
+
+
+
+// Nettoie la tab pour l'affichage : remplace 'o' par '-' sur les lignes de tab
+// et simplifie ||| en |. Les lignes de texte (↩ retour…) sont laissées intactes.
+function cleanTabDisplay(tabStr) {
+  return tabStr.split('\n').map(line => {
+    if (/^[eEBGDA]\|/.test(line) || /^[-\d]/.test(line)) {
+      return line
+        .replace(/o/g, '-')       // 'o' → '-' : maintient l'alignement
+        .replace(/\|\|\|/g, '|'); // triple barre → barre simple
+    }
+    return line; // lignes de texte (↩ retour…) intactes
+  }).join('\n');
+}
+
+// ─── TAB TRANSFORM (groupe de cordes + position du manche) ──────────────────────
+function transformTab(tabStr, patId, skipStringShift = false) {
+  // Les gammes (special:true) ignorent le décalage de groupe de cordes — leur tab couvre déjà toutes les cordes
+  const shift  = skipStringShift ? 0 : (STRING_SHIFTS[SETTINGS.stringGroup] || 0);
+  const offset = (SETTINGS.neckPosition === 'high') ? 7 : 0;  // mid: 0 (case 5), high: 7 (case 12)
+
+  // Vérifier si le pattern a un fretOffset personnalisé
+  let patFretOffset = 0;
+  if (patId) {
+    const pat = PATTERNS.find(p => p.id === patId);
+    if (pat && pat.fretOffset) patFretOffset = pat.fretOffset;
+  }
+
+  let s = tabStr;
+  if (shift  !== 0) s = tabApplyStringShift(s, shift);
+  const totalOffset = offset + patFretOffset;
+  if (totalOffset !== 0) s = tabApplyFretOffset(s, totalOffset);
+  return s;
+}
+
+// Passe 1 : décalage groupe de cordes (réordonne les lignes, sans toucher aux cases)
+function tabApplyStringShift(tabStr, shift) {
+  const emptyEquiv = s => s.replace(/[^|]/g, '-');
+  const lines = tabStr.split('\n');
+  const out = [];
+  let block = [], blockType = null;
+
+  function flush() {
+    if (!block.length) return;
+    if (blockType === 'labeled') {
+      const byLabel = {};
+      block.forEach(l => { const m = l.match(/^([eEBGDA])\s*\|(.*)/); if (m) byLabel[m[1]] = m[2]; });
+      const ref = Object.values(byLabel)[0] || '';
+      const empty = emptyEquiv(ref);
+      STRING_LINES.forEach((label, i) => {
+        const srcLabel = STRING_LINES[i - shift];
+        const raw = (i - shift >= 0 && byLabel[srcLabel] !== undefined) ? byLabel[srcLabel] : empty;
+        out.push(label + '|' + raw);
+      });
+    } else if (blockType === 'unlabeled') {
+      const N = block.length;
+      const empty = emptyEquiv(block[0] || '');
+      const padded = [...Array(shift).fill(empty), ...block].slice(0, N);
+      padded.forEach(l => out.push(l));
+    }
+    block = []; blockType = null;
+  }
+
+  for (const line of lines) {
+    if (/^\s*↩/.test(line) || /retour/i.test(line)) { flush(); out.push(line); }
+    else if (/^[eEBGDA]\s*\|/.test(line)) { if (blockType !== 'labeled') flush(); blockType = 'labeled'; block.push(line); }
+    else if (/^[-\d]/.test(line))       { if (blockType !== 'unlabeled') flush(); blockType = 'unlabeled'; block.push(line); }
+    else                               { flush(); out.push(line); }
+  }
+  flush();
+  return out.join('\n');
+}
+
+// Passe 2 : décalage case de départ avec colonnes à largeur fixe
+// Chaque numéro de case est mis à jour ET les tirets sont recalculés
+// pour que l'alignement reste parfait, même avec des cases à 2 chiffres.
+function tabApplyFretOffset(tabStr, offset) {
+  const lines = tabStr.split('\n');
+  const out = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    if (/^[eEBGDA]\s*\|/.test(lines[i])) {
+      const block = [];
+      while (i < lines.length && /^[eEBGDA]\s*\|/.test(lines[i])) block.push(lines[i++]);
+      out.push(...tabReRenderLabeledBlock(block, offset));
+    } else if (/^[-\d]/.test(lines[i])) {
+      const block = [];
+      while (i < lines.length && /^[-\d]/.test(lines[i])) block.push(lines[i++]);
+      out.push(...tabReRenderUnlabeledBlock(block, offset));
+    } else {
+      out.push(lines[i++]);
+    }
+  }
+  return out.join('\n');
+}
+
+// Tokenise une ligne de tab en : tirets | chiffres | 'o' | reste (|||, |)
+function tabTokenize(content) {
+  const tokens = [];
+  let j = 0;
+  while (j < content.length) {
+    const c = content[j];
+    if (/\d/.test(c)) {
+      let s = j; while (j < content.length && /\d/.test(content[j])) j++;
+      tokens.push({ t: 'num', v: parseInt(content.slice(s, j)) });
+    } else if (c === 'o') {
+      tokens.push({ t: 'mark', v: 'o' }); j++;
+    } else if (c === '|') {
+      tokens.push({ t: 'end', v: content.slice(j) }); break;
+    } else {
+      let s = j; while (j < content.length && !/[\d|o]/.test(content[j])) j++;
+      tokens.push({ t: 'dash', v: content.slice(s, j) });
+    }
+  }
+  return tokens;
+}
+
+// Analyse une ligne tokenisée → { leading, notes[], hasReturnMark, endSuffix }
+function tabParseLine(tokens) {
+  let leading = 0, notes = [], hasReturnMark = false, endSuffix = '';
+  let phase = 'lead';
+  for (const tok of tokens) {
+    if (tok.t === 'end')  { endSuffix = tok.v; break; }
+    if (tok.t === 'mark') { hasReturnMark = true; continue; }
+    if (phase === 'lead') {
+      if (tok.t === 'dash') leading += tok.v.length;
+      else if (tok.t === 'num') { phase = 'notes'; notes.push(tok.v); }
+    } else {
+      if (tok.t === 'num') notes.push(tok.v);
+      // tirets entre les notes ignorés → recalculés au rendu
+    }
+  }
+  return { leading, notes, hasReturnMark, endSuffix };
+}
+
+// Reconstruit un bloc de lignes étiquetées (e|, B|, …) avec colonnes fixes
+function tabReRenderLabeledBlock(lines, offset) {
+  const parsed = lines.map(line => {
+    const m = line.match(/^([eEBGDA])(\s*)\|(.*)/);
+    if (!m) return { label: '', leading: 0, notes: [], hasReturnMark: false, endSuffix: '|', raw: line };
+    const info = tabParseLine(tabTokenize(m[3]));
+    info.label = m[1];
+    info.spacing = m[2];
+    info.notes = info.notes.map(n => n === 0 ? 0 : n + offset);  // Don't transpose open strings (0)
+    return info;
+  });
+
+  const maxDigits = parsed.reduce((mx, p) =>
+    p.notes.reduce((m, n) => Math.max(m, String(n).length), mx), 1);
+
+  return tabBuildLines(parsed, maxDigits, offset, true);
+}
+
+// Reconstruit un bloc de lignes non étiquetées (section retour en ---)
+function tabReRenderUnlabeledBlock(lines, offset) {
+  const parsed = lines.map(line => {
+    const info = tabParseLine(tabTokenize(line));
+    info.label = '';
+    info.notes = info.notes.map(n => n === 0 ? 0 : n + offset);  // Don't transpose open strings (0)
+    return info;
+  });
+
+  const maxDigits = parsed.reduce((mx, p) =>
+    p.notes.reduce((m, n) => Math.max(m, String(n).length), mx), 1);
+
+  return tabBuildLines(parsed, maxDigits, offset, false);
+}
+
+// Moteur de rendu commun : calcule les nouvelles positions et reconstruit les lignes
+function tabBuildLines(parsed, maxDigits, offset, labeled) {
+  const withNotes = parsed.filter(p => p.notes.length > 0);
+  if (withNotes.length === 0) return parsed.map(p => (labeled ? p.label + '|' : '') + p.endSuffix || (labeled ? p.label + '|' + p.raw : p.raw));
+
+  // Trier par leading dashes pour trouver l'ordre de jeu
+  const sorted = [...withNotes].sort((a, b) => a.leading - b.leading);
+  const firstLeading = sorted[0].leading;
+  const colWidth     = maxDigits + 1; // chiffres + 1 tiret séparateur
+
+  // Nouvelle position de départ de chaque corde (gère des notes variables par corde)
+  sorted.forEach((s, k) => {
+    s.newLeading = firstLeading + sorted.slice(0, k).reduce((sum, prev) => sum + prev.notes.length * colWidth, 0);
+  });
+
+  const lastS    = sorted[sorted.length - 1];
+  const noteSpan = lastS.notes.length * maxDigits + Math.max(0, lastS.notes.length - 1);
+  const totalChars = lastS.newLeading + noteSpan + 1; // +1 tiret final
+
+  const endSuffix = (parsed.find(p => p.endSuffix) || { endSuffix: labeled ? '|' : '|||' }).endSuffix;
+
+  const leadingMap = new Map(sorted.map(s => [labeled ? s.label : parsed.indexOf(s), s]));
+
+  return parsed.map((p, idx) => {
+    const key   = labeled ? p.label : idx;
+    const ns    = leadingMap.get(key);
+    let content = '';
+
+    if (ns && ns.notes.length > 0) {
+      content = '-'.repeat(ns.newLeading);
+      ns.notes.forEach((fret, i) => {
+        content += String(fret);
+        if (i < ns.notes.length - 1) content += '-';
+      });
+      if (ns.hasReturnMark) content += 'o';
+      content += '-'.repeat(Math.max(0, totalChars - content.length));
+    } else {
+      content = '-'.repeat(totalChars);
+    }
+
+    return (labeled ? p.label + (p.spacing || '') + '|' : '') + content + endSuffix;
+  });
+}
+
+// ─── LOOP ÉTENDU ────────────────────────────────────────────────────────────────
+// buildLoopExtTab(rawTabStr, loopExt)
+//
+// Étend un pattern en une séquence de blocs ascendants/descendants successifs :
+//   Loop+0 : UP(+0) → DOWN(+1)                              (= base inchangée)
+//   Loop+1 : UP(+0) → DOWN(+1) → UP(+2) → DOWN(+1)
+//   Loop+2 : UP(+0) → DOWN(+1) → UP(+2) → DOWN(+3) → UP(+2) → DOWN(+1)
+//   Loop+N : séquence d'offsets [0,1,2,…,N+1,N,…,2,1], direction alterne UP/DOWN
+//
+// Utilise tabApplyFretOffset() existant pour le rendu de chaque bloc.
+// Retourne un nouveau tab string multi-sections séparées par ↩.
+//
+function buildLoopExtTab(rawTabStr, loopExt) {
+  if (loopExt === 0) return rawTabStr;
+
+  // ── 1. Découper le tab en montée (labeled) et retour (unlabeled) ─────────────
+  const allLines = rawTabStr.split('\n');
+  const monteeLines = [], retourLines = [];
+  let inRetour = false;
+  for (const line of allLines) {
+    if (line.includes('↩')) { inRetour = true; continue; }
+    if (!inRetour) monteeLines.push(line);
+    else           retourLines.push(line);
+  }
+  const monteeStr = monteeLines.join('\n');
+  const retourStr = retourLines.join('\n');
+
+  // ── Cas spécial Loop −1 : retour sans décalage ────────────────────────────────
+  // Le template retour a +1 intégré (case de base+1) → appliquer −1 pour l'annuler
+  if (loopExt === -1) {
+    const retourBase = tabApplyFretOffset(retourStr, -1);
+    return monteeStr + '\n↩\n' + retourBase;
+  }
+
+  // ── 2. Template intermédiaire pour les blocs DOWN non-finals ──────────────────
+  //   • Supprime les marques 'o' (notes de résolution)
+  //   • Change ||| → | (pas de double barre avant la fin)
+  function makeIntermediateDown(str) {
+    return str.split('\n').map(l =>
+      l.replace(/o(?=\|+)/g, '').replace(/\|{2,}$/g, '|')
+    ).join('\n');
+  }
+  const retourIntermediate = makeIntermediateDown(retourStr);
+
+  // ── 3. Montée sans labels (pour les blocs UP répétés, indices 2, 4…) ─────────
+  //   Les lignes `X|content` deviennent `content` (commencent toujours par -)
+  function stripLabels(str) {
+    return str.split('\n').map(l => {
+      const m = l.match(/^[eEBGDA]\|(.*)$/);
+      return m ? m[1] : l;
+    }).join('\n');
+  }
+  const monteeUnlabeled = stripLabels(monteeStr);
+
+  // ── 4. Séquence d'offsets : [0, 1, 2, …, N+1, N, …, 2, 1] ──────────────────
+  const N = loopExt;
+  const offsetSeq = [];
+  for (let i = 0; i <= N + 1; i++) offsetSeq.push(i);
+  for (let i = N; i >= 1; i--) offsetSeq.push(i);
+  // total = 2*(N+1) blocs · alterne UP (pair) / DOWN (impair)
+
+  // ── 5. Générer chaque bloc ───────────────────────────────────────────────────
+  const parts = [];
+  for (let b = 0; b < offsetSeq.length; b++) {
+    const k      = offsetSeq[b];
+    const isUp   = (b % 2 === 0);
+    const isFinal = (b === offsetSeq.length - 1);
+    const isFirst = (b === 0);
+
+    let blockStr;
+    if (isUp) {
+      // UP block : template = montée, offset direct k (montée part de la case de base)
+      const tmpl = isFirst ? monteeStr : monteeUnlabeled;
+      blockStr = (k === 0) ? tmpl : tabApplyFretOffset(tmpl, k);
+    } else {
+      // DOWN block : template = retour (qui a déjà +1 intégré).
+      //   Pour obtenir offset k total : appliquer (k-1) au template
+      const tmpl       = isFinal ? retourStr : retourIntermediate;
+      const applyOffset = k - 1;
+      blockStr = (applyOffset === 0) ? tmpl : tabApplyFretOffset(tmpl, applyOffset);
+    }
+
+    parts.push({ blockStr, isUp, k, isFinal, isFirst });
+  }
+
+  // ── 6. Assembler avec séparateurs ↩ ──────────────────────────────────────────
+  let result = parts[0].blockStr;
+  for (let b = 1; b < parts.length; b++) {
+    const { blockStr, isUp, k } = parts[b];
+    const dir = isUp ? 'montée' : 'retour';
+    result += `\n↩ ${dir} +${k}\n${blockStr}`;
+  }
+  return result;
+}
+
+// Helper : renvoie le tab effectif en tenant compte de loopExt
+// Retourne le tab approprié selon que le pattern a tabMid/tabHigh ou juste tab
+function getTabForNeckPosition(pat) {
+  if (pat.tabMid && pat.tabHigh) {
+    return SETTINGS.neckPosition === 'high' ? pat.tabHigh : pat.tabMid;
+  }
+  return pat.tab || '';
+}
+
+// Retourne true si le pattern utilise tabMid/tabHigh statiques (pas de transformation)
+function isStaticNeckTab(pat) {
+  return !!(pat.tabMid && pat.tabHigh);
+}
+
+// Pour les tabs statiques : applique uniquement le string shift (pas le fret offset)
+// Le fret offset est déjà intégré dans tabMid/tabHigh, mais le groupe de cordes reste flexible
+function applyStaticTabTransform(rawTab) {
+  const shift = STRING_SHIFTS[SETTINGS.stringGroup] || 0;
+  return shift !== 0 ? tabApplyStringShift(rawTab, shift) : rawTab;
+}
+
+// ── Sélection de cordes pour les gammes ──────────────────────────────────────
+// activeStrings = [bool×6] dans l'ordre de la tab : [e, B, G, D, A, E]
+function getGammeActiveStrings(patId) {
+  if (!state.gammeActiveStrings || !state.gammeActiveStrings[patId]) {
+    return [true, true, true, true, true, true]; // toutes actives par défaut
+  }
+  return state.gammeActiveStrings[patId];
+}
+
+// Masque les notes des cordes inactives en remplaçant les chiffres par des tirets.
+// Préserve la structure complète de la tab (toutes les lignes restent présentes).
+function applyGammeStringFilter(tabStr, activeStrings) {
+  if (!activeStrings || activeStrings.every(v => v)) return tabStr;
+  const STRING_NAMES = ['e', 'B', 'G', 'D', 'A', 'E'];
+  const lines = tabStr.split('\n');
+  let unlabeledIdx = 0;
+  return lines.map(line => {
+    const trimmed = line.trim();
+    if (trimmed === '') return line;
+    // Ligne avec label de corde : "e |---5---" ou "B|---7---"
+    const labeled = line.match(/^([eEBGDA])\s*\|(.+)/);
+    if (labeled) {
+      const idx = STRING_NAMES.indexOf(labeled[1]);
+      if (idx !== -1 && !activeStrings[idx]) {
+        const pipePos = line.indexOf('|');
+        const prefix = line.substring(0, pipePos + 1);
+        const masked = labeled[2].replace(/\d+/g, m => '-'.repeat(m.length));
+        return prefix + masked;
+      }
+      return line;
+    }
+    // Ligne unlabeled (section retour) — suit l'ordre STRING_NAMES
+    if (/^[-\d]/.test(line) && !trimmed.includes('↩') && !trimmed.includes('retour')) {
+      const idx = unlabeledIdx % 6;
+      unlabeledIdx++;
+      if (!activeStrings[idx]) {
+        return line.replace(/\d+/g, m => '-'.repeat(m.length));
+      }
+      return line;
+    }
+    return line;
+  }).join('\n');
+}
+
+// Toggle une corde (stringIdx : 0=e, 1=B, 2=G, 3=D, 4=A, 5=E)
+function toggleGammeString(patId, stringIdx) {
+  if (!state.gammeActiveStrings) state.gammeActiveStrings = {};
+  if (!state.gammeActiveStrings[patId]) {
+    state.gammeActiveStrings[patId] = [true, true, true, true, true, true];
+  }
+  const current = [...state.gammeActiveStrings[patId]];
+  current[stringIdx] = !current[stringIdx];
+  if (!current.some(v => v)) return; // au moins 1 corde doit rester active
+  state.gammeActiveStrings[patId] = current;
+  saveState();
+  // Stopper l'audio si ce pattern joue
+  if (PREVIEW.patId === patId) previewStop();
+  // Mettre à jour la tab affichée
+  const pre = document.getElementById('tab-pre-' + patId);
+  if (pre) {
+    const pat = PATTERNS.find(p => p.id === patId);
+    if (pat) {
+      const rawTab = getGammeActiveTab(pat);
+      const _useStaticHigh1 = pat.directionsHigh && SETTINGS.neckPosition === 'high';
+      const neckTab = pat.disableHighNeck ? rawTab : (_useStaticHigh1 ? applyStaticTabTransform(rawTab) : transformTab(rawTab, pat.id, !!pat.special));
+      const filtered = applyGammeStringFilter(neckTab, current);
+      pre.innerHTML = tabWithSymbols(cleanTabDisplay(filtered), PREVIEW.interp);
+    }
+  }
+  // Bouton "Tout" : affiché/masqué selon si toutes les cordes sont actives
+  const allActiveNow = current.every(v => v);
+  const resetBtn = document.getElementById(`gamme-reset-btn-${patId}`);
+  if (resetBtn) resetBtn.style.display = allActiveNow ? 'none' : '';
+  // Mettre à jour l'apparence des boutons
+  ['e','B','G','D','A','E'].forEach((_, i) => {
+    const btn = document.getElementById(`gamme-str-btn-${patId}-${i}`);
+    if (btn) {
+      const active = current[i];
+      btn.style.background  = active ? 'var(--green)'  : 'rgba(0,0,0,0.1)';
+      btn.style.color       = active ? '#fff'           : '#999';
+      btn.style.borderColor = active ? 'var(--green)'  : '#ccc';
+      btn.style.opacity     = '1';
+    }
+  });
+}
+
+// Réactiver toutes les cordes
+function resetGammeStrings(patId) {
+  if (!state.gammeActiveStrings) state.gammeActiveStrings = {};
+  state.gammeActiveStrings[patId] = [true, true, true, true, true, true];
+  saveState();
+  if (PREVIEW.patId === patId) previewStop();
+  const pre = document.getElementById('tab-pre-' + patId);
+  if (pre) {
+    const pat = PATTERNS.find(p => p.id === patId);
+    if (pat) {
+      const rawTab = getGammeActiveTab(pat);
+      const _useStaticHigh2 = pat.directionsHigh && SETTINGS.neckPosition === 'high';
+      const neckTab = pat.disableHighNeck ? rawTab : (_useStaticHigh2 ? applyStaticTabTransform(rawTab) : transformTab(rawTab, pat.id, !!pat.special));
+      pre.innerHTML = tabWithSymbols(cleanTabDisplay(neckTab), PREVIEW.interp);
+    }
+  }
+  // Masquer le bouton "Tout"
+  const resetBtn = document.getElementById(`gamme-reset-btn-${patId}`);
+  if (resetBtn) resetBtn.style.display = 'none';
+  ['e','B','G','D','A','E'].forEach((_, i) => {
+    const btn = document.getElementById(`gamme-str-btn-${patId}-${i}`);
+    if (btn) {
+      btn.style.background  = 'var(--green)';
+      btn.style.color       = '#fff';
+      btn.style.borderColor = 'var(--green)';
+      btn.style.opacity     = '1';
+    }
+  });
+}
+
+// ── Direction active pour les gammes avec hasDirectionTabs ───────────────────
+function getGammeSelectedDir(patId) {
+  const pat = PATTERNS.find(p => p.id === patId);
+  if (!pat || !pat.hasDirectionTabs || !pat.directions) return null;
+  const saved = state.gammeSelectedDir && state.gammeSelectedDir[patId];
+  if (pat.versionTabs) {
+    return (saved && pat.versionTabs.includes(saved)) ? saved : pat.versionTabs[0];
+  }
+  const keys = Object.keys(pat.directions);
+  return (saved && keys.includes(saved)) ? saved : keys[0];
+}
+
+function getGammeSelectedForme(patId) {
+  const pat = PATTERNS.find(p => p.id === patId);
+  if (!pat || !pat.formeTabs) return null;
+  const saved = state.gammeSelectedForme && state.gammeSelectedForme[patId];
+  return (saved && pat.formeTabs.includes(saved)) ? saved : pat.formeTabs[0];
+}
+
+function getGammePenta(patId) {
+  return !!(state.gammaPenta && state.gammaPenta[patId]);
+}
+
+function toggleGammePenta(patId) {
+  if (!state.gammaPenta) state.gammaPenta = {};
+  state.gammaPenta[patId] = !state.gammaPenta[patId];
+  saveState();
+  if (PREVIEW.patId === patId) previewStop();
+  _refreshGammeTabAndProg(patId);
+  const btn = document.getElementById('gamme-penta-btn-' + patId);
+  if (btn) {
+    const active = state.gammaPenta[patId];
+    btn.style.background  = active ? '#e53e3e' : 'transparent';
+    btn.style.color       = active ? '#fff'    : '#e53e3e';
+    btn.style.borderColor = '#e53e3e';
+  }
+}
+
+// Retourne le tab actif (version + forme ou direction simple)
+function getGammeActiveTab(pat) {
+  if (!pat.hasDirectionTabs || !pat.directions) return getEffectiveTab(getTabForNeckPosition(pat));
+  const dirObj = (pat.directionsHigh && SETTINGS.neckPosition === 'high') ? pat.directionsHigh : pat.directions;
+  if (pat.formeTabs) {
+    const version = getGammeSelectedDir(pat.id);
+    const forme   = getGammeSelectedForme(pat.id);
+    const prefix  = getGammePenta(pat.id) ? 'Penta ' : '';
+    return dirObj[prefix + version + '|' + forme] || Object.values(dirObj)[0];
+  }
+  const dirKey = getGammeSelectedDir(pat.id);
+  return dirObj[dirKey] || Object.values(dirObj)[0];
+}
+
+function _refreshGammeTabAndProg(patId) {
+  const pat = PATTERNS.find(p => p.id === patId);
+  if (!pat) return;
+  const pre = document.getElementById('tab-pre-' + patId);
+  if (pre) {
+    const rawTab = getGammeActiveTab(pat);
+    const _useStaticHigh3 = pat.directionsHigh && SETTINGS.neckPosition === 'high';
+    const neckTab = pat.disableHighNeck ? rawTab : (_useStaticHigh3 ? applyStaticTabTransform(rawTab) : transformTab(rawTab, pat.id, !!pat.special));
+    const filtered = applyGammeStringFilter(neckTab, getGammeActiveStrings(patId));
+    pre.innerHTML = tabWithSymbols(cleanTabDisplay(filtered), PREVIEW.interp);
+  }
+  const progEl = document.getElementById('gamme-prog-' + patId);
+  if (progEl) {
+    const { html, progressPercent } = buildGammeProgGrid(pat);
+    progEl.innerHTML = html;
+    const trainEl = document.getElementById('pat-train-' + patId);
+    if (trainEl) {
+      const pctSpan = trainEl.querySelector('span:last-child');
+      if (pctSpan) pctSpan.textContent = progressPercent > 0 ? progressPercent + '%' : '';
+    }
+  }
+}
+
+// Changer la version (Base / Étendue) — mise à jour DOM ciblée
+function setGammeDirection(patId, dirKey) {
+  if (!state.gammeSelectedDir) state.gammeSelectedDir = {};
+  state.gammeSelectedDir[patId] = dirKey;
+  saveState();
+  if (PREVIEW.patId === patId) previewStop();
+  _refreshGammeTabAndProg(patId);
+  const pat = PATTERNS.find(p => p.id === patId);
+  // Boutons de version
+  if (pat && pat.versionTabs) {
+    pat.versionTabs.forEach(vk => {
+      const btn = document.getElementById('gamme-dir-btn-' + patId + '-' + vk);
+      if (btn) {
+        const isActive = vk === dirKey;
+        const dc = DIR_BTN_COLORS[vk] || { bg:'var(--blue-light)', color:'var(--blue)', border:'var(--blue)' };
+        btn.style.background  = isActive ? dc.bg          : 'transparent';
+        btn.style.color       = isActive ? dc.color       : 'var(--text2)';
+        btn.style.borderColor = isActive ? dc.border      : 'var(--border)';
+        btn.style.borderWidth = isActive ? '1.5px'        : '1px';
+        btn.style.fontWeight  = isActive ? '700'          : '600';
+      }
+    });
+  } else if (pat && pat.directions) {
+    Object.keys(pat.directions).forEach(dk => {
+      const btn = document.getElementById('gamme-dir-btn-' + patId + '-' + dk.replace(/[→↔]/g, '_'));
+      if (btn) {
+        const isActive = dk === dirKey;
+        btn.style.background  = isActive ? 'var(--blue)' : 'transparent';
+        btn.style.color       = isActive ? '#fff'        : 'var(--text2)';
+        btn.style.borderColor = isActive ? 'var(--blue)' : 'var(--border)';
+        btn.style.fontWeight  = isActive ? '700'         : '600';
+      }
+    });
+  }
+}
+
+// Changer la forme (C / A / …) — mise à jour DOM ciblée
+function setGammeForme(patId, forme) {
+  if (!state.gammeSelectedForme) state.gammeSelectedForme = {};
+  const pat = PATTERNS.find(p => p.id === patId);
+  const prev = getGammeSelectedForme(patId);
+  state.gammeSelectedForme[patId] = forme;
+  saveState();
+  if (PREVIEW.patId === patId) previewStop();
+  _refreshGammeTabAndProg(patId);
+  if (pat && pat.formeTabs) {
+    [prev, forme].forEach(fk => {
+      if (!fk) return;
+      const btn = document.getElementById('gamme-forme-btn-' + patId + '-' + fk.replace(/[↔→\s]/g, '_'));
+      if (btn) {
+        const isActive = fk === forme;
+        btn.style.background  = isActive ? 'var(--blue)' : 'transparent';
+        btn.style.color       = isActive ? '#fff'        : 'var(--text2)';
+        btn.style.borderColor = isActive ? 'var(--blue)' : 'var(--border)';
+        btn.style.fontWeight  = isActive ? '700'         : '600';
+      }
+    });
+  }
+}
+
+function getTriadeStringGroup(patId) {
+  const pat = PATTERNS.find(p => p.id === patId);
+  if (!pat || !pat.stringGroups) return null;
+  const saved = state.triadeStringGroup && state.triadeStringGroup[patId];
+  const keys = Object.keys(pat.stringGroups);
+  return (saved && keys.includes(saved)) ? saved : keys[0];
+}
+
+function getTriadeActiveTab(pat) {
+  if (!pat.stringGroups) return pat.tab;
+  const groupKey = getTriadeStringGroup(pat.id);
+  return pat.stringGroups[groupKey] || Object.values(pat.stringGroups)[0];
+}
+
+function getValidInterp(pat) {
+  if (!pat.customInterps) return PREVIEW.interp;
+  if (pat.customInterps.includes(PREVIEW.interp)) return PREVIEW.interp;
+  return pat.customInterps[0];  // Fallback à la première interprétation disponible
+}
+
+function setTriadeStringGroup(patId, groupKey) {
+  if (!state.triadeStringGroup) state.triadeStringGroup = {};
+  state.triadeStringGroup[patId] = groupKey;
+  saveState();
+  if (PREVIEW.patId === patId) previewStop();
+  const pat = PATTERNS.find(p => p.id === patId);
+  // Mettre à jour la tab affichée
+  const pre = document.getElementById('tab-pre-' + patId);
+  if (pre && pat) {
+    const rawTab = getTriadeActiveTab(pat);
+    let neckTab = rawTab;
+    if (!pat.disableHighNeck) {
+      neckTab = transformTab(rawTab, pat.id, true);
+    }
+    const filtered = neckTab;  // Pas de filtrage de cordes pour les triades
+    pre.innerHTML = tabWithSymbols(cleanTabDisplay(filtered), getValidInterp(pat));
+  }
+  // Live refresh de la progression
+  if (pat) {
+    const progEl = document.getElementById('gamme-prog-' + patId);
+    if (progEl) {
+      const { html, progressPercent } = buildGammeProgGrid(pat);
+      progEl.innerHTML = html;
+      // Mettre à jour le % affiché dans l'en-tête de la carte
+      const trainEl = document.getElementById('pat-train-' + patId);
+      if (trainEl) {
+        const pctSpan = trainEl.querySelector('span:last-child');
+        if (pctSpan) pctSpan.textContent = progressPercent > 0 ? progressPercent + '%' : '';
+      }
+    }
+  }
+  // Mettre à jour l'apparence des boutons de groupe
+  if (pat && pat.stringGroups) {
+    Object.keys(pat.stringGroups).forEach(gk => {
+      const btn = document.getElementById('triade-group-btn-' + patId + '-' + gk);
+      if (btn) {
+        const isActive = gk === groupKey;
+        btn.style.background  = isActive ? 'var(--blue)'   : 'transparent';
+        btn.style.color       = isActive ? '#fff'          : 'var(--text2)';
+        btn.style.borderColor = isActive ? 'var(--blue)'   : 'var(--border)';
+        btn.style.fontWeight  = isActive ? '700'           : '600';
+      }
+    });
+  }
+}
+
+// ─── SÉLECTEUR DE CORDE (patterns stringSelector) ────────────────────────────
+// Permet de jouer un pattern mono-corde sur n'importe quelle corde choisie
+
+function getRhythmicStringSelect(patId) {
+  const saved = state.rhythmicStringSelect && state.rhythmicStringSelect[patId];
+  if (saved) return saved;
+  // Auto-détecter la corde source dans le tab de base
+  const pat = PATTERNS.find(p => p.id === patId);
+  if (pat && pat.tab) {
+    for (const line of pat.tab.split('\n')) {
+      const m = line.match(/^([eEBGDA])\s*\|(.+)/);
+      if (m && /\d/.test(m[2])) return m[1];
+    }
+  }
+  return 'E';
+}
+
+// Remplace chaque case N par (N+12) en volant 1 tiret après la note pour compenser
+// → les colonnes et lineLength restent identiques (timing préservé)
+function applyHighNeckToTab(tabStr) {
+  return tabStr.split('\n').map(line => {
+    const m = line.match(/^([eEBGDA])\s*\|(.*)/);
+    if (!m) return line;
+    const content = m[2];
+    if (!/\d/.test(content)) return line; // ligne sans notes → inchangée
+    let result = '';
+    let i = 0;
+    while (i < content.length) {
+      if (/\d/.test(content[i])) {
+        let num = '';
+        while (i < content.length && /\d/.test(content[i])) num += content[i++];
+        const newNum = String(parseInt(num) + 12);
+        const extra = newNum.length - num.length; // chars gagnés (ex: 0→12 = +1)
+        result += newNum;
+        // Compenser en sautant 'extra' tirets immédiatement après
+        let skipped = 0;
+        while (skipped < extra && i < content.length && content[i] === '-') { i++; skipped++; }
+      } else {
+        result += content[i++];
+      }
+    }
+    return m[1] + '|' + result;
+  }).join('\n');
+}
+
+function transposeSingleStringTab(tabStr, targetStr) {
+  const lines = tabStr.split('\n');
+  let sourceStr = null, sourceContent = null;
+  for (const line of lines) {
+    const m = line.match(/^([eEBGDA])\s*\|(.+)/);
+    if (m && /\d/.test(m[2])) { sourceStr = m[1]; sourceContent = m[2]; break; }
+  }
+  if (!sourceStr || sourceStr === targetStr) return tabStr;
+  return lines.map(line => {
+    const m = line.match(/^([eEBGDA])\s*\|(.+)/);
+    if (!m) return line;
+    if (m[1] === sourceStr) return m[1] + '|' + m[2].replace(/\d+/g, n => '-'.repeat(n.length));
+    if (m[1] === targetStr) return m[1] + '|' + sourceContent;
+    return line;
+  }).join('\n');
+}
+
+// Décale TOUTES les cordes de N positions (pour accords multi-cordes transposables)
+// Ex: shift=1 (E→A) : contenu E va sur A, contenu A va sur D, reste = dashes
+function transposeShiftTab(tabStr, targetStr) {
+  const SL = ['e','B','G','D','A','E'];
+  const baseIdx = SL.indexOf('E'); // 5
+  const targetIdx = SL.indexOf(targetStr);
+  if (targetIdx === -1 || targetIdx === baseIdx) return tabStr;
+  const shift = baseIdx - targetIdx; // ex: E→A: 1, E→D: 2
+  const lines = tabStr.split('\n');
+  const contentMap = {};
+  let lineLen = 0;
+  lines.forEach(line => {
+    const m = line.match(/^([eEBGDA])\|(.*)\|$/);
+    if (m) { contentMap[m[1]] = m[2]; lineLen = Math.max(lineLen, m[2].length); }
+  });
+  const newMap = {};
+  SL.forEach((s, idx) => {
+    const src = idx + shift;
+    newMap[s] = (src >= 0 && src < SL.length)
+      ? (contentMap[SL[src]] || '-'.repeat(lineLen))
+      : '-'.repeat(lineLen);
+  });
+  return lines.map(line => {
+    const m = line.match(/^([eEBGDA])\|(.*)\|$/);
+    if (!m) return line;
+    return m[1] + '|' + newMap[m[1]] + '|';
+  }).join('\n');
+}
+
+function setRhythmicStringSelect(patId, strKey) {
+  if (!state.rhythmicStringSelect) state.rhythmicStringSelect = {};
+  state.rhythmicStringSelect[patId] = strKey;
+  saveState();
+  if (PREVIEW.patId === patId) previewStop();
+  const pat = PATTERNS.find(p => p.id === patId);
+  if (!pat) return;
+  // Mettre à jour la tab affichée
+  const pre = document.getElementById('tab-pre-' + patId);
+  if (pre) {
+    let transposed = pat.stringShift
+      ? transposeShiftTab(pat.tab, strKey)
+      : transposeSingleStringTab(pat.tab, strKey);
+    // Correction G-B : intervalle de 4 demi-tons au lieu de 5
+    if (pat.stringShift && strKey === 'G' && GB_SHIFT_PATTERN_IDS.includes(patId)) {
+      transposed = applyGBShiftCorrection(transposed);
+    }
+    if (SETTINGS.neckPosition === 'high') transposed = applyHighNeckToTab(transposed);
+    pre.innerHTML = tabWithSymbols(cleanTabDisplay(transposed), PREVIEW.interp, pat.rhythmicResolution ? { rhythmicResolution: pat.rhythmicResolution } : {});
+  }
+  // Mettre à jour les boutons
+  ['e','B','G','D','A','E'].forEach(s => {
+    const btn = document.getElementById('rhythmic-str-btn-' + patId + '-' + s);
+    if (btn) {
+      const active = s === strKey;
+      btn.style.background  = active ? 'var(--blue)' : 'transparent';
+      btn.style.color       = active ? '#fff'        : 'var(--text2)';
+      btn.style.borderColor = active ? 'var(--blue)' : 'var(--border)';
+      btn.style.fontWeight  = active ? '700'         : '600';
+    }
+  });
+}
+
+function getEffectiveTab(rawTabStr) {
+  return buildLoopExtTab(rawTabStr, SETTINGS.loopExt);
+}
+
+// ─── NOTES PAR PATTERN ────────────────────────────────────────────────────────
+
+function relativeTime(ts) {
+  const diff = (Date.now() - ts) / 1000;
+  if (diff < 90)    return "à l'instant";
+  if (diff < 3600)  return `il y a ${Math.floor(diff / 60)} min`;
+  if (diff < 86400) return `il y a ${Math.floor(diff / 3600)} h`;
+  const days = Math.floor(diff / 86400);
+  if (days < 7)     return `il y a ${days} jour${days > 1 ? 's' : ''}`;
+  return new Date(ts).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+}
+
+// Navigue vers un pattern depuis le journal
+function goToPatternFromJournal(patId) {
+  const pat = PATTERNS.find(p => p.id === patId);
+  if (!pat) return;
+  state.tab = 'patterns';
+  state.filter = 'all';
+  state.diffFilter = 'all';
+  state.openCards = { [pat.cat + 'P' + pat.num]: true };
+  state.cardDir[pat.cat + 'P' + pat.num] = pat.dir || 'U';
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('nav-patterns').classList.add('active');
+  render();
+  // Scroll vers le pattern
+  setTimeout(() => {
+    const card = document.querySelector(`[data-group="${pat.cat}P${pat.num}"]`);
+    if (card) card.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }, 100);
+}
+
+// Appelé au début du playback — enregistre le moment + BPM courant
+function recordPatPlay(patId) {
+  if (!patId) return;
+  const t = PAT_TRACE[patId] || { lastPlayed: 0, maxBpm: 0, totalLoops: 0 };
+  t.lastPlayed = Date.now();
+  // maxBpm global (compat. historique)
+  if (PREVIEW.bpm > (t.maxBpm || 0)) t.maxBpm = PREVIEW.bpm;
+
+  if (!SETTINGS.trainMode) {
+    // ── Mode libre : tracking indépendant ─────────────────────────────────
+    if (PREVIEW.bpm > (t.freeMaxBpm || 0)) t.freeMaxBpm = PREVIEW.bpm;
+    t.freeLastPlayed = Date.now();
+  } else {
+    // ── Mode entraînement : min/max/date — se réinitialise si nouveau jour ─
+    const today = new Date().toDateString();
+    const wasToday = t.trainDate && new Date(t.trainDate).toDateString() === today;
+    if (!wasToday) {
+      t.trainMin  = HCTRL.bpm;
+      t.trainMax  = HCTRL.bpm;
+      t.trainDate = Date.now();
+    } else {
+      if (!t.trainMin) t.trainMin = HCTRL.bpm;
+      if (HCTRL.bpm > (t.trainMax || 0)) t.trainMax = HCTRL.bpm;
+    }
+  }
+
+  PAT_TRACE[patId] = t;
+  savePatTrace();
+  updatePatTraceDisplay(patId);
+
+  // Ajouter une entrée au journal
+  addJournalEntry(patId, PREVIEW.bpm, SETTINGS.trainMode, SETTINGS.trainPyramide, SETTINGS.shuffleMode);
+  updateTrainDisplay(patId);
+
+  // Enregistrer la session dès qu'une preview est lancée (v1.12)
+  try { logSession(); } catch(e) { console.warn('logSession:', e); }
+}
+
+// Appelé à l'arrêt — commit les boucles jouées pendant la session
+function commitSessionTrace(patId) {
+  if (!patId) return;
+  const loops = PREVIEW.sessionLoops || 0;
+  if (loops <= 0) return;
+  const t = PAT_TRACE[patId] || { lastPlayed: 0, maxBpm: 0, totalLoops: 0 };
+  t.totalLoops = (t.totalLoops || 0) + loops;
+  PAT_TRACE[patId] = t;
+  savePatTrace();
+  updatePatTraceDisplay(patId);
+  updateTrainDisplay(patId);
+}
+
+// Met à jour le badge trace dans la carte du pattern
+function updatePatTraceDisplay(patId) {
+  const el = document.getElementById('pat-trace-' + patId);
+  if (!el) return;
+  const t = PAT_TRACE[patId];
+  if (!t || !t.lastPlayed) { el.style.display = 'none'; return; }
+  const parts = [`⏱ ${relativeTime(t.lastPlayed)}`];
+  if (t.maxBpm > 0)     parts.push(`🎯 max ${t.maxBpm} bpm`);
+  if (t.totalLoops > 0) parts.push(`🔁 ${t.totalLoops} boucle${t.totalLoops > 1 ? 's' : ''}`);
+  el.textContent = parts.join('  ·  ');
+  el.style.display = 'block';
+}
+
+// Affiche la date + BPM max sous les boutons de direction
+function updateTrainDisplay(patId) {
+  const el = document.getElementById('pat-train-' + patId);
+  if (!el) return;
+  const t = PAT_TRACE[patId];
+  if (!t || !t.lastPlayed || !t.maxBpm) {
+    el.innerHTML = '<span style="opacity:.35">— pas encore de lecture —</span>';
+    el.style.display = 'block';
+    return;
+  }
+  const dateStr = new Date(t.lastPlayed).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' });
+  el.innerHTML = `<span style="opacity:.55">${dateStr}</span>  ·  max <b>${t.maxBpm}</b> bpm`;
+  el.style.display = 'block';
+}
+
+// Rafraîchit tous les badges visibles après un render()
+function refreshAllTraceDisplays() {
+  Object.keys(PAT_TRACE).forEach(patId => {
+    updatePatTraceDisplay(patId);
+    updateTrainDisplay(patId);
+  });
+}
+
+// ─── ONBOARDING — désactivé ───────────────────────────────────────────────────
+function checkOnboarding() {}
+function dismissOnboarding() {}
+
+// ─── FEEDBACK CASE ────────────────────────────────────────────────────────────
+function checkSound(isDone) {
+  if (navigator.vibrate) navigator.vibrate(isDone ? 12 : 5);
+  try {
+    const ctx = metroCtx();
+    const osc  = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.type = 'sine';
+    osc.frequency.value = isDone ? 1047 : 660;
+    const t = ctx.currentTime;
+    gain.gain.setValueAtTime(0.12, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + (isDone ? 0.22 : 0.08));
+    osc.start(t); osc.stop(t + (isDone ? 0.23 : 0.09));
+  } catch(e) { console.warn('checkSound:', e); }
+}
+
+// ─── PROGRESS STATE ───────────────────────────────────────────────────────────
+
+function updateHeaderStatsDisplay() {
+  // Met à jour le CONTENU des stats (valeurs) — la visibilité est gérée par updateHeaderUI()
+  if (!SETTINGS.showHeaderStats) return;
+  const sessions = getSessions();
+  const { current, record } = computeStreak(sessions);
+  const total = sessions.length;
+  const streak = document.getElementById('stats-streak');
+  const rec    = document.getElementById('stats-record');
+  const tot    = document.getElementById('stats-total');
+  if (streak) streak.textContent = current;
+  if (rec)    rec.textContent    = record;
+  if (tot)    tot.textContent    = total;
+}
+
+// ─── HEADER CONTROLS ─────────────────────────────────────────────────────────
+const HCTRL = { mode:'metro', patId:null, patName:'', bpm:60 };
+
+function headerPlayToggle() {
+  if (HCTRL.mode === 'preview' && HCTRL.patId) {
+    previewPlay(HCTRL.patId);   // toggle: stop si déjà en lecture, sinon joue
+  } else {
+    if (METRO.running && METRO.patId === 'global') metroStop();
+    else headerMetroStart();
+  }
+  syncHeaderPlay();
+}
+
+function headerMetroStart() {
+  if (PREVIEW.patId) previewStop();
+  metroStop(false);
+  const ctx = metroCtx();
+
+  METRO.bpm = HCTRL.bpm;
+  METRO.patId = 'global';
+  METRO.running = true;
+  METRO.nextBeat = ctx.currentTime + 0.1;
+  METRO.timer = setInterval(metroSchedule, 50);
+}
+
+function headerMetroSolo() {
+  HCTRL.mode = 'metro';
+  if (METRO.running && METRO.patId === 'global') metroStop();
+  else headerMetroStart();
+  syncHeaderPlay();
+}
+
+function headerBpmChange(delta) {
+  HCTRL.bpm = Math.max(20, Math.min(200, HCTRL.bpm + delta));
+  const el = document.getElementById('header-bpm-val');
+  if (el) el.textContent = HCTRL.bpm;
+  playBip();
+  if (METRO.running && METRO.patId === 'global') METRO.bpm = HCTRL.bpm;
+  if (PREVIEW.patId) {
+    PREVIEW.bpm = HCTRL.bpm;
+    const id = PREVIEW.patId;
+    previewStop();
+    setTimeout(() => previewPlay(id), 40);
+  }
+}
+
+function syncHeaderPlay() {
+  const btn = document.getElementById('header-play-btn');
+  const metroBtn = document.getElementById('header-metro-solo-btn');
+  const lbl = document.getElementById('header-mode-lbl');
+  const playing = (HCTRL.mode === 'preview' && PREVIEW.patId === HCTRL.patId)
+    || (HCTRL.mode === 'metro' && METRO.running && METRO.patId === 'global');
+  // Update play/stop button if it exists
+  if (btn) {
+    btn.innerHTML = playing
+      ? '<svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor"><rect width="9" height="9" rx="1"/></svg>'
+      : '<svg width="9" height="10" viewBox="0 0 9 10" fill="currentColor"><path d="M0 0l9 5-9 5z"/></svg>';
+    btn.classList.toggle('running', playing);
+  }
+  // Set active state on metronome solo button when global metro is running
+  const metroActive = METRO.running && METRO.patId === 'global';
+  if (metroBtn) {
+    if (metroActive) metroBtn.classList.add('active');
+    else metroBtn.classList.remove('active');
+  }
+  if (lbl) lbl.textContent = HCTRL.mode === 'preview'
+    ? (HCTRL.patName || 'Preview')
+    : 'Métro';
+}
+
+// ── Bouton "Train." header — 1 clic = train, 2 clics = pyramide, 3 = OFF ──────
+function trainBtnClick() {
+  if (!SETTINGS.trainMode) {
+    // OFF → Train ON
+    SETTINGS.trainMode = true;
+    SETTINGS.trainPyramide = false;
+    PREVIEW._trainNeedsReset = true;
+    HCTRL.bpm = SETTINGS.trainBpmStart;
+    const hbpm = document.getElementById('header-bpm-val');
+    if (hbpm) hbpm.textContent = HCTRL.bpm;
+  } else if (!SETTINGS.trainPyramide) {
+    // Train ON → Pyramide ON
+    SETTINGS.trainPyramide = true;
+  } else {
+    // Pyramide ON → tout OFF
+    SETTINGS.trainMode = false;
+    SETTINGS.trainPyramide = false;
+    PREVIEW._trainNeedsReset = false;
+  }
+  saveSettings();
+  syncTrainBtnUI();
+  syncTrainModeUI();
+  try { if (navigator.vibrate) navigator.vibrate(30); } catch(ex){}
+  if (document.getElementById('settings-overlay')) { closeSettings(); setTimeout(() => openSettings('tempo'), 50); }
+}
+
+function syncTrainBtnUI() {
+  const btn = document.getElementById('header-train-btn');
+  if (!btn) return;
+  if (!SETTINGS.trainMode) {
+    btn.style.color = 'rgba(244,238,226,.45)';
+    btn.style.borderColor = 'rgba(244,238,226,.25)';
+    btn.style.background = 'transparent';
+  } else if (!SETTINGS.trainPyramide) {
+    btn.style.color = '#4dd0e1';
+    btn.style.borderColor = 'rgba(77,208,225,.4)';
+    btn.style.background = 'rgba(77,208,225,.12)';
+  } else {
+    btn.style.color = 'var(--orange)';
+    btn.style.borderColor = 'rgba(212,98,46,.4)';
+    btn.style.background = 'rgba(212,98,46,.12)';
+  }
+}
+
+// ── Gestion centralisée du header (visibility, styling, paliers) ───────────────
+function updateHeaderUI() {
+  // Helper : affiche/cache un élément par ID
+  const setVisible = (id, visible) => {
+    const el = document.getElementById(id);
+    if (el) el.classList.toggle('hidden', !visible);
+  };
+
+  // ── ROW 1 : Mid/High + Stats ──────────────────────────────────────────────
+  const neckBtn = document.getElementById('neck-toggle-btn');
+  if (neckBtn) {
+    neckBtn.classList.toggle('hidden', !SETTINGS.showNeckBtn);
+    neckBtn.textContent = SETTINGS.neckPosition === 'high' ? 'HI' : 'MID';
+    neckBtn.style.background   = SETTINGS.neckPosition === 'high' ? 'var(--orange)' : 'rgba(244,238,226,.08)';
+    neckBtn.style.borderColor  = SETTINGS.neckPosition === 'high' ? 'var(--orange)' : 'rgba(244,238,226,.12)';
+    neckBtn.style.color        = SETTINGS.neckPosition === 'high' ? '#fff' : 'var(--header-text)';
+  }
+  const statsEl = document.getElementById('header-stats');
+  if (statsEl) {
+    statsEl.style.display = SETTINGS.showHeaderStats ? 'flex' : 'none';
+    if (SETTINGS.showHeaderStats) updateHeaderStatsDisplay();
+  }
+  // Quand les stats sont visibles, masquer le texte "Dico Pattern / le dictionnaire de patterns"
+  // pour éviter que la Row 1 passe sur deux lignes
+  const brandText = document.getElementById('brand-text');
+  if (brandText) brandText.classList.toggle('hidden', !!SETTINGS.showHeaderStats);
+
+  // Bouton groupe de cordes (Row 1) — couleur propre à chaque groupe
+  const stringBtn = document.getElementById('string-group-btn');
+  if (stringBtn) {
+    stringBtn.classList.toggle('hidden', !SETTINGS.showStringBtn);
+    const STRING_COL = { DGBE:'#56864A', ADGB:'#1a7fa6', EADG:'#D4622E' };
+    const col = STRING_COL[SETTINGS.stringGroup] || 'rgba(244,238,226,.08)';
+    stringBtn.textContent       = SETTINGS.stringGroup;
+    stringBtn.style.background  = col;
+    stringBtn.style.borderColor = col;
+    stringBtn.style.color       = '#fff';
+  }
+
+  // Bouton Shuffle (Row 1)
+  const shuffleBtn = document.getElementById('shuffle-toggle-btn');
+  if (shuffleBtn) {
+    shuffleBtn.classList.toggle('hidden', !SETTINGS.showShuffleBtn);
+    shuffleBtn.classList.toggle('active', SETTINGS.shuffleMode);
+  }
+  // Badge Shuffle — masqué, le bouton SH le remplace
+  const badge = document.getElementById('header-shuffle-badge');
+  if (badge) badge.style.display = 'none';
+
+  // ── ROW 2 : visibilité individuelle des boutons ───────────────────────────
+  setVisible('header-train-btn',     SETTINGS.showTrain);
+  setVisible('header-countin-btn',   SETTINGS.showCountin);
+  setVisible('header-click-btn',     SETTINGS.showClick);
+  setVisible('subdiv-cycle-btn',     SETTINGS.showSubdivBtn);
+  setVisible('header-metro-solo-btn', SETTINGS.showMetroSolo);
+
+  // ── PALIERS ADAPTATIFS : compte les boutons texte visibles dans la row 2 ──
+  const textBtnsVisible = [SETTINGS.showTrain, SETTINGS.showCountin, SETTINGS.showClick, SETTINGS.showSubdivBtn].filter(Boolean).length;
+  const metroRow = document.querySelector('.metro-row');
+  if (metroRow) {
+    metroRow.classList.remove('hd-large', 'hd-normal', 'hd-compact');
+    if      (textBtnsVisible <= 1) metroRow.classList.add('hd-large');
+    else if (textBtnsVisible === 2) metroRow.classList.add('hd-normal');
+    else                            metroRow.classList.add('hd-compact');
+  }
+}
+
+function toggleNeckPosition() {
+  SETTINGS.neckPosition = SETTINGS.neckPosition === "mid" ? "high" : "mid";
+  saveSettings();
+  updateHeaderUI();
+  previewStop();
+  render();
+  try { if (navigator.vibrate) navigator.vibrate([40, 20, 40]); } catch(ex){}
+}
+
+function toggleShowNeckBtn() {
+  SETTINGS.showNeckBtn = !SETTINGS.showNeckBtn;
+  saveSettings();
+  updateHeaderUI();
+}
+
+// Gestion unifiée de tous les toggles du header
+function toggleHeaderEl(key, value) {
+  SETTINGS[key] = value;
+  saveSettings();
+  updateHeaderUI();
+}
+
+// Cycle DGBE → ADGB → EADG → DGBE …
+function cycleStringGroup() {
+  const order = ['DGBE', 'ADGB', 'EADG'];
+  const idx  = order.indexOf(SETTINGS.stringGroup);
+  const next = order[(idx + 1) % order.length];
+  setStringGroup(next); // sauvegarde + refreshSettingsSeg + applySettingsAndRender
+}
+
+// Cycle ÷2 → ÷3 → ÷4 → ÷6 → ÷2 …
+function cycleClickSubdiv() {
+  const order = [2, 3, 4, 6];
+  const idx = order.indexOf(SETTINGS.clickSubdiv);
+  const next = order[(idx + 1) % order.length];
+  setClickSubdiv(next); // audio.js : sauvegarde + syncSubdivUI + redémarre le clic
+}
+function syncTrainModeUI() {
+  // BPM val passe en cyan si mode entraînement actif
+  const bpmEl = document.getElementById('header-bpm-val');
+  if (bpmEl) { const atMax = SETTINGS.trainMode && HCTRL.bpm >= SETTINGS.trainBpmMax; bpmEl.style.color = SETTINGS.trainMode ? (atMax ? '#ef5350' : '#4dd0e1') : ''; }
+}
+
+// ─── SAISIE BPM NUMÉRIQUE — double-clic / double-tap ─────────────────────────
+let _bpmTapCount = 0, _bpmTapTimer = null;
+function bpmValTouchStart(e) {
+  e.preventDefault(); // évite que le dblclick mobile ne fire aussi
+  _bpmTapCount++;
+  if (_bpmTapTimer) clearTimeout(_bpmTapTimer);
+  if (_bpmTapCount >= 2) {
+    _bpmTapCount = 0; _bpmTapTimer = null;
+    bpmEditStart();
+    return;
+  }
+  _bpmTapTimer = setTimeout(() => { _bpmTapCount = 0; _bpmTapTimer = null; }, 400);
+}
+function bpmValTouchEnd() { /* stopper la propagation des artefacts */ }
+
+function bpmEditStart() {
+  const span = document.getElementById('header-bpm-val');
+  const inp  = document.getElementById('bpm-edit-input');
+  if (!span || !inp || span._editing) return;
+  span._editing = true;
+  inp._prevVal  = HCTRL.bpm;
+  inp.value     = HCTRL.bpm;
+  span.style.display = 'none';
+  inp.style.display  = '';
+  // iOS : focus direct dans la même pile d'exécution que le geste → clavier s'ouvre
+  inp.focus();
+  inp.select();
+}
+
+function bpmEditKeydown(e) {
+  if (e.key === 'Enter')  e.target.blur();
+  if (e.key === 'Escape') {
+    const span = document.getElementById('header-bpm-val');
+    const inp  = document.getElementById('bpm-edit-input');
+    if (!span || !inp) return;
+    inp.style.display  = 'none';
+    span.style.display = '';
+    span._editing = false;
+  }
+}
+
+function bpmEditCommit() {
+  const span = document.getElementById('header-bpm-val');
+  const inp  = document.getElementById('bpm-edit-input');
+  if (!span || !inp || !span._editing) return;
+  const fallback = inp._prevVal || HCTRL.bpm;
+  const v = Math.max(20, Math.min(240, parseInt(inp.value) || fallback));
+  inp.style.display  = 'none';
+  span.style.display = '';
+  span.textContent   = v;
+  span._editing      = false;
+  HCTRL.bpm = v;
+  if (METRO.running && METRO.patId === 'global') METRO.bpm = v;
+  if (PREVIEW.patId) {
+    PREVIEW.bpm = v;
+    const id = PREVIEW.patId;
+    previewStop();
+    setTimeout(() => previewPlay(id), 40);
+  }
+  syncTrainModeUI();
+}
+
+// Tap sur la tab → lecture/stop
+function tabWrapClick(patId) { previewPlay(patId); }
+
+// ─── CHRONO ───────────────────────────────────────────────────────────────────
+const CHRONO = { running:false, elapsed:0, startAt:0, timer:null, lastBeep:-1 };
+
+// Messages popup chrono
+const CHRONO_MSGS_5 = [
+  "Déjà 5 min 🎯 C'est une bonne session !",
+  "5 minutes — le geste commence à s'ancrer 💪",
+  "Beau travail ! 5 min de patterns, ça compte 🎸",
+  "5 min dans la zone. Tu gères.",
+];
+const CHRONO_MSGS_10 = [
+  "10 min 🏁 Il est temps de passer à autre chose — arpèges, chansons…",
+  "Dico Pattern : à consommer avec modération 😉 10 min régulières > 1h par mois.",
+  "10 min c'est parfait ! Maintenant joue de la musique 🎵",
+  "Bravo ! 10 min de patterns, change d'activité — ton cerveau a besoin de digérer.",
+];
+
+function showChronoPopup(msg) {
+  let ex = document.getElementById('chrono-popup');
+  if (ex) ex.remove();
+  const el = document.createElement('div');
+  el.id = 'chrono-popup';
+  el.className = 'chrono-popup';
+  el.textContent = msg;
+  document.getElementById('app').appendChild(el);
+  setTimeout(() => el.classList.add('visible'), 50);
+  setTimeout(() => { el.classList.remove('visible'); setTimeout(() => el.remove(), 400); }, 5500);
+}
+
+function chronoBeep() {
+  try {
+    const ctx = metroCtx();
+    // Deux bips courts pour signaler 5 min
+    [0, 0.18].forEach(offset => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain); gain.connect(ctx.destination);
+      osc.frequency.value = 660;
+      const t = ctx.currentTime + offset;
+      gain.gain.setValueAtTime(0.4, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
+      osc.start(t); osc.stop(t + 0.13);
+    });
+  } catch(e) { console.warn('chronoBeep:', e); }
+}
+
+function chronoTick() {
+  const total = CHRONO.elapsed + (Date.now() - CHRONO.startAt);
+  const s = Math.floor(total / 1000);
+  const mm = String(Math.floor(s / 60)).padStart(2,'0');
+  const ss = String(s % 60).padStart(2,'0');
+  const el = document.getElementById('chrono-time');
+  if (el) el.textContent = mm + ':' + ss;
+  // Flash rouge + popup à 5 et 10 minutes (sans bip sonore)
+  const beepAt = Math.floor(s / 300);
+  if (beepAt > 0 && beepAt !== CHRONO.lastBeep) {
+    CHRONO.lastBeep = beepAt;
+    if (el) { el.style.color = 'var(--red)'; setTimeout(() => { if (el) el.style.color = 'var(--blue)'; }, 5000); }
+    if (beepAt <= 2) {
+      const msgs = beepAt === 1 ? CHRONO_MSGS_5 : CHRONO_MSGS_10;
+      showChronoPopup(msgs[Math.floor(Math.random() * msgs.length)]);
+    }
+  }
+}
+
+function chronoToggle() {
+  if (CHRONO.running) {
+    clearInterval(CHRONO.timer);
+    CHRONO.elapsed += Date.now() - CHRONO.startAt;
+    CHRONO.running = false;
+    const btn = document.getElementById('chrono-play');
+    if (btn) btn.innerHTML = '<svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor"><path d="M0 0l10 6-10 6z"/></svg>';
+  } else {
+    CHRONO.startAt = Date.now();
+    CHRONO.running = true;
+    CHRONO.timer = setInterval(chronoTick, 500);
+    const btn = document.getElementById('chrono-play');
+    if (btn) btn.innerHTML = '<svg width="11" height="13" viewBox="0 0 11 13" fill="currentColor"><rect x="0" y="0" width="3.5" height="13" rx="1"/><rect x="7.5" y="0" width="3.5" height="13" rx="1"/></svg>';
+  }
+}
+
+function chronoReset() {
+  clearInterval(CHRONO.timer);
+  CHRONO.running = false;
+  CHRONO.elapsed = 0;
+  CHRONO.lastBeep = -1;
+  const el  = document.getElementById('chrono-time');
+  if (el) { el.textContent = '00:00'; el.style.color = 'var(--blue)'; }
+  const btn = document.getElementById('chrono-play');
+  if (btn) btn.textContent = '▶';
+}
+
+
+// ─── TABS ─────────────────────────────────────────────────────────────────────
+function showTab(tab) {
+  // Double-tap sur l'onglet actif : ferme les cartes, stop la preview, reset vers métronome
+  if (tab === state.tab && (tab === 'patterns' || tab === 'gammes' || tab === 'arpeges')) {
+    previewStop();
+    state.openCards = {};
+    HCTRL.mode = 'metro';
+    syncHeaderPlay();
+    render();
+    return;
+  }
+  if (METRO.running && tab !== state.tab) { metroStop(false); }
+  state.tab = tab;
+  // Retour sur Journal → toujours afficher Historique en premier
+  if (tab === 'journal') journalSubTab = 'journal';
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('nav-'+tab).classList.add('active');
+  render();
+  updateHeaderStatsDisplay();
+}
+
+
+// ─── TEMPO PRESETS ────────────────────────────────────────────────────────────
+function applyTempoPreset(key) {
+  const preset = SETTINGS.tempoPresets[key];
+  if (!Number.isFinite(preset)) return;
+  HCTRL.bpm = Math.max(20, Math.min(200, preset));
+  PREVIEW.bpm = HCTRL.bpm;
+  const el = document.getElementById('header-bpm-val');
+  if (el) el.textContent = HCTRL.bpm;
+  if (navigator.vibrate) navigator.vibrate(18);
+  // Si une preview est en cours, la relancer au nouveau BPM immédiatement
+  if (PREVIEW.patId) {
+    const id = PREVIEW.patId;
+    previewStop();
+    setTimeout(() => previewPlay(id), 40);
+  }
+}
+
+function setTempoPreset(key, val) {
+  const n = parseInt(val);
+  if (!Number.isFinite(n) || n < 20 || n > 200) return;
+  SETTINGS.tempoPresets[key] = n;
+  saveSettings();
+}
+
+// ─── SETTINGS MODAL ───────────────────────────────────────────────────────────
+let settingsTab = 'son'; // onglet actif du panneau réglages
+
+let _tempoModified = false;
+function openSettings(tab) {
+  if (document.getElementById('settings-overlay')) return;
+  if (tab) settingsTab = tab;
+  const html = `
+  <div id="settings-overlay" class="settings-overlay" onclick="closeSettingsIfBackdrop(event)">
+    <div class="settings-modal" role="dialog" aria-label="Réglages">
+      <div class="modal-head">
+        <div>
+          <h2 style="display:flex;align-items:center;gap:7px">
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            Réglages
+          </h2>
+        </div>
+        <button class="settings-close" onclick="closeSettings()" aria-label="Fermer">×</button>
+      </div>
+
+      <!-- ONGLETS -->
+      <div class="seg tabs-settings" id="seg-settings-tabs" style="margin-bottom:16px">
+        <button data-val="son" aria-label="Paramètres son: volume métronome, sample guitare"      class="${settingsTab==='son'?'active':''}"      onclick="switchSettingsTab('son')" style="display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 4px">
+          <svg width="12" height="12" viewBox="0 0 12 12" fill="currentColor"><rect x="1" y="5" width="2.5" height="7" rx="1.2"/><rect x="4.75" y="2" width="2.5" height="10" rx="1.2"/><rect x="8.5" y="0" width="2.5" height="12" rx="1.2"/></svg>
+          Son
+        </button>
+        <button data-val="tempo" aria-label="Paramètres tempo: presets et tempo d'entraînement"    class="${settingsTab==='tempo'?'active':''}"    onclick="switchSettingsTab('tempo')" style="display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 4px">
+          <svg width="12" height="13" viewBox="0 0 12 13" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"><path d="M2 13L6 1l4 12"/><line x1="2" y1="13" x2="10" y2="13"/><line x1="6" y1="5" x2="9.5" y2="7.5"/></svg>
+          Tempo
+        </button>
+        <button data-val="affichage" aria-label="Paramètres affichage: groupe de cordes et position neck" class="${settingsTab==='affichage'?'active':''}" onclick="switchSettingsTab('affichage')" style="display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 4px">
+          <svg width="13" height="11" viewBox="0 0 13 11" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="0.7" y="0.7" width="11.6" height="7.6" rx="1.3"/><line x1="4.5" y1="10" x2="8.5" y2="10"/><line x1="6.5" y1="8.3" x2="6.5" y2="10"/></svg>
+          Affichage
+        </button>
+        <button data-val="header" aria-label="Personnaliser le header" class="${settingsTab==='header'?'active':''}" onclick="switchSettingsTab('header')" style="display:flex;align-items:center;justify-content:center;gap:5px;padding:9px 4px">
+          <svg width="13" height="11" viewBox="0 0 13 11" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><rect x="0.7" y="0.7" width="11.6" height="3" rx="1"/><rect x="0.7" y="5.3" width="7" height="2" rx="1"/><rect x="0.7" y="8.7" width="4" height="2" rx="1"/></svg>
+          Header
+        </button>
+      </div>
+
+      <!-- ═══ PANE : SON — Volumes / Son de preview ═══ -->
+      <div id="pane-son" style="display:${settingsTab==='son'?'block':'none'}">
+        <div class="group">
+          <label class="group-label">Volumes</label>
+          <div class="vol-ctrl">
+            <div class="vol-head">
+              <span class="vol-label">Tablature</span>
+              <span class="vol-val" id="pat-vol-val" style="color:var(--blue)">${SETTINGS.patVolume}%</span>
+            </div>
+            <div class="vol-body">
+              <div class="vol-bar"><div class="vol-bar-fill" id="pat-vol-bar" style="width:${SETTINGS.patVolume}%;background:var(--blue)"></div></div>
+              <button class="control-btn cb-sm" onclick="adjustVolume('patVolume',-5)" aria-label="Baisser volume tablature">−</button>
+              <button class="control-btn cb-sm" onclick="adjustVolume('patVolume',+5)" aria-label="Monter volume tablature">+</button>
+            </div>
+          </div>
+          <div class="vol-ctrl">
+            <div class="vol-head">
+              <span class="vol-label">Clic métronome</span>
+              <span class="vol-val" id="click-vol-val" style="color:var(--orange)">${SETTINGS.clickVolume}%</span>
+            </div>
+            <div class="vol-body">
+              <div class="vol-bar"><div class="vol-bar-fill" id="click-vol-bar" style="width:${SETTINGS.clickVolume}%;background:var(--orange)"></div></div>
+              <button class="control-btn cb-sm" onclick="adjustVolume('clickVolume',-5)" aria-label="Baisser volume clic">−</button>
+              <button class="control-btn cb-sm" onclick="adjustVolume('clickVolume',+5)" aria-label="Monter volume clic">+</button>
+            </div>
+          </div>
+          <div class="hint">Régle l'équilibre entre le son de la tab et le clic du métronome.</div>
+        </div>
+
+        <div class="group">
+          <label class="group-label">Son de preview</label>
+          <div class="seg" id="seg-preview-sound">
+            ${PREVIEW_SOUND_KEYS.map(k => `
+              <button data-val="${k}" class="${SETTINGS.previewSound===k?'active':''}" onclick="setPreviewSound('${k}')">${PREVIEW_SOUND_LABELS[k]}</button>
+            `).join('')}
+          </div>
+          <div class="hint">Doux = son original · Piano = 5 harmoniques · Guitare = corde plumée (Karplus-Strong) · Mix = rotation auto à chaque boucle.</div>
+        </div>
+      </div>
+
+      <!-- ═══ PANE : TEMPO — Presets / Mode entraînement ═══ -->
+      <div id="pane-tempo" style="display:${settingsTab==='tempo'?'block':'none'}">
+        <div class="group">
+          <label class="group-label">Presets tempo</label>
+          <div style="display:flex;flex-direction:column;gap:12px">
+            ${TEMPOS.map(t => '<div class="vol-ctrl" style="margin-bottom:0">'
+              + '<div class="vol-head">'
+              + '<span class="vol-label" style="display:flex;align-items:center;gap:6px">' + t.icon + '<span style="color:' + t.color + '">' + t.range + '</span></span>'
+              + '<span class="vol-val" id="preset-' + t.key + '-val" style="color:' + t.color + '">' + SETTINGS.tempoPresets[t.key] + '</span>'
+              + '</div>'
+              + '<div class="vol-body">'
+              + '<div class="vol-bar"><div class="vol-bar-fill" id="preset-' + t.key + '-bar" style="width:' + Math.max(0, Math.min(100, Math.round((SETTINGS.tempoPresets[t.key] - t.rangeMin) / (t.rangeMax - t.rangeMin) * 100))) + '%;background:' + t.color + '"></div></div>'
+              + '<button class="control-btn cb-sm" onclick="adjustTempoPreset(\'' + t.key + '\',-5)" aria-label="Baisser ' + t.range + '">−</button>'
+              + '<button class="control-btn cb-sm" onclick="adjustTempoPreset(\'' + t.key + '\',+5)" aria-label="Monter ' + t.range + '">+</button>'
+              + '</div></div>'
+            ).join('')}
+          </div>
+          <div class="hint">Toucher une ligne dans le tableau règle directement le BPM.</div>
+        </div>
+
+        <div class="group">
+          <label class="group-label">Valeur rythmique de référence</label>
+          <div style="display:flex;gap:6px">
+            <button class="subdiv-btn" data-subdiv="2" onclick="setClickSubdiv(2)" aria-label="Croche – 8" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:8px;border:1.5px solid rgba(28,45,51,.18);background:rgba(28,45,51,.07);color:var(--text2);cursor:pointer;transition:all .12s;${SETTINGS.clickSubdiv===2 ? 'border-color:#1a7fa6;background:#1a7fa6;color:#fff;' : ''}">
+              <span style="font-size:14px;font-weight:800;line-height:1.1">8</span>
+              <span style="font-size:9px;font-weight:500;opacity:.75">croche</span>
+            </button>
+            <button class="subdiv-btn" data-subdiv="3" onclick="setClickSubdiv(3)" aria-label="Triolet – 3:8" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:8px;border:1.5px solid rgba(28,45,51,.18);background:rgba(28,45,51,.07);color:var(--text2);cursor:pointer;transition:all .12s;${SETTINGS.clickSubdiv===3 ? 'border-color:#56864A;background:#56864A;color:#fff;' : ''}">
+              <span style="font-size:14px;font-weight:800;line-height:1.1">3:8</span>
+              <span style="font-size:9px;font-weight:500;opacity:.75">triolet</span>
+            </button>
+            <button class="subdiv-btn" data-subdiv="4" onclick="setClickSubdiv(4)" aria-label="Double croche – 16" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:8px;border:1.5px solid rgba(28,45,51,.18);background:rgba(28,45,51,.07);color:var(--text2);cursor:pointer;transition:all .12s;${SETTINGS.clickSubdiv===4 ? 'border-color:#C8952A;background:#C8952A;color:#fff;' : ''}">
+              <span style="font-size:14px;font-weight:800;line-height:1.1">16</span>
+              <span style="font-size:9px;font-weight:500;opacity:.75">double croche</span>
+            </button>
+            <button class="subdiv-btn" data-subdiv="6" onclick="setClickSubdiv(6)" aria-label="Sextolet – 6:16" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:8px;border:1.5px solid rgba(28,45,51,.18);background:rgba(28,45,51,.07);color:var(--text2);cursor:pointer;transition:all .12s;${SETTINGS.clickSubdiv===6 ? 'border-color:#7B5EA7;background:#7B5EA7;color:#fff;' : ''}">
+              <span style="font-size:14px;font-weight:800;line-height:1.1">6:16</span>
+              <span style="font-size:9px;font-weight:500;opacity:.75">sextolet</span>
+            </button>
+          </div>
+          <div class="hint">Choisis le découpage rythmique du clic métronome.</div>
+        </div>
+
+        <div class="group">
+          <label class="group-label">Shuffle / Swing</label>
+          <div class="switch-row" style="border-bottom:none;padding-top:0">
+            <div>
+              <div class="sr-label">Mode swing</div>
+              <div class="sr-hint">Interprétation longue-courte (swing 0.67 = triolet)</div>
+            </div>
+            <button class="toggle-switch tog-orange ${SETTINGS.shuffleMode ? 'on' : ''}" role="switch" aria-checked="${!!SETTINGS.shuffleMode}" aria-label="Mode swing" onclick="toggleShuffleMode()"></button>
+          </div>
+          <div class="hint">La progression est trackée séparément — nouveau défi, nouvelle vision.</div>
+        </div>
+
+        <div class="group">
+          <label class="group-label">Mode Entraînement</label>
+          <div class="switch-row" style="border-bottom:none;padding-top:0;margin-bottom:${SETTINGS.trainMode ? '6px' : '0'}">
+            <div>
+              <div class="sr-label">Tempo progressif</div>
+              <div class="sr-hint">Augmente le tempo automatiquement au fil des boucles</div>
+            </div>
+            <button class="toggle-switch tog-green ${SETTINGS.trainMode ? 'on' : ''}" role="switch" aria-checked="${!!SETTINGS.trainMode}" aria-label="Mode entraînement" onclick="toggleTrainMode()"></button>
+          </div>
+          ${SETTINGS.trainMode ? `
+          <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">
+            <div class="control-row">
+              <span class="control-label">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="color:#4dd0e1">
+                  <circle cx="12" cy="12" r="10" stroke="currentColor" stroke-width="1.5"/>
+                  <line x1="12" y1="7" x2="12" y2="12" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  <line x1="12" y1="12" x2="15" y2="15" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                </svg>
+                Tempo de départ
+              </span>
+              <div class="stepper-grp">
+                <button onclick="adjustTrainBpm('start',-5)" aria-label="Baisser tempo de départ">−</button>
+                <span class="sg-val" id="train-bpmstart-val" style="color:#4dd0e1">${SETTINGS.trainBpmStart}</span>
+                <button onclick="adjustTrainBpm('start',+5)" aria-label="Monter tempo de départ">+</button>
+              </div>
+            </div>
+            <div class="control-row">
+              <span class="control-label">
+                <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="color:var(--red)">
+                  <rect x="4" y="5" width="16" height="14" rx="2" stroke="currentColor" stroke-width="1.5"/>
+                  <line x1="8" y1="5" x2="8" y2="3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  <line x1="16" y1="5" x2="16" y2="3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/>
+                  <line x1="4" y1="9" x2="20" y2="9" stroke="currentColor" stroke-width="1.5"/>
+                </svg>
+                Tempo plafond
+              </span>
+              <div class="stepper-grp">
+                <button onclick="adjustTrainBpm('max',-5)" aria-label="Baisser tempo plafond">−</button>
+                <span class="sg-val" id="train-bpmmax-val" style="color:var(--red)">${SETTINGS.trainBpmMax}</span>
+                <button onclick="adjustTrainBpm('max',+5)" aria-label="Monter tempo plafond">+</button>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--text2);margin-bottom:5px">Pas BPM</div>
+              <div class="seg" id="seg-train-step">
+                ${[1,2,3,5,10].map(n => `<button data-val="${n}" class="${SETTINGS.trainBpmStep===n?'active':''}" onclick="setTrainBpmStep(${n})">+${n}</button>`).join('')}
+              </div>
+            </div>
+            <div>
+              <div style="font-size:11px;color:var(--text2);margin-bottom:5px">Toutes les N boucles</div>
+              <div class="seg" id="seg-train-every">
+                ${[1,2,3,4,5].map(n => `<button data-val="${n}" class="${SETTINGS.trainLoopEvery===n?'active':''}" onclick="setTrainLoopEvery(${n})">${n}</button>`).join('')}
+              </div>
+            </div>
+            <div class="switch-row" style="margin-top:8px;padding:10px;border-bottom:none;border-radius:8px;background:rgba(212,98,46,.06)">
+              <div>
+                <div class="sr-label" style="color:var(--orange)">Mode pyramide</div>
+                <div class="sr-hint">Au plafond, le tempo redescend jusqu'au départ.</div>
+              </div>
+              <button class="toggle-switch tog-orange ${SETTINGS.trainPyramide ? 'on' : ''}" role="switch" aria-checked="${!!SETTINGS.trainPyramide}" aria-label="Mode pyramide" onclick="toggleTrainPyramide(!SETTINGS.trainPyramide); this.classList.toggle('on'); this.setAttribute('aria-checked', !!SETTINGS.trainPyramide)"></button>
+            </div>
+          </div>` : ''}
+          ${SETTINGS.trainMode ? `<div class="hint">+${SETTINGS.trainBpmStep} BPM toutes les ${SETTINGS.trainLoopEvery} boucle${SETTINGS.trainLoopEvery > 1 ? 's' : ''}. Le tempo repart à ${SETTINGS.trainBpmStart} bpm à chaque nouveau pattern.</div>` : ''}
+        </div>
+      </div>
+
+      <!-- ═══ PANE : AFFICHAGE — Cordes / Case / Loop étendu ═══ -->
+      <div id="pane-affichage" style="display:${settingsTab==='affichage'?'block':'none'}">
+        <div class="group">
+          <label class="group-label">Loop étendu</label>
+          <div class="seg" id="seg-loop-ext">
+            ${[-1,0,1,2,3,4].map(n => `
+              <button data-val="${n}" class="${SETTINGS.loopExt===n?'active':''}" onclick="setLoopExt(${n})">${n === -1 ? '−1' : n === 0 ? 'Base' : '+'+n}</button>
+            `).join('')}
+          </div>
+          <div class="hint">−1 = retour même niveau · Base = pattern original · +1 à +4 = extension en pyramide. Affecte les tabs et la preview audio.</div>
+        </div>
+
+        <div class="group">
+          <label class="group-label">Groupe de cordes</label>
+          <div class="seg" id="seg-string-group">
+            ${['DGBE','ADGB','EADG'].map(g => `
+              <button data-val="${g}" class="${SETTINGS.stringGroup===g?'active':''}" onclick="setStringGroup('${g}')">${g}</button>
+            `).join('')}
+          </div>
+          <div class="hint">DGBE = version de base (cordes 1 à 4). ADGB et EADG déplacent le pattern vers les cordes graves.</div>
+        </div>
+
+        <div class="group">
+          <label class="group-label">Position du manche</label>
+          <div class="seg" style="margin-bottom:8px">
+            <button data-position="mid" onclick="setNeckPosition('mid')"
+              class="neck-btn ${SETTINGS.neckPosition === 'mid' ? 'active' : ''}">
+              Mid-neck
+            </button>
+            <button data-position="high" onclick="setNeckPosition('high')"
+              class="neck-btn ${SETTINGS.neckPosition === 'high' ? 'active' : ''}">
+              High-neck
+            </button>
+          </div>
+          <div class="hint">Choisir la section du manche pour jouer.</div>
+        </div>
+
+        <div class="group">
+          <label class="group-label">Mode sombre</label>
+          <div class="switch-row" style="border-bottom:none;padding-top:0">
+            <div>
+              <div class="sr-label">Mode sombre</div>
+              <div class="sr-hint">Fond foncé et texte clair pour une meilleure lecture la nuit</div>
+            </div>
+            <button class="toggle-switch ${SETTINGS.darkMode ? 'on' : ''}" role="switch" aria-checked="${SETTINGS.darkMode ? 'true' : 'false'}" aria-label="Mode sombre" onclick="toggleDarkMode(); this.classList.toggle('on'); this.setAttribute('aria-checked', String(SETTINGS.darkMode))"></button>
+          </div>
+        </div>
+
+        <div class="group">
+          <label class="group-label">Couleur des tablatures</label>
+          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:8px">
+            <button onclick="setTabColor('#fff');this.parentElement.querySelectorAll('button').forEach(b=>b.style.border='');this.style.border='2px solid var(--blue)'" style="width:100%;height:36px;background:#1a1a2e;border:${SETTINGS.tabColor==='#fff'?'2px solid var(--blue)':'1px solid #ccc'};border-radius:6px;cursor:pointer;font-size:10px;color:#fff;transition:all .15s" title="Blanc">Blanc</button>
+            <button onclick="setTabColor('#a8d8a8');this.parentElement.querySelectorAll('button').forEach(b=>b.style.border='');this.style.border='2px solid var(--blue)'" style="width:100%;height:36px;background:#1a1a2e;border:${SETTINGS.tabColor==='#a8d8a8'?'2px solid var(--blue)':'1px solid #ccc'};border-radius:6px;cursor:pointer;font-size:10px;color:#a8d8a8;transition:all .15s" title="Vert">Vert</button>
+            <button onclick="setTabColor('#4dd0e1');this.parentElement.querySelectorAll('button').forEach(b=>b.style.border='');this.style.border='2px solid var(--blue)'" style="width:100%;height:36px;background:#1a1a2e;border:${SETTINGS.tabColor==='#4dd0e1'?'2px solid var(--blue)':'1px solid #ccc'};border-radius:6px;cursor:pointer;font-size:10px;color:#4dd0e1;transition:all .15s" title="Cyan">Cyan</button>
+            <button onclick="setTabColor('#ff9966');this.parentElement.querySelectorAll('button').forEach(b=>b.style.border='');this.style.border='2px solid var(--blue)'" style="width:100%;height:36px;background:#1a1a2e;border:${SETTINGS.tabColor==='#ff9966'?'2px solid var(--blue)':'1px solid #ccc'};border-radius:6px;cursor:pointer;font-size:10px;color:#ff9966;transition:all .15s" title="Orange">Orange</button>
+            <button onclick="setTabColor('#d0d0d0');this.parentElement.querySelectorAll('button').forEach(b=>b.style.border='');this.style.border='2px solid var(--blue)'" style="width:100%;height:36px;background:#1a1a2e;border:${SETTINGS.tabColor==='#d0d0d0'?'2px solid var(--blue)':'1px solid #ccc'};border-radius:6px;cursor:pointer;font-size:10px;color:#d0d0d0;transition:all .15s" title="Gris">Gris</button>
+          </div>
+          <div class="hint">Sélectionnez la couleur de votre choix pour les tablatures ASCII. Les changements s'appliquent immédiatement.</div>
+        </div>
+
+        <div class="group">
+          <label class="group-label">Taille des tablatures</label>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px">
+            <button onclick="setTabSize(11);this.parentElement.querySelectorAll('button').forEach(b=>b.style.border='1px solid var(--border)');this.style.border='2px solid var(--blue)'" style="width:100%;height:40px;background:var(--card);border:${SETTINGS.tabSize===11?'2px solid var(--blue)':'1px solid var(--border)'};border-radius:6px;cursor:pointer;color:var(--text);transition:all .15s;font-family:'Courier New',monospace;font-size:11px;font-weight:600">S</button>
+            <button onclick="setTabSize(13);this.parentElement.querySelectorAll('button').forEach(b=>b.style.border='1px solid var(--border)');this.style.border='2px solid var(--blue)'" style="width:100%;height:40px;background:var(--card);border:${SETTINGS.tabSize===13?'2px solid var(--blue)':'1px solid var(--border)'};border-radius:6px;cursor:pointer;color:var(--text);transition:all .15s;font-family:'Courier New',monospace;font-size:13px;font-weight:600">M</button>
+            <button onclick="setTabSize(16);this.parentElement.querySelectorAll('button').forEach(b=>b.style.border='1px solid var(--border)');this.style.border='2px solid var(--blue)'" style="width:100%;height:40px;background:var(--card);border:${SETTINGS.tabSize===16?'2px solid var(--blue)':'1px solid var(--border)'};border-radius:6px;cursor:pointer;color:var(--text);transition:all .15s;font-family:'Courier New',monospace;font-size:16px;font-weight:600">L</button>
+            <button onclick="setTabSize(20);this.parentElement.querySelectorAll('button').forEach(b=>b.style.border='1px solid var(--border)');this.style.border='2px solid var(--blue)'" style="width:100%;height:40px;background:var(--card);border:${SETTINGS.tabSize===20?'2px solid var(--blue)':'1px solid var(--border)'};border-radius:6px;cursor:pointer;color:var(--text);transition:all .15s;font-family:'Courier New',monospace;font-size:20px;font-weight:600">XL</button>
+          </div>
+          <div class="hint">Les changements s'appliquent immédiatement sur toutes les tablatures.</div>
+        </div>
+
+      </div>
+
+      <!-- ═══ PANE : HEADER — Personnalisation de la barre d'en-tête ═══ -->
+      <div id="pane-header" style="display:${settingsTab==='header'?'block':'none'}">
+        <div class="hint" style="margin-bottom:14px">Choisissez les éléments à afficher dans la barre d'en-tête. Les boutons s'adaptent automatiquement à l'espace disponible.</div>
+
+        <div class="group">
+          <label class="group-label">Ligne métronome</label>
+          ${[
+            { key:'showTrain',    label:'Mode entraînement',    hint:'Bouton Train. pour activer le mode progressif' },
+            { key:'showCountin',  label:'Décompte',             hint:'Décompte 4 temps avant la lecture' },
+            { key:'showClick',    label:'Clic métronome',       hint:'Métronome avec clic audible' },
+            { key:'showSubdivBtn',label:'Subdivision rythmique',hint:'Bouton ÷N pour changer la subdivision (croches, triolets, doubles croches, sextolets)' },
+            { key:'showMetroSolo',label:'Métronome solo',       hint:'Démarrer le métronome indépendamment' },
+          ].map(item => `
+          <div class="switch-row">
+            <div>
+              <div class="sr-label">${item.label}</div>
+              <div class="sr-hint">${item.hint}</div>
+            </div>
+            <button class="toggle-switch ${SETTINGS[item.key] ? 'on' : ''}" role="switch" aria-checked="${!!SETTINGS[item.key]}" aria-label="${item.label}"
+              onclick="toggleHeaderEl('${item.key}', !SETTINGS['${item.key}']); this.classList.toggle('on'); this.setAttribute('aria-checked', !!SETTINGS['${item.key}'])"></button>
+          </div>`).join('')}
+        </div>
+
+        <div class="group" style="margin-top:12px">
+          <label class="group-label">Ligne titre</label>
+          ${[
+            { key:'showShuffleBtn',  label:'Shuffle (SH)',       hint:'Bouton pour activer/désactiver le mode swing' },
+            { key:'showStringBtn',   label:'Groupe de cordes',   hint:'Basculer DGBE · ADGB · EADG depuis le header' },
+            { key:'showNeckBtn',     label:'Mid / High',         hint:'Basculer la position du manche depuis le header' },
+            { key:'showHeaderStats', label:'Stats streak', hint:'Afficher la série, le record et le total (🔥⚡📅)' },
+          ].map(item => `
+          <div class="switch-row">
+            <div>
+              <div class="sr-label">${item.label}</div>
+              <div class="sr-hint">${item.hint}</div>
+            </div>
+            <button class="toggle-switch ${SETTINGS[item.key] ? 'on' : ''}" role="switch" aria-checked="${!!SETTINGS[item.key]}" aria-label="${item.label}"
+              onclick="toggleHeaderEl('${item.key}', !SETTINGS['${item.key}']); this.classList.toggle('on'); this.setAttribute('aria-checked', !!SETTINGS['${item.key}'])"></button>
+          </div>`).join('')}
+        </div>
+      </div>
+
+      <div class="settings-footer">
+        <div class="sf-actions">
+          <button class="sf-btn" onclick="doExportJSON()">↓ Exporter JSON</button>
+          <button class="sf-btn" onclick="doImportJSON()">↑ Importer JSON</button>
+        </div>
+        <button class="sf-reset" onclick="resetApp()">Réinitialiser l'app</button>
+        <div class="sf-version">v3.3</div>
+      </div>
+    </div>
+  </div>`;
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function switchSettingsTab(tab) {
+  settingsTab = tab;
+  ['son','tempo','affichage','header'].forEach(t => {
+    const pane = document.getElementById('pane-' + t);
+    const btn  = document.querySelector('#seg-settings-tabs [data-val="' + t + '"]');
+    if (pane) pane.style.display = (t === tab) ? 'block' : 'none';
+    if (btn)  btn.classList.toggle('active', t === tab);
+  });
+}
+
+function closeSettingsIfBackdrop(event) {
+  // Ferme si on clique sur le fond (backdrop) de l'overlay, pas sur le modal lui-même
+  if (event.target.id === "settings-overlay") {
+    closeSettings();
+  }
+}
+
+function closeSettings() {
+  _tempoModified = false;
+  const el = document.getElementById('settings-overlay');
+  if (el) el.remove();
+  render();
+  updateHeaderUI();
+}
+
+function resetApp() {
+  if (!confirm(`⚠️ Remettre l'app à zéro ? Progression, notes et réglages seront effacés.`)) return;
+  ['dicoPattern','dicoPatNotes','dicoOnboarded','dicoSettings','dicoSessions','dicoPatTrace','dicoPatternJournal','dico-onboarding-done','dico-onboarding-level','dico-cache-version'].forEach(k => localStorage.removeItem(k));
+  Object.keys(localStorage).filter(k => k.startsWith('altFing_')).forEach(k => localStorage.removeItem(k));
+  location.reload();
+}
+function doExportJSON() {
+  try {
+    const KEYS = ['dicoPattern','dicoPatTrace','dicoSessions','dicoPatNotes','dicoSettings','dicoPatternJournal'];
+    const data = {};
+    KEYS.forEach(k => {
+      const v = localStorage.getItem(k);
+      if (v) data[k] = JSON.parse(v);
+    });
+    Object.keys(localStorage).filter(k => k.startsWith('altFing_')).forEach(k => {
+      const v = localStorage.getItem(k);
+      if (v) data[k] = v;
+    });
+
+    const jsonStr = JSON.stringify(data, null, 2);
+    const blob = new Blob([jsonStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.style.display = 'none';
+    const date = new Date().toISOString().slice(0,10);
+    a.download = `dico-pattern-${date}.json`;
+    a.href = url;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 100);
+
+    alert('✓ Sauvegarde téléchargée');
+  } catch(err) {
+    alert('❌ Erreur : ' + err.message);
+  }
+}
+
+function doImportJSON() {
+  try {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json,application/json';
+    input.style.display = 'none';
+
+    input.onchange = e => {
+      const file = e.target.files[0];
+      if (input.parentNode) document.body.removeChild(input);
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = ev => {
+        try {
+          const data = JSON.parse(ev.target.result);
+          if (!confirm('Importer cette sauvegarde ?\n\nLes données actuelles seront remplacées.')) return;
+          Object.entries(data).forEach(([k, v]) => {
+            localStorage.setItem(k, typeof v === 'string' ? v : JSON.stringify(v));
+          });
+          alert('✓ Sauvegarde importée. Rechargement...');
+          location.reload();
+        } catch(err) {
+          alert('❌ Fichier invalide : ' + err.message);
+        }
+      };
+      reader.readAsText(file);
+    };
+
+    document.body.appendChild(input);
+    input.click();
+  } catch(err) {
+    alert('❌ Erreur : ' + err.message);
+  }
+}
+
+function refreshSettingsSeg(segId, val) {
+  const seg = document.getElementById(segId);
+  if (!seg) return;
+  seg.querySelectorAll('button').forEach(b => {
+    b.classList.toggle('active', b.dataset.val === val);
+  });
+}
+
+function applySettingsAndRender() {
+  // Stop preview & métronome (on évite les sons hors-sync pendant le rerender)
+  if (PREVIEW.patId) previewStop();
+  if (METRO.running) metroStop(false);
+  saveSettings();
+  render();
+  updateHeaderUI();
+}
+
+function setStringGroup(g) {
+  if (STRING_SHIFTS[g] === undefined) return;
+  SETTINGS.stringGroup = g;
+  refreshSettingsSeg('seg-string-group', g);
+  applySettingsAndRender();
+}
+
+function setPreviewSound(s) {
+  if (!PREVIEW_SOUND_KEYS.includes(s)) return;
+  SETTINGS.previewSound = s;
+  refreshSettingsSeg('seg-preview-sound', s);
+  saveSettings();
+  // Pas besoin de re-render pour le son — il s'applique au prochain pluck
+}
+
+function setPatVolume(v) {
+  SETTINGS.patVolume = Math.max(0, Math.min(100, +v));
+  saveSettings();
+  // Applique immédiatement si une preview tourne
+  if (PREVIEW.masterGain) PREVIEW.masterGain.gain.value = SETTINGS.patVolume * 0.02;
+  const lbl = document.getElementById('pat-vol-val');
+  if (lbl) lbl.textContent = SETTINGS.patVolume + '%';
+}
+
+function setClickVolume(v) {
+  SETTINGS.clickVolume = Math.max(0, Math.min(100, +v));
+  saveSettings();
+  const lbl = document.getElementById('click-vol-val');
+  if (lbl) lbl.textContent = SETTINGS.clickVolume + '%';
+}
+
+function setNeckPosition(pos) {
+  if (!['mid', 'high'].includes(pos)) return;
+  SETTINGS.neckPosition = pos;
+  // Update button states
+  document.querySelectorAll('.neck-btn').forEach(btn => {
+    if (btn.dataset.position === pos) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+  applySettingsAndRender();
+}
+
+function toggleShuffleMode() {
+  SETTINGS.shuffleMode = !SETTINGS.shuffleMode;
+  saveSettings();
+  syncShuffleModeUI();
+  // Arrêter la lecture en cours — le timing change fondamentalement
+  if (PREVIEW.masterGain) previewStop();
+  // Re-rendre toutes les vues : les % Étapes / Patterns / Progression
+  // passent tous par getProgressKey() → clés __sh séparées → live refresh
+  render();
+  // Rafraîchir les réglages si ouverts
+  if (document.getElementById('settings-overlay')) {
+    closeSettings();
+    setTimeout(() => openSettings('tempo'), 50);
+  }
+}
+
+function syncShuffleModeUI() {
+  // Animation header quand shuffle est actif
+  const header = document.querySelector('header');
+  if (header) header.classList.toggle('header-shuffle', SETTINGS.shuffleMode);
+  // Bouton SH dans la Row 1
+  const shuffleBtn = document.getElementById('shuffle-toggle-btn');
+  if (shuffleBtn) shuffleBtn.classList.toggle('active', SETTINGS.shuffleMode);
+  // Badge legacy — masqué (remplacé par le bouton SH)
+  const badge = document.getElementById('header-shuffle-badge');
+  if (badge) badge.style.display = 'none';
+}
+
+function toggleTrainMode() {
+  SETTINGS.trainMode = !SETTINGS.trainMode;
+  saveSettings();
+  syncTrainModeUI();
+  // Quand on active le mode entraînement : déclencher le reset BPM au prochain pattern
+  if (SETTINGS.trainMode) {
+    PREVIEW._trainNeedsReset = true;
+    // Applique immédiatement le tempo de départ dans le header
+    HCTRL.bpm = SETTINGS.trainBpmStart;
+    const hbpm = document.getElementById('header-bpm-val');
+    if (hbpm) hbpm.textContent = HCTRL.bpm;
+  } else {
+    PREVIEW._trainNeedsReset = false;
+  }
+  // Si les réglages sont ouverts, les rafraîchir sur l'onglet Tempo
+  if (document.getElementById('settings-overlay')) {
+    closeSettings();
+    setTimeout(() => openSettings('tempo'), 50);
+  }
+}
+
+function setTrainBpmStep(n) {
+  if (![1,2,3,5,10].includes(n)) return;
+  SETTINGS.trainBpmStep = n;
+  saveSettings();
+  refreshSettingsSeg('seg-train-step', String(n));
+}
+
+function setTrainLoopEvery(n) {
+  if (![1,2,3,4,5].includes(n)) return;
+  SETTINGS.trainLoopEvery = n;
+  saveSettings();
+  refreshSettingsSeg('seg-train-every', String(n));
+}
+
+function toggleTrainPyramide(value) {
+  SETTINGS.trainPyramide = (value !== undefined) ? value : !SETTINGS.trainPyramide;
+  saveSettings();
+}
+
+function toggleDarkMode() {
+  SETTINGS.darkMode = !SETTINGS.darkMode;
+  saveSettings();
+  applyDarkMode();
+}
+
+function applyDarkMode() {
+  const html = document.documentElement;
+  if (SETTINGS.darkMode) {
+    html.style.colorScheme = 'dark';
+    html.classList.add('dark-mode');
+    html.classList.remove('light-mode');
+  } else {
+    html.style.colorScheme = 'light';
+    html.classList.remove('dark-mode');
+    html.classList.add('light-mode');
+  }
+}
+
+function setTabSize(size) {
+  if ([11, 13, 16, 20].includes(size)) {
+    SETTINGS.tabSize = size;
+    saveSettings();
+    document.documentElement.style.setProperty('--tab-size', size + 'px');
+  }
+}
+
+function applyTabSize() {
+  document.documentElement.style.setProperty('--tab-size', SETTINGS.tabSize + 'px');
+}
+
+function setTabColor(color) {
+  if (['#fff', '#a8d8a8', '#4dd0e1', '#ff9966', '#d0d0d0'].includes(color)) {
+    SETTINGS.tabColor = color;
+    saveSettings();
+    document.documentElement.style.setProperty('--tab-color', color);
+  }
+}
+
+function applyTabColor() {
+  document.documentElement.style.setProperty('--tab-color', SETTINGS.tabColor);
+}
+
+function toggleDailyChallenge() {
+  state.dailyChallengeOpen = !state.dailyChallengeOpen;
+  saveState();
+
+  // Manipuler directement le DOM au lieu de re-rendre
+  const patternsContainer = document.querySelector('[id^="daily-challenge-patterns"]');
+  const arrow = document.getElementById('daily-challenge-arrow');
+
+  if (patternsContainer) {
+    patternsContainer.style.display = state.dailyChallengeOpen ? 'flex' : 'none';
+  }
+  if (arrow) {
+    arrow.style.transform = state.dailyChallengeOpen ? 'rotate(180deg)' : 'rotate(0deg)';
+  }
+}
+
+function setTrainBpmStart(v) {
+  const n = parseInt(v, 10);
+  if (!Number.isFinite(n) || n < 20 || n > 200) return;
+  SETTINGS.trainBpmStart = n;
+  saveSettings();
+  const valEl = document.getElementById('train-bpmstart-val');
+  if (valEl) valEl.textContent = n + ' bpm';
+  // Si entraînement actif, met à jour le BPM affiché immédiatement
+  if (SETTINGS.trainMode) {
+    HCTRL.bpm = n;
+    const hbpm = document.getElementById('header-bpm-val');
+    if (hbpm) hbpm.textContent = n;
+    PREVIEW._trainNeedsReset = true;
+  }
+}
+
+function setTrainBpmMax(v) {
+  const n = parseInt(v, 10);
+  if (!Number.isFinite(n) || n < 40 || n > 200) return;
+  SETTINGS.trainBpmMax = n;
+  saveSettings();
+  const valEl = document.getElementById('train-bpmmax-val');
+  if (valEl) valEl.textContent = n + ' bpm';
+}
+
+// ─── CONTRÔLES +/- (Volumes, Tempos, Presets) ─────────────────────────────────
+function adjustVolume(type, delta) {
+  if (type === 'patVolume') {
+    SETTINGS.patVolume = Math.max(0, Math.min(100, SETTINGS.patVolume + delta));
+    saveSettings();
+    if (PREVIEW.masterGain) PREVIEW.masterGain.gain.value = SETTINGS.patVolume * 0.02;
+    const lbl = document.getElementById('pat-vol-val');
+    if (lbl) lbl.textContent = SETTINGS.patVolume + '%';
+    const bar = document.getElementById('pat-vol-bar');
+    if (bar) bar.style.width = SETTINGS.patVolume + '%';
+  } else if (type === 'clickVolume') {
+    SETTINGS.clickVolume = Math.max(0, Math.min(100, SETTINGS.clickVolume + delta));
+    saveSettings();
+    const lbl = document.getElementById('click-vol-val');
+    if (lbl) lbl.textContent = SETTINGS.clickVolume + '%';
+    const bar = document.getElementById('click-vol-bar');
+    if (bar) bar.style.width = SETTINGS.clickVolume + '%';
+  }
+}
+
+function adjustTempoPreset(key, delta) {
+  const TEMPO = TEMPOS.find(t => t.key === key);
+  if (!TEMPO) return;
+  const newVal = Math.max(TEMPO.rangeMin, Math.min(TEMPO.rangeMax, SETTINGS.tempoPresets[key] + delta));
+  SETTINGS.tempoPresets[key] = newVal;
+  saveSettings();
+  const lbl = document.getElementById('preset-' + key + '-val');
+  _tempoModified = true;
+  if (lbl) lbl.textContent = newVal;
+  const bar = document.getElementById('preset-' + key + '-bar');
+  if (bar) bar.style.width = Math.max(0, Math.min(100, Math.round((newVal - TEMPO.rangeMin) / (TEMPO.rangeMax - TEMPO.rangeMin) * 100))) + '%';
+}
+
+function adjustTrainBpm(which, delta) {
+  if (which === 'start') {
+    const newVal = Math.max(20, Math.min(200, Math.min(SETTINGS.trainBpmMax - 5, SETTINGS.trainBpmStart + delta)));
+    SETTINGS.trainBpmStart = newVal;
+    saveSettings();
+    const valEl = document.getElementById('train-bpmstart-val');
+    if (valEl) valEl.textContent = newVal;
+    if (SETTINGS.trainMode) {
+      HCTRL.bpm = newVal;
+      const hbpm = document.getElementById('header-bpm-val');
+      if (hbpm) hbpm.textContent = newVal;
+      PREVIEW._trainNeedsReset = true;
+    }
+  } else if (which === 'max') {
+    const newVal = Math.max(40, Math.min(200, Math.max(SETTINGS.trainBpmStart + 5, SETTINGS.trainBpmMax + delta)));
+    SETTINGS.trainBpmMax = newVal;
+    saveSettings();
+    const valEl = document.getElementById('train-bpmmax-val');
+    if (valEl) valEl.textContent = newVal;
+  }
+}
+
+function trainDualRangeInput(which, val) {
+  const MIN = 20, MAX = 200, GAP = 5;
+  if (which === 'start') {
+    val = Math.min(val, SETTINGS.trainBpmMax - GAP);
+    val = Math.max(val, MIN);
+    SETTINGS.trainBpmStart = val;
+    const el = document.getElementById('train-range-start');
+    if (el) el.value = val;
+    setTrainBpmStart(val);
+  } else {
+    val = Math.max(val, SETTINGS.trainBpmStart + GAP);
+    val = Math.min(val, MAX);
+    SETTINGS.trainBpmMax = val;
+    const el = document.getElementById('train-range-max');
+    if (el) el.value = val;
+    setTrainBpmMax(val);
+  }
+  updateDualRangeTrack();
+}
+
+function updateDualRangeTrack() {
+  const fill = document.getElementById('train-range-fill');
+  if (!fill) return;
+  const pct1 = (SETTINGS.trainBpmStart - 20) / 180 * 100;
+  const pct2 = (SETTINGS.trainBpmMax - 20) / 180 * 100;
+  fill.style.left  = pct1 + '%';
+  fill.style.width = (pct2 - pct1) + '%';
+  // z-index : curseur de départ au dessus si proche du max
+  const startEl = document.getElementById('train-range-start');
+  const maxEl   = document.getElementById('train-range-max');
+  if (startEl && maxEl) {
+    const swap = SETTINGS.trainBpmStart >= SETTINGS.trainBpmMax - 10;
+    startEl.style.zIndex = swap ? 5 : 3;
+    maxEl.style.zIndex   = swap ? 3 : 5;
+  }
+}
+
+function setLoopExt(n) {
+  if (![-1,0,1,2,3,4].includes(n)) return;
+  SETTINGS.loopExt = n;
+  saveSettings();
+  refreshSettingsSeg('seg-loop-ext', String(n));
+  // Stopper la preview en cours (le tab change, audio obsolète)
+  if (PREVIEW.patId) previewStop();
+  // Ré-afficher tous les tabs ouverts avec la nouvelle extension
+  applySettingsAndRender();
+}
+
+
+// ─── WAKE LOCK — empêche la mise en veille pendant l'utilisation ──────────────
+let _wakeLock = null;
+let _wakeLockInactiveTimer = null;
+const WAKELOCK_INACTIVITY_MS = 3 * 60 * 1000; // 3 minutes (v1.13)
+
+async function wakeLockRequest() {
+  if (!('wakeLock' in navigator)) return; // API non supportée
+  try {
+    if (_wakeLock) return; // déjà acquis
+    _wakeLock = await navigator.wakeLock.request('screen');
+    _wakeLock.addEventListener('release', () => { _wakeLock = null; });
+  } catch(e) { console.warn('wakeLockRequest:', e); }
+}
+
+function wakeLockRelease() {
+  if (_wakeLock) {
+    _wakeLock.release().catch(() => {});
+    _wakeLock = null;
+  }
+}
+
+function wakeLockResetInactiveTimer() {
+  if (_wakeLockInactiveTimer) clearTimeout(_wakeLockInactiveTimer);
+  _wakeLockInactiveTimer = setTimeout(wakeLockRelease, WAKELOCK_INACTIVITY_MS);
+  if (!_wakeLock) wakeLockRequest();
+}
+
+// ─── GESTION ARRIÈRE-PLAN / PREMIER PLAN ─────────────────────────────────────
+// Sur iOS, AudioContext.resume() échoue silencieusement sans geste utilisateur.
+// Stratégie : stopper au départ → bannière au retour → sur tap : fermer l'ancien
+// contexte cassé et relancer (previewCtx() crée un contexte neuf dans le geste).
+let _bgSavedPreviewId = null;
+let _bgSavedMetroId   = null;
+
+function showResumePrompt() {
+  if (document.getElementById('resume-prompt')) return;
+  const div = document.createElement('div');
+  div.id = 'resume-prompt';
+  div.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--orange);color:#fff;text-align:center;padding:14px 16px;font-size:13px;font-weight:600;cursor:pointer;letter-spacing:.2px;box-shadow:0 2px 12px rgba(0,0,0,.3);-webkit-tap-highlight-color:transparent;animation:fadeIn .15s ease';
+  div.textContent = '▶  Appuyer pour reprendre la lecture';
+  div.addEventListener('touchstart', onResumeGesture, { passive: true, once: true });
+  div.addEventListener('click',      onResumeGesture, { once: true });
+  document.body.appendChild(div);
+}
+
+function hideResumePrompt() {
+  const el = document.getElementById('resume-prompt');
+  if (el) el.remove();
+}
+
+async function onResumeGesture() {
+  hideResumePrompt();
+  // Fermer les anciens contextes suspendus — previewCtx()/metroCtx() en créeront
+  // de nouveaux dans ce geste utilisateur (garantis en état 'running' sur iOS)
+  if (PREVIEW.ctx) { try { await PREVIEW.ctx.close(); } catch(e){} PREVIEW.ctx = null; }
+  if (METRO.ctx)   { try { await METRO.ctx.close();   } catch(e){} METRO.ctx   = null; }
+  // Relancer directement dans le geste (pas de setTimeout — doit rester synchrone)
+  if (_bgSavedPreviewId) {
+    const id = _bgSavedPreviewId; _bgSavedPreviewId = null;
+    previewPlay(id);
+  } else if (_bgSavedMetroId) {
+    const id = _bgSavedMetroId; _bgSavedMetroId = null;
+    metroStart(id);
+  }
+  wakeLockRequest();
+}
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') {
+    _bgSavedPreviewId = PREVIEW.patId || null;
+    _bgSavedMetroId   = (METRO.running && METRO.patId) ? METRO.patId : null;
+    if (PREVIEW.patId) previewStop();
+    if (METRO.running) metroStop(false);
+    wakeLockRelease();
+    hideResumePrompt();
+  } else if (_bgSavedPreviewId || _bgSavedMetroId) {
+    showResumePrompt();
+  }
+});
+
+// Fallback : visibilitychange ne fire pas toujours en PWA iOS
+// → si on revient sur l'app avec quelque chose en attente, afficher la bannière au premier touch
+document.addEventListener('touchstart', () => {
+  if (!_bgSavedPreviewId && !_bgSavedMetroId) return;
+  if (document.getElementById('resume-prompt')) return;
+  showResumePrompt();
+}, { passive: true });
+
+// BFCache Safari (bouton retour → page restaurée depuis le cache)
+window.addEventListener('pageshow', (e) => {
+  if (e.persisted && (_bgSavedPreviewId || _bgSavedMetroId)) showResumePrompt();
+});
+
+// Timer d'inactivité wake lock
+document.addEventListener('touchstart', wakeLockResetInactiveTimer, { passive: true });
+document.addEventListener('mousedown',  wakeLockResetInactiveTimer, { passive: true });
+
+// ─── BOOT ─────────────────────────────────────────────────────────────────────
+loadState();
+showOnboarding();           // affiche le questionnaire de niveau à la première utilisation
+applyDarkMode();            // applique le dark mode si activé dans les settings
+applyTabColor();            // applique la couleur des tablatures sauvegardée
+applyTabSize();             // applique la taille des tablatures sauvegardée
+render();
+updateHeaderUI();           // met à jour le header (visibility du bouton mid/high, etc.)
+updateHeaderStatsDisplay(); // affiche les stats dans le header si activé
+syncSubdivUI();             // affiche le bon bouton subdiv actif au démarrage
+applyNavHidden();    // applique l'état nav masquée/visible mémorisé
+// Synchroniser l'état visuel des boutons Décompte et Clic
+const countinBtn = document.getElementById('header-countin-btn');
+if (countinBtn && PREVIEW.countIn) countinBtn.classList.add('on');
+const clickBtn = document.getElementById('header-click-btn');
+if (clickBtn && PREVIEW.click) clickBtn.classList.add('on');
+syncTrainModeUI();   // couleur BPM cyan si mode entraînement actif
+syncTrainBtnUI();    // couleur bouton Train. selon état train/pyramide
+syncShuffleModeUI(); // indicateur SH sur bouton Clic si shuffle actif
+chronoToggle();       // démarre le chrono automatiquement
+checkOnboarding();    // affiche l'onboarding au premier lancement
+
+
+
+
+// ─── Arrêter la lecture si on ferme un accordéon (patterns/étapes) ───────────
+document.addEventListener("toggle", (event) => {
+  if (event.target.tagName === "DETAILS" && !event.target.open) {
+    console.log("[ACCORDION CLOSED] Arrêt de la preview");
+    previewStop();
+    metroStop();
+  }
+}, false);
+
+// ── Vérification de mise à jour PWA ────────────────────────────────────────────
+// Charge version.json pour vérifier s'il y a une nouvelle version
+// Si la version change, efface le cache et force un refresh
+async function checkForUpdate() {
+  try {
+    const resp = await fetch('./version.json?t=' + Date.now(), { cache: 'no-store' });
+    const versionData = await resp.json();
+    const savedVersion = localStorage.getItem('dico-cache-version');
+
+    if (savedVersion !== versionData.cacheVersion) {
+      console.log('🔄 Nouvelle version détectée, vidage du cache...');
+      // Vider tous les caches
+      if ('caches' in window) {
+        const cacheNames = await caches.keys();
+        await Promise.all(cacheNames.map(name => caches.delete(name)));
+      }
+      // Sauvegarder la nouvelle version
+      localStorage.setItem('dico-cache-version', versionData.cacheVersion);
+      // Force un reload complet
+      window.location.reload(true);
+    }
+  } catch (e) {
+    console.warn('Erreur lors de la vérification de mise à jour:', e);
+  }
+}
+
+// Vérifier la mise à jour au chargement et toutes les 5 minutes
+checkForUpdate();
+setInterval(checkForUpdate, 5 * 60 * 1000);
+
+// PWA Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('./sw.js').catch(()=>{});
+}
+
+// ─── PINCH-TO-ZOOM + PAN temporaire sur les tablatures ───────────────────────
+// Écarte 2 doigts pour zoomer, déplace les doigts pour explorer la tab zoommée.
+// Le zoom/pan revient à l'état normal dès que les doigts se lèvent (spring-back).
+(function() {
+  let _pz = null;
+  // _pz = { wrapEl, preEl, startDist, startMidX, startMidY, wrapLeft, wrapTop }
+
+  function fingerDist(t0, t1) {
+    const dx = t0.clientX - t1.clientX;
+    const dy = t0.clientY - t1.clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+  function fingerMid(t0, t1) {
+    return { x: (t0.clientX + t1.clientX) / 2, y: (t0.clientY + t1.clientY) / 2 };
+  }
+
+  function findPinchTarget(el) {
+    while (el && el !== document.body) {
+      if (el.classList && el.classList.contains('tab-wrap')) {
+        const pre = el.querySelector('pre');
+        return pre ? { wrapEl: el, preEl: pre } : null;
+      }
+      el = el.parentElement;
+    }
+    return null;
+  }
+
+  document.addEventListener('touchstart', e => {
+    if (e.touches.length !== 2) return;
+    const target = findPinchTarget(e.target);
+    if (!target) return;
+    const rect = target.wrapEl.getBoundingClientRect();
+    const mid  = fingerMid(e.touches[0], e.touches[1]);
+    _pz = {
+      wrapEl:    target.wrapEl,
+      preEl:     target.preEl,
+      startDist: fingerDist(e.touches[0], e.touches[1]),
+      // point d'ancrage du zoom (en coordonnées élément, scroll compris)
+      anchorX:   mid.x - rect.left + target.wrapEl.scrollLeft,
+      anchorY:   mid.y - rect.top,
+      // midpoint initial pour le pan
+      startMidX: mid.x,
+      startMidY: mid.y,
+    };
+    target.preEl.style.transition    = 'none';
+    target.preEl.style.transformOrigin = '0 0';
+    target.wrapEl.style.touchAction  = 'none';
+    target.wrapEl.style.overflow     = 'visible';
+    target.wrapEl.style.zIndex       = '50';
+    e.preventDefault();
+  }, { passive: false });
+
+  document.addEventListener('touchmove', e => {
+    if (!_pz || e.touches.length < 2) return;
+    const d     = fingerDist(e.touches[0], e.touches[1]);
+    const scale = Math.min(4, Math.max(1, d / _pz.startDist));
+    const mid   = fingerMid(e.touches[0], e.touches[1]);
+    // Translate : zoom autour de l'ancrage + déplacement des doigts
+    const tx = _pz.anchorX * (1 - scale) + (mid.x - _pz.startMidX);
+    const ty = _pz.anchorY * (1 - scale) + (mid.y - _pz.startMidY);
+    _pz.preEl.style.transform = `translate(${tx}px,${ty}px) scale(${scale})`;
+    e.preventDefault();
+  }, { passive: false });
+
+  function releasePinch() {
+    if (!_pz) return;
+    _pz.preEl.style.transition = 'transform 0.38s cubic-bezier(.22,.68,0,1.18)';
+    _pz.preEl.style.transform  = 'none';
+    _pz.wrapEl.style.touchAction = '';
+    _pz.wrapEl.style.overflow    = '';
+    _pz.wrapEl.style.zIndex      = '';
+    _pz = null;
+  }
+
+  document.addEventListener('touchend',    releasePinch, { passive: true });
+  document.addEventListener('touchcancel', releasePinch, { passive: true });
+})();
+
+// ─── FONCTIONS DE GESTION D'ÉTAT ─────────────────────────────────────────────
+function toggleCard(key) {
+  const wasOpen = state.openCards[key];
+  state.openCards[key] = !state.openCards[key];
+  // Si on FERME la carte, arrêter la preview/métronome
+  if (wasOpen && !state.openCards[key]) {
+    previewStop();
+    metroStop();
+  }
+  saveState();
+  render();
+}
+
+function toggleFavorite(key, event) {
+  event.stopPropagation();
+  state.favorites[key] = !state.favorites[key];
+  saveState();
+  // Mise à jour directe du cœur sans re-render complet
+  const btn = event.target.closest('button');
+  if (btn) btn.innerHTML = heartSVG(!!state.favorites[key]);
+}
+
+function toggleParcoursCell(key, btn, color) {
+  state.progress[key] = !state.progress[key];
+  saveState();
+  const done = !!state.progress[key];
+  checkSound(done);
+  btn.classList.toggle('checked', done);
+  if (done) {
+    btn.style.background = color;
+    btn.style.borderColor = color;
+  } else {
+    btn.style.background = '';
+    btn.style.borderColor = '';
+  }
+  // Mettre à jour l'affichage du pourcentage
+  refreshSpecialProgressPercent(key);
+  // Mettre à jour aussi les pourcentages par direction s'il s'agit d'un pattern normal
+  const parts = key.split('__');
+  if (parts.length >= 5) {
+    const patId = parts[0];
+    const dir = parts[2];
+    const pat = PATTERNS.find(p => p.id === patId);
+    if (pat) {
+      const groupKey = pat.cat + 'P' + pat.num;
+      // Mettre à jour la progress bar uniquement (pas les couleurs)
+      refreshDirPctsNoColor(groupKey);
+      // Mettre à jour le % de la direction
+      let tot = 0, don = 0;
+      const dp = PATTERNS.find(p => p.id === patId);
+      if (dp) INTERPS.forEach(i => TEMPOS.forEach(t => {
+        tot++; if (state.progress[getProgressKey(dp.id, 1, dir, i, t)]) don++;
+      }));
+      const dpct = tot ? Math.round(don/tot*100) : 0;
+      const dirPctEl = document.getElementById('dirpct-' + groupKey + '-' + dir);
+      if (dirPctEl) dirPctEl.textContent = dpct > 0 ? dpct + '%' : '';
+    }
+  }
+}
+
+function refreshSpecialProgressPercent(progressKey) {
+  // Cette fonction met à jour le pourcentage sans re-render complet
+  // Cherche le pattern et recalcule son pourcentage
+  // Les progressKeys ont le format: patId__1__dir__interp__tempo
+  const parts = progressKey.split('__');
+  if (parts.length < 5) return;
+  const patId = parts[0];
+
+  // Cherche le groupe contenant ce pattern
+  const pat = PATTERNS.find(p => p.id === patId);
+  if (!pat) return;
+
+  const key = pat.cat + 'P' + pat.num;
+  const pct = getGroupPct(key);
+
+  // Mettre à jour le % affiché dans le card (s'il existe)
+  const pctEl = document.getElementById('grppct-' + key);
+  if (pctEl) {
+    pctEl.textContent = pct > 0 ? pct + '%' : '';
+  }
+}
+
+function heartSVG(filled) {
+  if (filled) {
+    return `<svg width="18" height="18" viewBox="0 0 24 24" fill="var(--red)" xmlns="http://www.w3.org/2000/svg">
+      <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" pointer-events="none"/>
+    </svg>`;
+  }
+  return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" xmlns="http://www.w3.org/2000/svg">
+    <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z" pointer-events="none"/>
+  </svg>`;
+}
+</script>
+</body>
+</html>
