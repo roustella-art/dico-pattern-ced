@@ -2,6 +2,45 @@
 
 ---
 
+## Session du 18 juin 2026
+
+### Taille réglable des tablatures
+
+**Fichiers modifiés :** `state.js`, `index.html`, `render.js`, `version.json`
+
+Ajout d'un sélecteur de taille pour les tablatures ASCII dans **Réglages > Affichage** avec 4 options : S (11px), M (13px, défaut), L (16px), XL (20px). Particulièrement utile pour la lisibilité sur tablette.
+
+**Implémentation :**
+- `state.js` : ajout de `tabSize: 13` à SETTINGS, chargement/sauvegarde dans localStorage
+- CSS : `.tab-wrap pre` utilise `font-size: var(--tab-size, 13px)`
+- `index.html` : sélecteur 4 boutons avec preview visuel (chaque label affiché dans sa taille)
+- `render.js` : suppression du `style="font-size:12px"` inline sur les `<pre>` pour laisser la variable CSS s'appliquer
+- Fonctions `setTabSize()` et `applyTabSize()` pour live refresh
+
+---
+
+### Onglet Challenge au filtrage + Suppression de la carte Challenge du jour
+
+**Fichiers modifiés :** `render.js`, `version.json`
+
+Déplacement du "Challenge du jour" hors de la vue par défaut en l'intégrant au système de filtrage par difficulté. Maintenant : Tous → Basique → Technique → Complexe → **Challenge**.
+
+**Logique :**
+- Quand l'utilisateur clique sur "Challenge", affiche 2 patterns aléatoires avec progression < 40%
+- Encourage la pratique ciblée sur les patterns moins maîtrisés
+- Le challenge n'apparaît que si l'utilisateur le demande explicitement
+- La carte "Challenge du jour" qui s'affichait en haut des patterns a été supprimée de l'interface
+
+---
+
+### Masquage du tri par catégorie
+
+**Fichiers modifiés :** `render.js`
+
+Le tri par catégorie (Tous, A2, A3, A4…) est masqué avec `display:none` pour nettoyer l'interface, mais reste fonctionnel en code pour réactivation future.
+
+---
+
 ## Session du 10 juin 2026
 
 ### Patterns rythmiques : moteur, accord, flèches, bends, phrase

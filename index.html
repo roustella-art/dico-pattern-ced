@@ -92,6 +92,8 @@
   .h-icon-btn:active{background:rgba(244,238,226,.22)}
   .h-icon-btn.active{background:var(--orange);border-color:var(--orange);color:#fff;font-weight:700}
   .h-icon-btn.hidden{display:none}
+  .h-icon-btn[data-unavailable="true"]{opacity:.38;cursor:not-allowed;position:relative}
+  .h-icon-btn[data-unavailable="true"]::after{content:'';position:absolute;inset:0;background:linear-gradient(to bottom right,transparent calc(50% - .8px),rgba(210,40,40,.85) calc(50% - .8px),rgba(210,40,40,.85) calc(50% + .8px),transparent calc(50% + .8px));border-radius:inherit;pointer-events:none}
   .hidden{display:none!important}
   .h-icon-btn.large{width:auto;min-width:32px;height:32px;padding:0 7px}
   .h-time{font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;letter-spacing:.3px;color:var(--header-text);transition:color .3s}
@@ -171,7 +173,7 @@
   .filter-seg button.active.diff-deb{background:#4a9e6b}
   .filter-seg button.active.diff-int{background:#c07830}
   .filter-seg button.active.diff-adv{background:#a03030}
-
+  .filter-seg button.active.diff-challenge{background:#7B5EA7}
 
   /* TAB DISPLAY */
   .tab-wrap{overflow-x:auto;margin:10px 0;background:#1a1a2e;border-radius:8px;padding:10px 12px;position:relative;cursor:pointer;-webkit-tap-highlight-color:transparent}
@@ -1515,6 +1517,14 @@ function updateHeaderUI() {
     if (el) el.classList.toggle('hidden', !visible);
   };
 
+  // ── Détection tabs figées : vérifier les cartes ouvertes ─────────────────
+  const openPats = Object.entries(state.openCards)
+    .filter(([,open]) => open)
+    .map(([key]) => PATTERNS.filter(p => p.cat + 'P' + p.num === key))
+    .flat();
+  const anyDisableNeck   = openPats.length > 0 && openPats.every(p => p.disableHighNeck);
+  const anyDisableString = openPats.length > 0 && openPats.every(p => p.special);
+
   // ── ROW 1 : Mid/High + Stats ──────────────────────────────────────────────
   const neckBtn = document.getElementById('neck-toggle-btn');
   if (neckBtn) {
@@ -1523,6 +1533,7 @@ function updateHeaderUI() {
     neckBtn.style.background   = SETTINGS.neckPosition === 'high' ? 'var(--orange)' : 'rgba(244,238,226,.08)';
     neckBtn.style.borderColor  = SETTINGS.neckPosition === 'high' ? 'var(--orange)' : 'rgba(244,238,226,.12)';
     neckBtn.style.color        = SETTINGS.neckPosition === 'high' ? '#fff' : 'var(--header-text)';
+    neckBtn.dataset.unavailable = anyDisableNeck ? 'true' : 'false';
   }
   const statsEl = document.getElementById('header-stats');
   if (statsEl) {
@@ -1544,6 +1555,7 @@ function updateHeaderUI() {
     stringBtn.style.background  = col;
     stringBtn.style.borderColor = col;
     stringBtn.style.color       = '#fff';
+    stringBtn.dataset.unavailable = anyDisableString ? 'true' : 'false';
   }
 
   // Bouton Shuffle (Row 1)
@@ -1575,6 +1587,7 @@ function updateHeaderUI() {
 }
 
 function toggleNeckPosition() {
+  if (document.getElementById('neck-toggle-btn')?.dataset.unavailable === 'true') return;
   SETTINGS.neckPosition = SETTINGS.neckPosition === "mid" ? "high" : "mid";
   saveSettings();
   updateHeaderUI();
@@ -1598,6 +1611,7 @@ function toggleHeaderEl(key, value) {
 
 // Cycle DGBE → ADGB → EADG → DGBE …
 function cycleStringGroup() {
+  if (document.getElementById('string-group-btn')?.dataset.unavailable === 'true') return;
   const order = ['DGBE', 'ADGB', 'EADG'];
   const idx  = order.indexOf(SETTINGS.stringGroup);
   const next = order[(idx + 1) % order.length];
@@ -2143,7 +2157,7 @@ function openSettings(tab) {
           <button class="sf-btn" onclick="doImportJSON()">↑ Importer JSON</button>
         </div>
         <button class="sf-reset" onclick="resetApp()">Réinitialiser l'app</button>
-        <div class="sf-version">v3.4</div>
+        <div class="sf-version">v3.5</div>
       </div>
     </div>
   </div>`;
@@ -2822,6 +2836,7 @@ function toggleCard(key) {
   }
   saveState();
   render();
+  updateHeaderUI();
 }
 
 function toggleFavorite(key, event) {
