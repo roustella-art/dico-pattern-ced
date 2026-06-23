@@ -802,14 +802,14 @@ function renderGammes() {
     </div>`;
   }
 
-  // Filtre difficulté
-  const diffs = ['all','Basique','Technique','Complexe'];
-  const diffColors = {all:'',Basique:'diff-deb',Technique:'diff-int',Complexe:'diff-adv'};
+  // Filtre catégorie gammes
+  const gammeCats = ['all','Majeur','Pentatonique','Mode'];
+  const gammeCatLabels = {all:'Tous', Majeur:'Majeur', Pentatonique:'Pentatonique', Mode:'Mode'};
+  if (!state.gammeCategory) state.gammeCategory = 'all';
   let html = `<div class="filter-seg" style="margin-bottom:14px">`;
-  diffs.forEach(d => {
-    const active = state.diffFilter === d ? 'active' : '';
-    const colorClass = active && d !== 'all' ? diffColors[d] : '';
-    html += `<button class="${active} ${colorClass}" onclick="setDiffFilter('${d}')">${d === 'all' ? 'Tous' : d}</button>`;
+  gammeCats.forEach(c => {
+    const active = state.gammeCategory === c ? 'active' : '';
+    html += `<button class="${active}" onclick="setGammeCategory('${c}')">${gammeCatLabels[c]}</button>`;
   });
   html += `</div>`;
 
@@ -819,18 +819,17 @@ function renderGammes() {
     return na - nb;
   }).forEach(([key, pats]) => {
     const base = pats[0];
-    if (state.diffFilter !== 'all' && base.difficulty !== state.diffFilter) return;
+    if (state.gammeCategory !== 'all' && base.gammeCategory !== state.gammeCategory) return;
     const isOpen = state.openCards[key];
     const pct = getGroupPct(key);
-    const diffDot = {Basique:'#4a9e6b',Technique:'#c07830',Complexe:'#a03030'}[base.difficulty]||'#999';
     const isPenta = base.id.startsWith('penta');
+    const isGammeMaj = ['gammeC1','gammeG1','gammeD1','gammeA1','gammeE1'].includes(base.id);
 
     html += `
-    <div class="card ${isPenta ? 'card-penta' : ''}" id="card-${key}">
+    <div class="card ${isPenta ? 'card-penta' : ''} ${isGammeMaj ? 'card-gamme-maj' : ''}" id="card-${key}">
       <div class="card-head" onclick="toggleCard('${key}')">
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:7px">
-            <span style="width:7px;height:7px;border-radius:50%;background:${diffDot};flex-shrink:0;display:inline-block"></span>
             <h2 style="font-size:14px">${base.name}</h2>
           </div>
           <div class="progress-bar-wrap" style="margin-top:6px"><div id="grpbar-${key}" class="progress-bar" style="width:${pct}%;background:var(--blue)"></div></div>
@@ -1160,6 +1159,12 @@ function filterByGroup(groupKey) {
 
 function setDiffFilter(d) {
   state.diffFilter = d;
+  render();
+}
+
+function setGammeCategory(c) {
+  state.gammeCategory = c;
+  saveState();
   render();
 }
 

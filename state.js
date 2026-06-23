@@ -17,6 +17,7 @@ let state = {
   etapeOpen: {},   // accordéon par numéro d'étape
   cardDir: {},   // direction active par groupe, ex: {'A4P1b':'U'}
   dailyChallengeOpen: false,  // accordéon challenge du jour (fermé par défaut)
+  gammeCategory: 'all',  // filtre catégorie gammes : 'all' | 'Majeur' | 'Pentatonique' | 'Transitions' | 'Mode'
   gammeActiveStrings: {}, // { "gammeP1": [true,true,true,true,true,true] } — [e,B,G,D,A,E]
   gammeSelectedDir: {},  // { "pentaTrans1": "1→2" } — direction active par gamme avec directions multiples
   triadeStringGroup: {},  // { "triadeDim1": "GBe" } — groupe de cordes actif par triade
