@@ -161,6 +161,10 @@
   .card-body.open{display:block}
 
   /* FILTER BAR — catégories */
+  .forme-scroll-fade-left,.forme-scroll-fade-right{position:absolute;top:0;bottom:0;width:28px;pointer-events:none;z-index:1;transition:opacity .2s}
+  .forme-scroll-fade-left{left:0;background:linear-gradient(to right,var(--card-bg,var(--bg)) 0%,transparent 100%)}
+  .forme-scroll-fade-right{right:0;background:linear-gradient(to left,var(--card-bg,var(--bg)) 0%,transparent 100%)}
+  .forme-scroll-fade-left.hidden,.forme-scroll-fade-right.hidden{opacity:0}
   .filter-bar{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;margin-bottom:8px;scrollbar-width:none}
   .filter-bar::-webkit-scrollbar{display:none}
   .filter-bar button{flex-shrink:0;border:1px solid var(--border);background:transparent;border-radius:20px;padding:4px 13px;font-size:12px;font-weight:500;color:var(--text2);cursor:pointer;transition:all .15s}
@@ -414,7 +418,7 @@
           <span id="header-bpm-val"
           ondblclick="bpmEditStart()"
           ontouchstart="bpmValTouchStart(event)" ontouchend="bpmValTouchEnd()" ontouchmove="bpmValTouchEnd()"
-          style="min-width:30px;text-align:center;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.3px;color:var(--header-text);padding:0 4px;transition:color .2s;cursor:pointer" title="Double-tap → saisir BPM">60</span>
+          style="min-width:30px;text-align:center;font-size:13px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:.3px;color:var(--header-text);padding:0 4px;transition:color .2s;cursor:pointer" title="Double-tap → saisir BPM">80</span>
           <input type="number" id="bpm-edit-input" min="20" max="240" inputmode="numeric" pattern="[0-9]*"
           aria-label="Tempo en BPM (20-240)"
           onkeydown="bpmEditKeydown(event)" onblur="bpmEditCommit()"
@@ -1024,6 +1028,20 @@ function setGammeDirection(patId, dirKey) {
 }
 
 // Changer la forme (C / A / …) — mise à jour DOM ciblée
+function updateFormeFade(scrollEl) {
+  const wrapper = scrollEl.parentElement;
+  const left  = wrapper.querySelector('.forme-scroll-fade-left');
+  const right = wrapper.querySelector('.forme-scroll-fade-right');
+  if (left)  left.classList.toggle('hidden', scrollEl.scrollLeft <= 2);
+  if (right) right.classList.toggle('hidden', scrollEl.scrollLeft + scrollEl.clientWidth >= scrollEl.scrollWidth - 2);
+}
+function initFormeFades() {
+  document.querySelectorAll('.forme-scroll-fade-right').forEach(fade => {
+    const scrollEl = fade.previousElementSibling;
+    if (scrollEl) updateFormeFade(scrollEl);
+  });
+}
+
 function setGammeForme(patId, forme) {
   if (!state.gammeSelectedForme) state.gammeSelectedForme = {};
   const pat = PATTERNS.find(p => p.id === patId);
@@ -1397,7 +1415,7 @@ function updateHeaderStatsDisplay() {
 }
 
 // ─── HEADER CONTROLS ─────────────────────────────────────────────────────────
-const HCTRL = { mode:'metro', patId:null, patName:'', bpm:60 };
+const HCTRL = { mode:'metro', patId:null, patName:'', bpm:80 };
 
 function headerPlayToggle() {
   if (HCTRL.mode === 'preview' && HCTRL.patId) {
@@ -2158,7 +2176,7 @@ function openSettings(tab) {
           <button class="sf-btn" onclick="doImportJSON()">↑ Importer JSON</button>
         </div>
         <button class="sf-reset" onclick="resetApp()">Réinitialiser l'app</button>
-        <div class="sf-version">v3.6</div>
+        <div class="sf-version">v3.7</div>
       </div>
     </div>
   </div>`;

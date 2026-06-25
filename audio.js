@@ -156,7 +156,7 @@ function toggleAltFing(patId, idx, btn) {
 
 // ─── PREVIEW AUDIO ────────────────────────────────────────────────────────────
 const OPEN_MIDI = {e:64, B:59, G:55, D:50, A:45, E:40};
-const PREVIEW = { ctx:null, masterGain:null, patId:null, timer:null, clickTimer:null, pulseTimer:null, bpm:40, interp:'Down', countIn:true, click:true, settingsOpen:false, cycleIdx:0, cursorTimeouts:[], clickNotes:4, cycleT0:0 };
+const PREVIEW = { ctx:null, masterGain:null, patId:null, timer:null, clickTimer:null, pulseTimer:null, bpm:80, interp:'Down', countIn:false, click:true, settingsOpen:false, cycleIdx:0, cursorTimeouts:[], clickNotes:4, cycleT0:0 };
 
 /**
  * Crée ou récupère le Web Audio Context pour la prévisualisation des patterns

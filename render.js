@@ -41,6 +41,7 @@ function render() {
   else                               el.innerHTML = renderProgress();
   metroPostRender();
   refreshAllTraceDisplays();
+  if (typeof initFormeFades === 'function') requestAnimationFrame(initFormeFades);
 }
 
 
@@ -376,7 +377,11 @@ function renderPatternGroupBody(pats, key) {
           return `<button id="${btnId}" onclick="setGammeForme('${p.id}','${fk}')" style="${st}">${fk}</button>`;
         }).join('');
         const formeContainer = useScrollForme
-          ? `<div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch;scrollbar-width:none">${formeRow}</div>`
+          ? `<div style="position:relative">
+              <div class="forme-scroll-fade-left"></div>
+              <div style="display:flex;gap:8px;overflow-x:auto;padding-bottom:2px;-webkit-overflow-scrolling:touch;scrollbar-width:none" onscroll="updateFormeFade(this)">${formeRow}</div>
+              <div class="forme-scroll-fade-right"></div>
+             </div>`
           : `<div style="display:flex;gap:6px">${formeRow}</div>`;
         dirTabsHtml = `
           <div style="margin-bottom:8px">
@@ -716,6 +721,7 @@ function renderPatterns() {
   html += `</div>`;
 
   let visible = PATTERNS.filter(p =>
+    p.cat !== 'arpeges' && p.cat !== 'gamme' &&
     (state.filter === 'all' || p.cat === state.filter) &&
     (state.diffFilter === 'all' || state.diffFilter === 'Challenge' || p.difficulty === state.diffFilter)
   );
@@ -758,7 +764,9 @@ function renderPatterns() {
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:7px">
             <span style="width:7px;height:7px;border-radius:50%;background:${diffDot};flex-shrink:0;display:inline-block"></span>
-            <h2 style="font-size:14px">${key} — ${base.name}</h2>
+            <h2 style="font-size:14px;margin:0;font-weight:700">${key}</h2>
+            <span style="color:var(--text);opacity:.3;font-size:13px;font-weight:300">·</span>
+            <span style="font-size:13px;color:var(--text);opacity:.65;font-style:italic;font-weight:400">${base.name}</span>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
