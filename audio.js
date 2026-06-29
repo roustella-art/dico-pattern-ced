@@ -164,7 +164,9 @@ const PREVIEW = { ctx:null, masterGain:null, patId:null, timer:null, clickTimer:
  * @returns {AudioContext} Contexte audio
  */
 function previewCtx() {
-  if (!PREVIEW.ctx) PREVIEW.ctx = new (window.AudioContext||window.webkitAudioContext)();
+  if (!PREVIEW.ctx || PREVIEW.ctx.state === 'closed') {
+    PREVIEW.ctx = new (window.AudioContext||window.webkitAudioContext)();
+  }
   if (PREVIEW.ctx.state === 'suspended') PREVIEW.ctx.resume();
   return PREVIEW.ctx;
 }
@@ -1406,6 +1408,7 @@ function getEffectiveTab(tabStr) {
 function previewPlay(patId) {
   if (PREVIEW.patId === patId) { previewStop(); return; }
   if (METRO.running) metroStop();
+  if (typeof stopShaker === 'function' && typeof skIsPlaying !== 'undefined' && skIsPlaying) stopShaker();
   previewStop();
   const pat = PATTERNS.find(p => p.id === patId);
   if (!pat) return;

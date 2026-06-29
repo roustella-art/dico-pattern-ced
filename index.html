@@ -179,6 +179,9 @@
   .filter-seg button.active.diff-int{background:#c07830}
   .filter-seg button.active.diff-adv{background:#a03030}
   .filter-seg button.active.diff-challenge{background:#7B5EA7}
+  .filter-seg button.active.sort-progressif{background:#2e7d9a}
+  .filter-seg button.active.sort-alphabetique{background:#6a5acd}
+  .filter-seg button.active.sort-aleatoire{background:#b06820}
 
   /* TAB DISPLAY */
   .tab-wrap{overflow-x:auto;margin:10px 0;background:#1a1a2e;border-radius:8px;padding:10px 12px;position:relative;cursor:pointer;-webkit-tap-highlight-color:transparent}
@@ -457,6 +460,9 @@
     <button onclick="showTab('journal')" id="nav-journal">
       <span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2z"/><polyline points="16 2 16 8 8 8 8 2"/><line x1="9" y1="13" x2="15" y2="13"/><line x1="9" y1="17" x2="15" y2="17"/></svg></span>Journal
     </button>
+    <button onclick="showTab('shaker')" id="nav-shaker">
+      <span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="2" rx="1"/><rect x="3" y="13" width="18" height="2" rx="1"/><circle cx="7" cy="5" r="1.5"/><circle cx="12" cy="5" r="1.5"/><circle cx="17" cy="5" r="1.5"/><circle cx="7" cy="19" r="1.5"/><circle cx="12" cy="19" r="1.5"/><circle cx="17" cy="19" r="1.5"/></svg></span>Shaker
+    </button>
   </nav>
 </div>
 
@@ -465,6 +471,7 @@
 <script src="onboarding.js"></script>
 <script src="audio.js"></script>
 <script src="render.js"></script>
+<script src="shaker.js"></script>
 <script>
 // ─── LOGIQUE PRINCIPALE ───────────────────────────────────────────────────────
 // Les données (PATTERNS, MODES, TEMPOS…)     → data.js
@@ -1820,6 +1827,7 @@ function showTab(tab) {
     return;
   }
   if (METRO.running && tab !== state.tab) { metroStop(false); }
+  if (tab !== 'shaker' && state.tab !== tab && typeof stopShaker === 'function') stopShaker();
   state.tab = tab;
   // Retour sur Journal → toujours afficher Historique en premier
   if (tab === 'journal') journalSubTab = 'journal';
@@ -2058,6 +2066,16 @@ function openSettings(tab) {
       <!-- ═══ PANE : AFFICHAGE — Cordes / Case / Loop étendu ═══ -->
       <div id="pane-affichage" style="display:${settingsTab==='affichage'?'block':'none'}">
         <div class="group">
+          <label class="group-label">Filtre de difficulté (Patterns)</label>
+          <div class="switch-row" style="border-bottom:none;padding-top:0">
+            <div>
+              <div class="sr-label">Afficher Basique / Technique / Complexe</div>
+            </div>
+            <button class="toggle-switch ${SETTINGS.showDiffFilter ? 'on' : ''}" role="switch" aria-checked="${SETTINGS.showDiffFilter ? 'true' : 'false'}" aria-label="Filtre difficulté" onclick="SETTINGS.showDiffFilter=!SETTINGS.showDiffFilter;saveSettings();this.classList.toggle('on');this.setAttribute('aria-checked',String(SETTINGS.showDiffFilter));render()"></button>
+          </div>
+        </div>
+
+        <div class="group">
           <label class="group-label">Loop étendu</label>
           <div class="seg" id="seg-loop-ext">
             ${[-1,0,1,2,3,4].map(n => `
@@ -2176,7 +2194,7 @@ function openSettings(tab) {
           <button class="sf-btn" onclick="doImportJSON()">↑ Importer JSON</button>
         </div>
         <button class="sf-reset" onclick="resetApp()">Réinitialiser l'app</button>
-        <div class="sf-version">v3.7</div>
+        <div class="sf-version">v3.8</div>
       </div>
     </div>
   </div>`;

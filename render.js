@@ -38,6 +38,7 @@ function render() {
   else if (state.tab === 'gammes')   el.innerHTML = renderGammes();
   else if (state.tab === 'arpeges')  el.innerHTML = renderArpeges();
   else if (state.tab === 'journal')  el.innerHTML = renderJournalPage();
+  else if (state.tab === 'shaker')   { el.innerHTML = renderShaker(); skInit(); }
   else                               el.innerHTML = renderProgress();
   metroPostRender();
   refreshAllTraceDisplays();
@@ -698,44 +699,40 @@ function dirLabel(d) {
 }
 
 /**
- * Redessine l'onglet Patterns avec filtrage par catégorie et difficulté
+ * Redessine l'onglet Patterns avec tri : Progressif / Alphabétique / Aléatoire
  * @returns {string} HTML du contenu Patterns
  */
 function renderPatterns() {
-  const filters = ['all','A2','A3','A4','A5','A6','B8','B6'];
-  const filterLabels = {all:'Tous',A2:'A2 — 2 notes',A3:'A3 — 3 notes',A4:'A4 — 4 notes',A5:'A5 — 5 notes',A6:'A6 — triade ×2',B8:'B8 — 2 cordes ×8',B6:'B6 — multi-cordes'};
-  let html = `<div class="filter-bar" style="display:none">`;
-  filters.forEach(f => {
-    html += `<button class="${state.filter===f?'active':''}" onclick="setFilter('${f}')">${filterLabels[f]}</button>`;
+  if (!state.patternSort) state.patternSort = 'progressif';
+
+  const sorts = ['progressif','alphabetique','aleatoire'];
+  const sortLabels = {progressif:'Progressif', alphabetique:'Alphabétique', aleatoire:'Aléatoire'};
+  let html = `<div class="filter-seg">`;
+  sorts.forEach(s => {
+    const active = state.patternSort === s ? 'active' : '';
+    html += `<button class="${active} sort-${s}" onclick="setPatternSort('${s}')">${sortLabels[s]}</button>`;
   });
   html += `</div>`;
 
-  const diffs = ['all','Basique','Technique','Complexe','Challenge'];
-  const diffColors = {all:'',Basique:'diff-deb',Technique:'diff-int',Complexe:'diff-adv',Challenge:'diff-challenge'};
-  html += `<div class="filter-seg">`;
-  diffs.forEach(d => {
-    const active = state.diffFilter === d ? 'active' : '';
-    const colorClass = active && d !== 'all' ? diffColors[d] : '';
-    html += `<button class="${active} ${colorClass}" onclick="setDiffFilter('${d}')">${d === 'all' ? 'Tous' : d === 'Challenge' ? 'Aléatoire' : d}</button>`;
-  });
-  html += `</div>`;
+  if (SETTINGS.showDiffFilter) {
+    if (!state.diffFilter) state.diffFilter = 'all';
+    const diffs = ['all','Basique','Technique','Complexe'];
+    const diffColors = {Basique:'diff-deb', Technique:'diff-int', Complexe:'diff-adv'};
+    html += `<div class="filter-seg" style="margin-top:-8px">`;
+    diffs.forEach(d => {
+      const active = state.diffFilter === d ? 'active' : '';
+      const colorClass = active && d !== 'all' ? diffColors[d] : '';
+      html += `<button class="${active} ${colorClass}" onclick="setDiffFilter('${d}')">${d === 'all' ? 'Tous' : d}</button>`;
+    });
+    html += `</div>`;
+  } else {
+    state.diffFilter = 'all';
+  }
 
   let visible = PATTERNS.filter(p =>
     p.cat !== 'arpeges' && p.cat !== 'gamme' &&
-    (state.filter === 'all' || p.cat === state.filter) &&
-    (state.diffFilter === 'all' || state.diffFilter === 'Challenge' || p.difficulty === state.diffFilter)
+    (state.diffFilter === 'all' || p.difficulty === state.diffFilter)
   );
-
-  // Si Challenge, filtrer patterns avec progression < 40% et en prendre 2 aléatoires
-  if (state.diffFilter === 'Challenge') {
-    const lowProgress = visible.filter(p => {
-      const key = p.cat + 'P' + p.num;
-      const pct = getGroupPct(key);
-      return pct < 40;
-    });
-    const shuffled = lowProgress.sort(() => Math.random() - 0.5);
-    visible = shuffled.slice(0, 2);
-  }
 
   // Group by cat+num
   const groups = {};
@@ -745,8 +742,26 @@ function renderPatterns() {
     groups[key].push(p);
   });
 
+  const diffOrder = {Basique:0, Technique:1, Complexe:2};
 
-  Object.entries(groups).sort((a,b) => a[0].localeCompare(b[0])).forEach(([key, pats]) => {
+  let sortedEntries = Object.entries(groups);
+
+  if (state.patternSort === 'progressif') {
+    sortedEntries = sortedEntries.sort((a, b) => {
+      const da = diffOrder[a[1][0].difficulty] ?? 3;
+      const db = diffOrder[b[1][0].difficulty] ?? 3;
+      if (da !== db) return da - db;
+      return a[0].localeCompare(b[0]);
+    });
+  } else if (state.patternSort === 'alphabetique') {
+    sortedEntries = sortedEntries.sort((a,b) => a[0].localeCompare(b[0]));
+  } else if (state.patternSort === 'aleatoire') {
+    const lowProgress = sortedEntries.filter(([key]) => getGroupPct(key) < 40);
+    const shuffled = lowProgress.sort(() => Math.random() - 0.5);
+    sortedEntries = shuffled.slice(0, 2);
+  }
+
+  sortedEntries.forEach(([key, pats]) => {
     // Passer les gammes (qui seront affichées dans une section séparée)
     if (pats[0].cat === 'gamme') return;
 
@@ -1167,6 +1182,12 @@ function filterByGroup(groupKey) {
 
 function setDiffFilter(d) {
   state.diffFilter = d;
+  render();
+}
+
+function setPatternSort(s) {
+  state.patternSort = s;
+  saveState();
   render();
 }
 

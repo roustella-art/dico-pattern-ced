@@ -10,6 +10,7 @@ let state = {
   tab: 'patterns',
   filter: 'all',
   diffFilter: 'all',
+  patternSort: 'progressif',
   openCards: {},
   progress: {},
   favorites: {},
@@ -39,6 +40,7 @@ const SETTINGS = {
   stringGroup: 'DGBE',     // 'DGBE' | 'ADGB' | 'EADG'
   previewSound: 'doux',    // 'doux' | 'piano' | 'guitare' | 'auto'
   neckPosition: 'mid',     // 'mid' (case 5, offset 0) | 'high' (case 12, offset 7)
+  showDiffFilter: false,   // afficher filtre Basique/Technique/Complexe sous le tri patterns
   showNeckBtn: false,      // afficher/masquer le bouton mid/high dans le header
   showShuffleBtn: false,   // afficher bouton Shuffle dans la row 1 du header
   showStringBtn: false,    // afficher bouton groupe de cordes dans la row 1 du header
@@ -76,6 +78,7 @@ function loadSettings() {
     if (s.stringGroup && STRING_SHIFTS[s.stringGroup] !== undefined) SETTINGS.stringGroup = s.stringGroup;
     if (PREVIEW_SOUND_KEYS.includes(s.previewSound)) SETTINGS.previewSound = s.previewSound;
     if (['mid', 'high'].includes(s.neckPosition)) SETTINGS.neckPosition = s.neckPosition;
+    if (s.showDiffFilter !== undefined) SETTINGS.showDiffFilter = s.showDiffFilter;
     if (s.showNeckBtn !== undefined) SETTINGS.showNeckBtn = s.showNeckBtn;
     if (s.showShuffleBtn !== undefined) SETTINGS.showShuffleBtn = s.showShuffleBtn;
     if (s.showStringBtn  !== undefined) SETTINGS.showStringBtn  = s.showStringBtn;
@@ -124,6 +127,7 @@ function saveSettings() {
       stringGroup: SETTINGS.stringGroup,
       previewSound: SETTINGS.previewSound,
       neckPosition: SETTINGS.neckPosition,
+      showDiffFilter: SETTINGS.showDiffFilter,
       showNeckBtn: SETTINGS.showNeckBtn,
       showShuffleBtn: SETTINGS.showShuffleBtn,
       showStringBtn:  SETTINGS.showStringBtn,

@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shaker — DicoPattern</title>
+  <script src="data.js"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      background: #12172e;
+      color: #f4eee2;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      padding: 16px;
+      min-height: 100vh;
+    }
+
+    h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+    .subtitle { font-size: 12px; color: rgba(244,238,226,.38); margin: 3px 0 20px; }
+
+    .section-label {
+      font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .5px; color: rgba(244,238,226,.4); margin-bottom: 8px;
+    }
+
+    /* ── SEGMENTED CONTROL ── */
+    .seg {
+      display: flex; border: 1px solid rgba(244,238,226,.13);
+      border-radius: 8px; overflow: hidden; margin-bottom: 18px;
+    }
+    .seg button {
+      flex: 1; border: none; border-right: 1px solid rgba(244,238,226,.13);
+      background: transparent; padding: 8px 4px; font-size: 12px;
+      font-weight: 500; color: rgba(244,238,226,.45); cursor: pointer;
+      transition: all .15s;
+    }
+    .seg button:last-child { border-right: none; }
+    .seg button.active.mode-strict  { background: #1e5f8a; color: #fff; font-weight: 700; }
+    .seg button.active.mode-mirror  { background: #1a5a6a; color: #fff; font-weight: 700; }
+    .seg button.active.mode-inverse { background: #5a3a7a; color: #fff; font-weight: 700; }
+    .seg button.active.mode-patron  { background: #7a5a1a; color: #fff; font-weight: 700; }
+
+    /* ── STEP LIST ── */
+    .steps-list { margin-bottom: 10px; }
+
+    .step-row {
+      display: flex; align-items: center; gap: 5px;
+      padding: 6px 0; border-bottom: 1px solid rgba(244,238,226,.06);
+    }
+    .step-row:last-child { border-bottom: none; }
+    .step-row.inactive .step-content { opacity: 0.28; pointer-events: none; }
+
+    .step-badge {
+      width: 20px; height: 20px; border-radius: 5px; flex-shrink: 0;
+      background: rgba(244,238,226,.1); color: rgba(244,238,226,.45);
+      font-size: 10px; font-weight: 700; display: flex;
+      align-items: center; justify-content: center;
+    }
+    .step-content {
+      display: flex; align-items: center; gap: 5px; flex: 1; min-width: 0;
+      transition: opacity .15s;
+    }
+
+    /* ── SELECTS ── */
+    select {
+      background: rgba(255,255,255,.06); border: 1px solid rgba(244,238,226,.13);
+      border-radius: 6px; color: #f4eee2; font-size: 12px; padding: 5px 6px;
+      cursor: pointer; outline: none; transition: border-color .15s;
+    }
+    select:focus { border-color: rgba(244,238,226,.35); }
+    select:disabled { opacity: .22; cursor: default; }
+    option { background: #12172e; }
+
+    .str-select  { width: 50px; flex-shrink: 0; padding: 5px 3px; text-align: center; }
+    .pat-select  { flex: 1; min-width: 0; }
+    .forme-select{ width: 82px; flex-shrink: 0; }
+    .dur-select  { width: 54px; flex-shrink: 0; font-weight: 600; color: #c8b87a; }
+
+    /* ── ACTIVE TOGGLE ── */
+    .active-toggle {
+      border: none; background: transparent; cursor: pointer; padding: 2px;
+      font-size: 15px; line-height: 1; flex-shrink: 0; color: rgba(244,238,226,.25);
+      transition: color .15s;
+    }
+    .active-toggle.on { color: #4caf80; }
+
+    /* ── STEPPER ── */
+    .stepper {
+      display: flex; align-items: center;
+      border: 1px solid rgba(244,238,226,.13); border-radius: 6px;
+      overflow: hidden; flex-shrink: 0;
+    }
+    .stepper button {
+      border: none; padding: 4px 6px; font-size: 13px; line-height: 1;
+      cursor: pointer; background: transparent; color: rgba(244,238,226,.5);
+    }
+    .stepper button:disabled { opacity: .25; cursor: default; }
+    .stepper-val {
+      font-size: 12px; font-weight: 700; min-width: 16px;
+      text-align: center; color: rgba(244,238,226,.7);
+    }
+    .stepper-val.offset { color: #f0a830; }
+
+    /* ── DIR BUTTONS ── */
+    .dir-btns {
+      display: flex; border: 1px solid rgba(244,238,226,.13);
+      border-radius: 6px; overflow: hidden; flex-shrink: 0;
+    }
+    .dir-btns button {
+      border: none; padding: 4px 7px; font-size: 11px; font-weight: 600;
+      cursor: pointer; background: transparent; color: rgba(244,238,226,.4);
+      transition: all .15s;
+    }
+    .dir-btns button + button { border-left: 1px solid rgba(244,238,226,.13); }
+    .dir-btns button.active-U { background: #1e6e4a; color: #fff; }
+    .dir-btns button.active-D { background: #7a2e28; color: #fff; }
+
+    /* ── MOVE BUTTONS ── */
+    .move-btns {
+      display: flex; flex-direction: column;
+      border: 1px solid rgba(244,238,226,.13); border-radius: 6px;
+      overflow: hidden; flex-shrink: 0;
+    }
+    .move-btns button {
+      border: none; padding: 2px 5px; font-size: 9px; line-height: 1.4;
+      cursor: pointer; background: transparent; color: rgba(244,238,226,.4);
+      transition: color .15s;
+    }
+    .move-btns button:disabled { opacity: .18; cursor: default; }
+    .move-btns button:not(:disabled):hover { color: #f4eee2; }
+    .move-btns button + button { border-top: 1px solid rgba(244,238,226,.1); }
+
+    /* ── ACTION BUTTONS ── */
+    .dup-btn, .del-btn {
+      border: none; background: transparent; font-size: 14px; line-height: 1;
+      cursor: pointer; padding: 3px 2px; flex-shrink: 0; transition: color .15s;
+    }
+    .dup-btn { color: rgba(244,238,226,.22); }
+    .dup-btn:not(:disabled):hover { color: #7ab0e0; }
+    .dup-btn:disabled { opacity: .15; cursor: not-allowed; }
+    .del-btn { color: rgba(244,238,226,.22); }
+    .del-btn:hover { color: #b05050; }
+
+    /* ── REST LABEL ── */
+    .rest-label {
+      width: 50px; flex-shrink: 0; text-align: center;
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .5px; color: rgba(244,238,226,.3);
+    }
+
+    /* ── ADD STEP BUTTON ── */
+    .add-step-btn {
+      width: 100%; padding: 9px; border-radius: 8px; margin-bottom: 18px;
+      border: 1px dashed rgba(244,238,226,.2); background: transparent;
+      color: rgba(244,238,226,.45); font-size: 13px; font-weight: 600;
+      cursor: pointer; transition: all .15s;
+    }
+    .add-step-btn:hover { border-color: rgba(244,238,226,.4); color: rgba(244,238,226,.7); }
+    .add-step-btn:disabled { opacity: .25; cursor: not-allowed; }
+
+    /* ── BPM ── */
+    .bpm-row { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .bpm-row label { font-size: 12px; color: rgba(244,238,226,.4); white-space: nowrap; }
+    .bpm-row input[type=range] { flex: 1; accent-color: #1e5f8a; }
+    .bpm-val { font-size: 14px; font-weight: 700; min-width: 36px; text-align: right; }
+
+    /* ── ACTIONS ── */
+    .actions { display: flex; gap: 8px; margin-bottom: 12px; }
+    .btn {
+      flex: 1; padding: 11px 8px; border-radius: 8px; border: none;
+      font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s;
+    }
+    .btn:active { transform: scale(0.97); }
+    .btn-play  { background: #1e6e4a; color: #fff; }
+    .btn-stop  { background: #7a2e28; color: #fff; }
+    .btn-clear { background: rgba(255,255,255,.08); color: rgba(244,238,226,.6); }
+
+    /* ── TAB ── */
+    .tab-wrap {
+      background: #080c1a; border-radius: 10px;
+      border: 1px solid rgba(244,238,226,.09); overflow: hidden;
+    }
+    .tab-measure-header {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .5px; color: rgba(244,238,226,.3);
+      padding: 8px 14px 4px; border-bottom: 1px solid rgba(244,238,226,.06);
+    }
+    .tab-display {
+      font-family: 'Courier New', Courier, monospace; font-size: 13px;
+      line-height: 2; color: #f4eee2; overflow-x: auto; white-space: pre;
+      padding: 10px 14px;
+    }
+    .tab-sep { height: 1px; background: rgba(244,238,226,.06); }
+    .empty-state {
+      color: rgba(244,238,226,.28); text-align: center;
+      padding: 32px 16px; font-size: 13px; line-height: 1.7;
+    }
+
+    /* ── INFO BAR ── */
+    .info-bar { display: flex; gap: 6px; margin-bottom: 12px; flex-wrap: wrap; }
+    .info-chip {
+      font-size: 11px; padding: 3px 9px; border-radius: 12px;
+      background: rgba(255,255,255,.07); color: rgba(244,238,226,.5);
+    }
+    .info-chip.ok   { background: rgba(30,110,74,.3);  color: #6fcfa0; }
+    .info-chip.warn { background: rgba(180,90,20,.3);  color: #e8aa60; }
+    .info-chip.rest { background: rgba(70,70,110,.3);  color: #9090c8; }
+
+    /* ── PRESETS ── */
+    .preset-bar {
+      display: flex; gap: 8px; margin-bottom: 16px; align-items: center;
+    }
+    .preset-select { flex: 1; font-style: italic; }
+    .preset-select.loaded { font-style: normal; font-weight: 600; color: #c8b87a; }
+    .preset-btn {
+      border: 1px solid rgba(244,238,226,.18); background: transparent;
+      border-radius: 6px; padding: 6px 11px; color: rgba(244,238,226,.55);
+      font-size: 12px; font-weight: 600; cursor: pointer; transition: all .15s;
+      white-space: nowrap; flex-shrink: 0;
+    }
+    .preset-btn:not(:disabled):hover { border-color: rgba(244,238,226,.45); color: rgba(244,238,226,.9); }
+    .preset-btn.save  { border-color: rgba(30,110,74,.5); color: #6fcfa0; }
+    .preset-btn.save:not(:disabled):hover { background: rgba(30,110,74,.2); }
+    .preset-btn.del   { border-color: rgba(180,60,60,.3); color: rgba(200,100,100,.6); }
+    .preset-btn.del:not(:disabled):hover  { border-color: #b05050; color: #e07070; }
+    .preset-btn:disabled { opacity: .22; cursor: not-allowed; }
+  </style>
+</head>
+<body>
+
+<h1>Shaker</h1>
+<p class="subtitle">Compose ton exercice en définissant une séquence de pas</p>
+
+<div class="preset-bar">
+  <select class="preset-select" id="preset-select" onchange="onPresetChange(this)">
+    <option value="">— Mes presets —</option>
+  </select>
+  <button class="preset-btn save" onclick="savePreset()">Sauvegarder</button>
+  <button class="preset-btn del" id="delete-preset-btn" onclick="deletePreset()" disabled>Supprimer</button>
+</div>
+
+<div class="section-label">
+  Séquence — <span id="step-count">0</span> / 16 pas
+</div>
+<div class="steps-list" id="steps-list"></div>
+<button class="add-step-btn" id="add-step-btn" onclick="addStep()">＋ Ajouter un pas</button>
+
+<div class="section-label">Mode de lecture</div>
+<div style="display:flex;gap:8px;margin-bottom:18px;align-items:center">
+  <div class="seg" id="mode-seg" style="margin-bottom:0;flex:1">
+    <button class="mode-strict"  onclick="setPlayMode('strict')">Strict</button>
+    <button class="mode-mirror"  onclick="setPlayMode('mirror')">Miroir</button>
+    <button class="mode-inverse active" onclick="setPlayMode('inverse')">Inversé</button>
+    <button class="mode-patron"  onclick="setPlayMode('patron')">Patron</button>
+  </div>
+  <div id="patron-offset-ctrl" style="display:none;align-items:center;border:1px solid rgba(244,238,226,.13);border-radius:6px;overflow:hidden;flex-shrink:0">
+    <button onclick="changePatronOffset(-1)" style="border:none;padding:6px 9px;font-size:13px;cursor:pointer;background:transparent;color:rgba(244,238,226,.5)">−</button>
+    <span id="patron-offset-val" style="font-size:12px;font-weight:700;min-width:24px;text-align:center;color:#f0a830">+1</span>
+    <button onclick="changePatronOffset(+1)" style="border:none;padding:6px 9px;font-size:13px;cursor:pointer;background:transparent;color:rgba(244,238,226,.5)">+</button>
+  </div>
+</div>
+
+<div class="bpm-row">
+  <label>Tempo</label>
+  <input type="range" min="40" max="200" value="80" id="bpm-slider"
+    oninput="document.getElementById('bpm-display').textContent = this.value">
+  <span class="bpm-val" id="bpm-display">80</span>
+  <span style="font-size:11px;color:rgba(244,238,226,.3)">BPM</span>
+</div>
+
+<div class="info-bar" id="info-bar"></div>
+
+<div class="actions">
+  <button class="btn btn-play" id="play-btn" onclick="playShaker()">▶ Play</button>
+  <button class="btn btn-stop" id="stop-btn" onclick="stopShaker()" style="display:none">■ Stop</button>
+  <button class="btn btn-clear" onclick="clearAll()">Reset</button>
+</div>
+
+<div class="tab-wrap" id="tab-wrap">
+  <div class="tab-display">
+    <div class="empty-state">Ajoute au moins un pas pour composer ton exercice</div>
+  </div>
+</div>
+
+<script>
+// ── CONSTANTS ─────────────────────────────────────────────────────────────────
+const DISPLAY_ORDER  = ['e','B','G','D','A','E'];
+const STRING_OPTIONS = ['e','B','G','D','A','E'];
+const OPEN_FREQS     = { E:82.41, A:110.0, D:146.83, G:196.0, B:246.94, e:329.63 };
+const MAX_STEPS      = 16;
+const DURATION_MULT  = { '1/4':1, '1/8':0.5, '1/16':0.25, '1/8t':1/3 };
+const REST_TAB_WIDTH = 4;
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+// step: { string, patKey, forme, dir, startFret, active, duration }
+let steps           = [];
+let lastAssignments = [];
+let playMode        = 'inverse';
+let patronOffset    = 1;
+let audioCtx        = null;
+let activeMaster    = null;
+let playTimers      = [];
+
+// ── PATTERN DATA ──────────────────────────────────────────────────────────────
+function buildPatGroups() {
+  const groups = {};
+  PATTERNS.forEach(p => {
+    if (!p.cat || !p.cat.match(/^A\d/)) return;
+    const key = p.cat + 'P' + p.num;
+    if (!groups[key]) groups[key] = [];
+    groups[key].push(p);
+  });
+  return groups;
+}
+const PAT_GROUPS = buildPatGroups();
+const PAT_KEYS   = Object.keys(PAT_GROUPS).sort((a,b) => a.localeCompare(b, undefined, {numeric:true}));
+
+function getBasePat(key) {
+  const pats = PAT_GROUPS[key];
+  if (!pats) return null;
+  return pats.find(p => p.hasDirectionTabs) ||
+         pats.find(p => !p.dir || p.dir === 'U') ||
+         pats[0];
+}
+
+function getFormes(key) {
+  const base = getBasePat(key);
+  if (!base) return ['standard'];
+  return base.formeTabs && base.formeTabs.length ? base.formeTabs : ['standard'];
+}
+
+function parseNotesFromTab(tabStr) {
+  if (!tabStr) return [];
+  const mainSection = tabStr.split(/\n?↩/)[0];
+  const lines = mainSection.split('\n');
+  const dLine = lines.find(l => /^D\s*\|/.test(l.trim()));
+  if (!dLine) return [];
+  const content = dLine.replace(/^D\s*\|/, '').replace(/\|+$/, '').replace(/[o]+/g, '');
+  const matches = content.match(/\d+/g);
+  return matches ? matches.map(Number) : [];
+}
+
+function getNotes(key, forme, dir) {
+  const pats = PAT_GROUPS[key];
+  if (!pats || !pats.length) return [];
+  const consolidated = pats.find(p => p.hasDirectionTabs);
+  if (consolidated && consolidated.directions) {
+    const tabKey = dir + '|' + forme;
+    let tabStr = consolidated.directions[tabKey];
+    if (!tabStr) {
+      const fallbackKey = Object.keys(consolidated.directions).find(k => k.endsWith('|' + forme));
+      tabStr = fallbackKey ? consolidated.directions[fallbackKey] : null;
+    }
+    if (!tabStr) tabStr = consolidated.directions[Object.keys(consolidated.directions)[0]];
+    return parseNotesFromTab(tabStr);
+  }
+  const dirPat = pats.find(p => p.dir === dir) || pats.find(p => p.dir === 'U') || pats[0];
+  return parseNotesFromTab(dirPat.tab || '');
+}
+
+function transposedNotes(notes, startFret) {
+  const offset = startFret - 5;
+  if (offset === 0) return notes;
+  return notes.map(n => n === 0 ? 0 : Math.max(0, n + offset));
+}
+
+// ── STEP MANAGEMENT ───────────────────────────────────────────────────────────
+function addStep() {
+  if (steps.length >= MAX_STEPS) return;
+  steps.push({ string:'e', patKey:'', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/4' });
+  buildStepsUI();
+  generateAndShow();
+}
+
+function removeStep(i) {
+  steps.splice(i, 1);
+  buildStepsUI();
+  generateAndShow();
+}
+
+function duplicateStep(i) {
+  if (steps.length >= MAX_STEPS) return;
+  steps.splice(i + 1, 0, { ...steps[i] });
+  buildStepsUI();
+  generateAndShow();
+}
+
+function moveStep(i, dir) {
+  const j = i + dir;
+  if (j < 0 || j >= steps.length) return;
+  [steps[i], steps[j]] = [steps[j], steps[i]];
+  buildStepsUI();
+  generateAndShow();
+}
+
+function toggleStepActive(i) {
+  steps[i].active = !steps[i].active;
+  buildStepsUI();
+  generateAndShow();
+}
+
+function setStepString(i, val)   { steps[i].string   = val;   generateAndShow(); }
+function setStepForme(i, forme)  { steps[i].forme     = forme; generateAndShow(); }
+function setStepDuration(i, d)   { steps[i].duration  = d;     generateAndShow(); }
+
+function setStepDir(i, d) {
+  steps[i].dir = d;
+  buildStepsUI();
+  generateAndShow();
+}
+
+function setStepPat(i, key) {
+  steps[i].patKey = key;
+  if (key && key !== 'rest') steps[i].forme = getFormes(key)[0] || 'standard';
+  buildStepsUI();
+  generateAndShow();
+}
+
+function changeStepFret(i, delta) {
+  steps[i].startFret = Math.max(0, Math.min(17, (steps[i].startFret ?? 5) + delta));
+  buildStepsUI();
+  generateAndShow();
+}
+
+// ── STEP UI ───────────────────────────────────────────────────────────────────
+function buildStepsUI() {
+  const list    = document.getElementById('steps-list');
+  const countEl = document.getElementById('step-count');
+  const addBtn  = document.getElementById('add-step-btn');
+
+  countEl.textContent = steps.length;
+  addBtn.disabled     = steps.length >= MAX_STEPS;
+
+  if (!steps.length) { list.innerHTML = ''; return; }
+
+  const atMax = steps.length >= MAX_STEPS;
+
+  list.innerHTML = steps.map((st, i) => {
+    const isRest = st.patKey === 'rest';
+    const formes = (!isRest && st.patKey) ? getFormes(st.patKey) : [];
+    const dur    = st.duration || '1/4';
+
+    const strOptions = STRING_OPTIONS.map(s =>
+      `<option value="${s}" ${st.string === s ? 'selected':''}>${s}</option>`
+    ).join('');
+
+    const patOptions = PAT_KEYS.map(k => {
+      const ff    = getFormes(k)[0] || 'standard';
+      const notes = getNotes(k, ff, st.dir || 'U');
+      const ns    = notes.length ? notes.map(n => '-'+n).join('')+'-' : '?';
+      return `<option value="${k}" ${st.patKey === k ? 'selected':''}>${k} : ${ns}</option>`;
+    }).join('');
+
+    const formeOptions = formes.map(f =>
+      `<option value="${f}" ${st.forme === f ? 'selected':''}>${f}</option>`
+    ).join('');
+
+    const fretColor = st.startFret !== 5 ? 'offset' : '';
+
+    return `
+<div class="step-row ${!st.active ? 'inactive' : ''}">
+  <button class="active-toggle ${st.active ? 'on' : ''}" onclick="toggleStepActive(${i})">${st.active ? '●' : '○'}</button>
+  <div class="step-badge">${i+1}</div>
+  <div class="step-content">
+    ${isRest
+      ? `<span class="rest-label">pause</span>`
+      : `<select class="str-select" onchange="setStepString(${i},this.value)">${strOptions}</select>`
+    }
+    <select class="pat-select" onchange="setStepPat(${i},this.value)">
+      <option value="" ${!st.patKey && !isRest ? 'selected':''}>— choisir —</option>
+      <option value="rest" ${isRest ? 'selected':''}>⊘ pause</option>
+      ${patOptions}
+    </select>
+    ${!isRest && formes.length > 1
+      ? `<select class="forme-select" onchange="setStepForme(${i},this.value)">${formeOptions}</select>`
+      : ''
+    }
+    ${!isRest ? `
+    <div class="dir-btns">
+      <button onclick="setStepDir(${i},'U')" class="${st.dir==='U'?'active-U':''}">↑</button>
+      <button onclick="setStepDir(${i},'D')" class="${st.dir==='D'?'active-D':''}">↓</button>
+    </div>
+    <div class="stepper">
+      <button onclick="changeStepFret(${i},-1)">−</button>
+      <span class="stepper-val ${fretColor}">${st.startFret}</span>
+      <button onclick="changeStepFret(${i},+1)">+</button>
+    </div>` : ''}
+    <select class="dur-select" onchange="setStepDuration(${i},this.value)">
+      <option value="1/4"  ${dur==='1/4'  ? 'selected':''}>1/4</option>
+      <option value="1/8"  ${dur==='1/8'  ? 'selected':''}>1/8</option>
+      <option value="1/16" ${dur==='1/16' ? 'selected':''}>1/16</option>
+      <option value="1/8t" ${dur==='1/8t' ? 'selected':''}>T</option>
+    </select>
+  </div>
+  <div class="move-btns">
+    <button onclick="moveStep(${i},-1)" ${i===0?'disabled':''}>▲</button>
+    <button onclick="moveStep(${i},+1)" ${i===steps.length-1?'disabled':''}>▼</button>
+  </div>
+  <button class="dup-btn" onclick="duplicateStep(${i})" ${atMax?'disabled':''} title="Dupliquer">⧉</button>
+  <button class="del-btn" onclick="removeStep(${i})" title="Supprimer">✕</button>
+</div>`;
+  }).join('');
+}
+
+// ── ASSIGNMENTS ───────────────────────────────────────────────────────────────
+function buildAssignments() {
+  return steps.map(st => {
+    if (!st.active) return null;
+    if (st.patKey === 'rest') {
+      return { string:null, notes:[], isRest:true, duration: st.duration || '1/4' };
+    }
+    if (!st.patKey) return null;
+    const forme = st.forme || 'standard';
+    const raw   = getNotes(st.patKey, forme, st.dir || 'U');
+    if (!raw.length) return null;
+    return { string: st.string, notes: transposedNotes(raw, st.startFret ?? 5), duration: st.duration || '1/4' };
+  }).filter(Boolean);
+}
+
+// ── TAB RENDERING ─────────────────────────────────────────────────────────────
+function renderStepCascade(assignments) {
+  const stepWidths = assignments.map(a =>
+    a.isRest ? REST_TAB_WIDTH :
+    a.notes.reduce((sum, n) => sum + 2 + String(n).length, 0)
+  );
+  let pos = 0;
+  const stepStarts = stepWidths.map(w => { const s = pos; pos += w; return s; });
+  const totalWidth = pos;
+
+  return DISPLAY_ORDER.map(s => {
+    const chars = Array(totalWidth).fill('-');
+    assignments.forEach((a, i) => {
+      if (a.isRest || a.string !== s) return;
+      a.notes.map(n => '--' + n).join('').split('').forEach((c, j) => {
+        chars[stepStarts[i] + j] = c;
+      });
+    });
+    return `${s} |${chars.join('')}|`;
+  }).join('\n');
+}
+
+// ── MEASURE 2 ─────────────────────────────────────────────────────────────────
+function mirrorOf(assignments) {
+  return assignments.slice().reverse().map(a =>
+    a.isRest ? { ...a } : { ...a, notes: [...a.notes].reverse() }
+  );
+}
+
+function buildMeasure2(assignments) {
+  if (playMode === 'strict' || playMode === 'mirror') return null;
+  if (playMode === 'inverse') return mirrorOf(assignments);
+  // patron
+  return assignments.map(a =>
+    a.isRest ? { ...a } : { ...a, notes: a.notes.map(n => n === 0 ? 0 : n + patronOffset) }
+  );
+}
+
+function modeLabel2() {
+  if (playMode === 'strict' || playMode === 'mirror') return null;
+  if (playMode === 'inverse') return 'Mesure 2 — retour inversé';
+  return `Mesure 2 — retour +${patronOffset}`;
+}
+
+// ── GENERATE & DISPLAY ────────────────────────────────────────────────────────
+function generateAndShow() {
+  const assignments = buildAssignments();
+
+  if (!assignments.length) {
+    document.getElementById('tab-wrap').innerHTML =
+      `<div class="tab-display"><div class="empty-state">Assigne au moins un pattern pour voir la tablature</div></div>`;
+    lastAssignments = [];
+    updateInfoBar([]);
+    return;
+  }
+
+  // Mirror mode: play the reversed sequence as the single measure
+  const displayAssignments = playMode === 'mirror' ? mirrorOf(assignments) : assignments;
+  lastAssignments = displayAssignments;
+
+  const noteCount = displayAssignments.filter(a => !a.isRest).reduce((s,a) => s + a.notes.length, 0);
+  const m2 = buildMeasure2(assignments);
+
+  const m1label = playMode === 'mirror'
+    ? `Mesure 1 — ${noteCount} notes · descendant`
+    : `Mesure 1 — ${noteCount} notes · ${assignments.length} pas`;
+
+  let html = `
+    <div class="tab-measure-header">${m1label}</div>
+    <div class="tab-display">${renderStepCascade(displayAssignments)}</div>`;
+
+  if (m2) {
+    html += `
+    <div class="tab-sep"></div>
+    <div class="tab-measure-header">${modeLabel2()}</div>
+    <div class="tab-display">${renderStepCascade(m2)}</div>`;
+  }
+
+  document.getElementById('tab-wrap').innerHTML = html;
+  updateInfoBar(assignments);
+}
+
+function updateInfoBar(assignments) {
+  const bar = document.getElementById('info-bar');
+  if (!assignments.length) { bar.innerHTML = ''; return; }
+  const noteSteps = assignments.filter(a => !a.isRest);
+  const restSteps = assignments.filter(a => a.isRest);
+  const noteCount = noteSteps.reduce((s, a) => s + a.notes.length, 0);
+  const inactive  = steps.filter(s => !s.active).length;
+
+  const durations = new Set(assignments.map(a => a.duration));
+  const durLabels = { '1/4':'noires', '1/8':'croches', '1/16':'double-croches', '1/8t':'triolets' };
+  const durText   = durations.size === 1 ? ' · ' + (durLabels[assignments[0].duration] || '') : ' · mixte';
+
+  let html = `<span class="info-chip ok">${assignments.length} pas · ${noteCount} notes${durText}</span>`;
+  if (restSteps.length) html += `<span class="info-chip rest">${restSteps.length} pause${restSteps.length > 1 ? 's':''}</span>`;
+  if (inactive)         html += `<span class="info-chip warn">${inactive} inactif${inactive > 1 ? 's':''}</span>`;
+  bar.innerHTML = html;
+}
+
+// ── PLAY MODE ─────────────────────────────────────────────────────────────────
+function setPlayMode(m) {
+  playMode = m;
+  document.querySelectorAll('#mode-seg button').forEach(b =>
+    b.classList.toggle('active', b.classList.contains('mode-' + m))
+  );
+  const ctrl = document.getElementById('patron-offset-ctrl');
+  if (ctrl) ctrl.style.display = m === 'patron' ? 'flex' : 'none';
+  generateAndShow();
+}
+
+function changePatronOffset(delta) {
+  patronOffset = Math.max(1, Math.min(5, patronOffset + delta));
+  document.getElementById('patron-offset-val').textContent = '+' + patronOffset;
+  generateAndShow();
+}
+
+// ── CLEAR ─────────────────────────────────────────────────────────────────────
+function clearAll() {
+  stopShaker();
+  steps = [];
+  lastAssignments = [];
+  buildStepsUI();
+  generateAndShow();
+  buildPresetSelect();
+}
+
+// ── AUDIO ─────────────────────────────────────────────────────────────────────
+function getAudioCtx() {
+  if (!audioCtx || audioCtx.state === 'closed')
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  if (audioCtx.state === 'suspended') audioCtx.resume();
+  return audioCtx;
+}
+
+function fretFreq(string, fret) {
+  return (OPEN_FREQS[string] || OPEN_FREQS.e) * Math.pow(2, fret / 12);
+}
+
+function scheduleNote(ctx, masterGain, freq, startTime, duration) {
+  const osc  = ctx.createOscillator();
+  const gain = ctx.createGain();
+  osc.connect(gain);
+  gain.connect(masterGain);
+  osc.type = 'triangle';
+  osc.frequency.value = freq;
+  gain.gain.setValueAtTime(0.45, startTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, startTime + duration * 0.85);
+  osc.start(startTime);
+  osc.stop(startTime + duration);
+}
+
+// Build timed event list respecting per-step duration
+function toTimedEvents(arr, baseNoteDur) {
+  let t = 0;
+  const events = [];
+  arr.forEach(a => {
+    const mult = DURATION_MULT[a.duration || '1/4'];
+    const nd   = baseNoteDur * mult;
+    if (!a.isRest && a.notes.length) {
+      a.notes.forEach((n, j) => {
+        events.push({ string: a.string, fret: n, startTime: t + j * nd, dur: nd });
+      });
+      t += a.notes.length * nd;
+    } else {
+      t += nd; // rest or unconfigured: advance by one beat
+    }
+  });
+  return { events, totalTime: t };
+}
+
+function playShaker() {
+  if (!lastAssignments.length) {
+    generateAndShow();
+    if (!lastAssignments.length) return;
+  }
+  stopShaker();
+
+  const bpm     = parseInt(document.getElementById('bpm-slider').value);
+  const noteDur = 60 / bpm;
+  const ctx     = getAudioCtx();
+  const masterGain = ctx.createGain();
+  masterGain.gain.value = 0.55;
+  masterGain.connect(ctx.destination);
+  activeMaster = masterGain;
+
+  const m2  = buildMeasure2(lastAssignments);
+  const seq = [...lastAssignments, ...(m2 || [])];
+  const { events, totalTime } = toTimedEvents(seq, noteDur);
+
+  let loopStart = ctx.currentTime + 0.05;
+  const scheduleLoop = () => {
+    events.forEach(e => {
+      scheduleNote(ctx, masterGain, fretFreq(e.string, e.fret), loopStart + e.startTime, e.dur);
+    });
+    loopStart += totalTime;
+    playTimers.push(setTimeout(scheduleLoop, (loopStart - ctx.currentTime - 0.15) * 1000));
+  };
+  scheduleLoop();
+
+  document.getElementById('play-btn').style.display = 'none';
+  document.getElementById('stop-btn').style.display = '';
+}
+
+function stopShaker() {
+  playTimers.forEach(clearTimeout);
+  playTimers = [];
+  if (activeMaster) {
+    try {
+      activeMaster.gain.cancelScheduledValues(0);
+      activeMaster.gain.setValueAtTime(0, 0);
+      activeMaster.disconnect();
+    } catch(e) {}
+    activeMaster = null;
+  }
+  document.getElementById('play-btn').style.display = '';
+  document.getElementById('stop-btn').style.display = 'none';
+}
+
+// ── PRESETS ───────────────────────────────────────────────────────────────────
+const PRESETS_KEY = 'shaker_presets';
+
+function loadPresets() {
+  try { return JSON.parse(localStorage.getItem(PRESETS_KEY) || '{}'); }
+  catch(e) { return {}; }
+}
+
+function savePresetsToStorage(presets) {
+  localStorage.setItem(PRESETS_KEY, JSON.stringify(presets));
+}
+
+function buildPresetSelect(selectName) {
+  const presets = loadPresets();
+  const sel     = document.getElementById('preset-select');
+  const names   = Object.keys(presets).sort((a, b) => a.localeCompare(b));
+  sel.innerHTML = `<option value="">— Mes presets —</option>` +
+    names.map(n => `<option value="${n}">${n}</option>`).join('');
+  if (selectName && names.includes(selectName)) {
+    sel.value = selectName;
+    sel.classList.add('loaded');
+  } else {
+    sel.value = '';
+    sel.classList.remove('loaded');
+  }
+  document.getElementById('delete-preset-btn').disabled = !sel.value;
+}
+
+function onPresetChange(sel) {
+  document.getElementById('delete-preset-btn').disabled = !sel.value;
+  sel.classList.toggle('loaded', !!sel.value);
+  if (!sel.value) return;
+  const saved = loadPresets()[sel.value];
+  if (!saved) return;
+  stopShaker();
+  steps = saved.map(s => ({ ...s }));
+  buildStepsUI();
+  generateAndShow();
+}
+
+function savePreset() {
+  if (!steps.length) return;
+  const name = prompt('Nom du preset :');
+  if (!name || !name.trim()) return;
+  const trimmed = name.trim();
+  const presets = loadPresets();
+  presets[trimmed] = steps.map(s => ({ ...s }));
+  savePresetsToStorage(presets);
+  buildPresetSelect(trimmed);
+}
+
+function deletePreset() {
+  const sel = document.getElementById('preset-select');
+  if (!sel.value) return;
+  if (!confirm(`Supprimer le preset "${sel.value}" ?`)) return;
+  const presets = loadPresets();
+  delete presets[sel.value];
+  savePresetsToStorage(presets);
+  buildPresetSelect();
+}
+
+// ── INIT ──────────────────────────────────────────────────────────────────────
+buildStepsUI();
+buildPresetSelect();
+</script>
+</body>
+</html>
