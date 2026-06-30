@@ -206,6 +206,37 @@
     .info-chip.warn { background: rgba(180,90,20,.3);  color: #e8aa60; }
     .info-chip.rest { background: rgba(70,70,110,.3);  color: #9090c8; }
 
+    /* ── PROGRESSION TABLE ── */
+    .shk-prog-wrap {
+      margin-top: 14px; border-radius: 10px;
+      border: 1px solid rgba(244,238,226,.09); overflow: hidden;
+    }
+    .shk-prog-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: .5px; color: rgba(244,238,226,.3);
+      padding: 8px 14px 6px;
+      border-bottom: 1px solid rgba(244,238,226,.06);
+    }
+    .shk-prog-table { width: 100%; border-collapse: collapse; }
+    .shk-prog-table th {
+      font-size: 10px; font-weight: 700; text-align: center;
+      padding: 5px 4px; background: #1a2440; color: rgba(244,238,226,.5);
+    }
+    .shk-prog-table th:first-child { text-align: left; padding-left: 14px; width: 72px; }
+    .shk-prog-table td {
+      text-align: center; padding: 6px 4px;
+      border-top: 1px solid rgba(244,238,226,.05);
+      cursor: pointer; transition: background .12s;
+      font-size: 16px; line-height: 1;
+    }
+    .shk-prog-table td:first-child {
+      text-align: left; padding-left: 14px; cursor: default;
+      font-size: 10px; font-weight: 700; color: rgba(244,238,226,.45);
+    }
+    .shk-prog-table td.done { color: #4caf80; }
+    .shk-prog-table td.todo { color: rgba(244,238,226,.15); }
+    .shk-prog-table td.todo:hover { color: rgba(244,238,226,.4); }
+
     /* ── PRESETS ── */
     .preset-bar {
       display: flex; gap: 8px; margin-bottom: 16px; align-items: center;
@@ -281,6 +312,7 @@
     <div class="empty-state">Ajoute au moins un pas pour composer ton exercice</div>
   </div>
 </div>
+<div id="prog-wrap" style="display:none"></div>
 
 <script>
 // ── CONSTANTS ─────────────────────────────────────────────────────────────────
@@ -767,13 +799,15 @@ function buildPresetSelect(selectName) {
 function onPresetChange(sel) {
   document.getElementById('delete-preset-btn').disabled = !sel.value;
   sel.classList.toggle('loaded', !!sel.value);
-  if (!sel.value) return;
+  currentPresetName = sel.value;
+  if (!sel.value) { renderProgTable(''); return; }
   const saved = loadPresets()[sel.value];
   if (!saved) return;
   stopShaker();
   steps = saved.map(s => ({ ...s }));
   buildStepsUI();
   generateAndShow();
+  renderProgTable(sel.value);
 }
 
 function savePreset() {
@@ -795,6 +829,64 @@ function deletePreset() {
   delete presets[sel.value];
   savePresetsToStorage(presets);
   buildPresetSelect();
+}
+
+// ── PROGRESSION ───────────────────────────────────────────────────────────────
+const SHKPROG_KEY = 'shaker_progress';
+let currentPresetName = '';
+
+function loadShakerProgress() {
+  try { return JSON.parse(localStorage.getItem(SHKPROG_KEY) || '{}'); }
+  catch(e) { return {}; }
+}
+
+function shkProgKey(presetName, interp, tempoKey) {
+  return `${presetName}__${interp}__${tempoKey}`;
+}
+
+function toggleShakerProgress(presetName, interp, tempoKey) {
+  const prog = loadShakerProgress();
+  const k = shkProgKey(presetName, interp, tempoKey);
+  prog[k] = !prog[k];
+  localStorage.setItem(SHKPROG_KEY, JSON.stringify(prog));
+  renderProgTable(presetName);
+}
+
+function renderProgTable(presetName) {
+  const wrap = document.getElementById('prog-wrap');
+  if (!presetName) { wrap.style.display = 'none'; wrap.innerHTML = ''; return; }
+
+  const prog = loadShakerProgress();
+  const interpsToUse = INTERPS; // ["Down","Up","Leg"]
+
+  const thead = `<tr>
+    <th></th>
+    ${interpsToUse.map(i => `<th>${INTERP_LABELS[i]}</th>`).join('')}
+  </tr>`;
+
+  const tbody = TEMPOS.map(tempo => {
+    const cells = interpsToUse.map(interp => {
+      const done = !!prog[shkProgKey(presetName, interp, tempo.key)];
+      return `<td class="${done ? 'done' : 'todo'}"
+        onclick="toggleShakerProgress('${presetName}','${interp}','${tempo.key}')">
+        ${done ? '✓' : '○'}
+      </td>`;
+    }).join('');
+    return `<tr>
+      <td style="color:${tempo.color}">${tempo.range}</td>
+      ${cells}
+    </tr>`;
+  }).join('');
+
+  wrap.style.display = '';
+  wrap.innerHTML = `
+    <div class="shk-prog-wrap">
+      <div class="shk-prog-label">Progression — ${presetName}</div>
+      <table class="shk-prog-table">
+        <thead>${thead}</thead>
+        <tbody>${tbody}</tbody>
+      </table>
+    </div>`;
 }
 
 // ── INIT ──────────────────────────────────────────────────────────────────────

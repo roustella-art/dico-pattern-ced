@@ -18,7 +18,7 @@ let state = {
   etapeOpen: {},   // accordéon par numéro d'étape
   cardDir: {},   // direction active par groupe, ex: {'A4P1b':'U'}
   dailyChallengeOpen: false,  // accordéon challenge du jour (fermé par défaut)
-  gammeCategory: 'all',  // filtre catégorie gammes : 'all' | 'Majeur' | 'Pentatonique' | 'Transitions' | 'Mode'
+
   gammeActiveStrings: {}, // { "gammeP1": [true,true,true,true,true,true] } — [e,B,G,D,A,E]
   gammeSelectedDir: {},  // { "pentaTrans1": "1→2" } — direction active par gamme avec directions multiples
   triadeStringGroup: {},  // { "triadeDim1": "GBe" } — groupe de cordes actif par triade
@@ -239,6 +239,41 @@ function addJournalEntry(patId, bpm, trainMode, pyramideMode, shuffleMode) {
   };
   PATTERN_JOURNAL.push(entry);
   savePatternJournal();
+}
+
+function getSessions() {
+  const dates = new Set();
+  (PATTERN_JOURNAL || []).forEach(entry => {
+    const d = new Date(entry.timestamp);
+    dates.add(d.toISOString().slice(0, 10));
+  });
+  return Array.from(dates).sort();
+}
+
+function computeStreak(sessions) {
+  if (!sessions.length) return { current: 0, record: 0 };
+  const set = new Set(sessions);
+  const today     = new Date().toISOString().slice(0, 10);
+  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
+
+  let current = 0;
+  let d = set.has(today) ? today : set.has(yesterday) ? yesterday : null;
+  if (d) {
+    current = 1;
+    while (true) {
+      const prev = new Date(new Date(d).getTime() - 86400000).toISOString().slice(0, 10);
+      if (set.has(prev)) { current++; d = prev; } else break;
+    }
+  }
+
+  let record = 0, streak = 1;
+  for (let i = 1; i < sessions.length; i++) {
+    const prevDay = new Date(new Date(sessions[i]).getTime() - 86400000).toISOString().slice(0, 10);
+    if (sessions[i - 1] === prevDay) { streak++; } else { streak = 1; }
+    record = Math.max(record, streak);
+  }
+  record = Math.max(record, current, sessions.length > 0 ? 1 : 0);
+  return { current, record };
 }
 
 /**

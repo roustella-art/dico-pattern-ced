@@ -1,4 +1,4 @@
-const ASSETS = ['./index.html', './manifest.json', './state.js', './data.js', './audio.js', './render.js', './version.json'];
+const ASSETS = ['./index.html', './manifest.json', './state.js', './data.js', './audio.js', './render.js', './shaker.js', './onboarding.js', './version.json'];
 
 self.addEventListener('install', e => {
   e.waitUntil(

@@ -35,8 +35,7 @@ function setJournalSubTab(tab) {
 function render() {
   const el = document.getElementById('content');
   if      (state.tab === 'patterns') el.innerHTML = renderPatterns();
-  else if (state.tab === 'gammes')   el.innerHTML = renderGammes();
-  else if (state.tab === 'arpeges')  el.innerHTML = renderArpeges();
+
   else if (state.tab === 'journal')  el.innerHTML = renderJournalPage();
   else if (state.tab === 'shaker')   { el.innerHTML = renderShaker(); skInit(); }
   else                               el.innerHTML = renderProgress();
@@ -731,6 +730,7 @@ function renderPatterns() {
 
   let visible = PATTERNS.filter(p =>
     p.cat !== 'arpeges' && p.cat !== 'gamme' &&
+    !p.laboOnly &&
     (state.diffFilter === 'all' || p.difficulty === state.diffFilter)
   );
 
@@ -806,320 +806,29 @@ function renderPatterns() {
 
 // ── GAMMES TAB ──
 
-/**
- * Redessine l'onglet Gammes avec grilles de progression par gamme
- * @returns {string} HTML du contenu Gammes
- */
-function renderGammes() {
-  const gammeGroups = {};
-  PATTERNS.filter(p => p.cat === 'gamme').forEach(p => {
-    const key = p.cat + 'P' + p.num;
-    if (!gammeGroups[key]) gammeGroups[key] = [];
-    gammeGroups[key].push(p);
-  });
-
-  if (Object.keys(gammeGroups).length === 0) {
-    return `<div style="padding:40px 20px;text-align:center;color:var(--text2)">
-      <div style="font-size:40px;margin-bottom:12px">🎵</div>
-      <div style="font-size:14px;font-weight:500">Aucune gamme disponible</div>
-    </div>`;
-  }
-
-  // Filtre catégorie gammes
-  const gammeCats = ['all','Majeur','Pentatonique','Mode'];
-  const gammeCatLabels = {all:'Tous', Majeur:'Majeur', Pentatonique:'Pentatonique', Mode:'Mode'};
-  if (!state.gammeCategory) state.gammeCategory = 'all';
-  let html = `<div class="filter-seg" style="margin-bottom:14px">`;
-  gammeCats.forEach(c => {
-    const active = state.gammeCategory === c ? 'active' : '';
-    html += `<button class="${active}" onclick="setGammeCategory('${c}')">${gammeCatLabels[c]}</button>`;
-  });
-  html += `</div>`;
-
-  Object.entries(gammeGroups).sort((a,b) => {
-    const na = parseInt(a[1][0].num, 10);
-    const nb = parseInt(b[1][0].num, 10);
-    return na - nb;
-  }).forEach(([key, pats]) => {
-    const base = pats[0];
-    if (state.gammeCategory !== 'all' && base.gammeCategory !== state.gammeCategory) return;
-    const isOpen = state.openCards[key];
-    const pct = getGroupPct(key);
-    const isPenta = base.id.startsWith('penta');
-    const isGammeMaj = ['gammeC1','gammeG1','gammeD1','gammeA1','gammeE1'].includes(base.id);
-
-    html += `
-    <div class="card ${isPenta ? 'card-penta' : ''} ${isGammeMaj ? 'card-gamme-maj' : ''}" id="card-${key}">
-      <div class="card-head" onclick="toggleCard('${key}')">
-        <div style="flex:1;min-width:0">
-          <div style="display:flex;align-items:center;gap:7px">
-            <h2 style="font-size:14px">${base.name}</h2>
-          </div>
-          <div class="progress-bar-wrap" style="margin-top:6px"><div id="grpbar-${key}" class="progress-bar" style="width:${pct}%;background:var(--blue)"></div></div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-          <span id="grppct-${key}" style="font-size:11px;font-weight:600;color:var(--blue)">${pct > 0 ? pct+'%' : ''}</span>
-          <button onclick="toggleFavorite('${key}',event)"
-            style="background:none;border:none;cursor:pointer;padding:2px;display:flex;align-items:center">
-            ${heartSVG(!!state.favorites[key])}
-          </button>
-          <span style="color:var(--border);font-size:13px;line-height:1;margin:0 1px">·</span>
-          <span class="arrow ${isOpen?'open':''}">▶</span>
-        </div>
-      </div>
-      <div class="card-body ${isOpen?'open':''}">`;
-
-    html += renderPatternGroupBody(pats, key);
-    html += `</div></div>`;
-  });
-
-  return html;
-}
-
-
-/**
- * Affiche l'onglet Arpèges (patterns avec cat:"arpeges")
- * @returns {string} HTML de la liste des arpèges
- */
-function renderArpeges() {
-  const arpegeGroups = {};
-  PATTERNS.filter(p => p.cat === 'arpeges').forEach(p => {
-    const key = p.cat + 'P' + p.num;
-    if (!arpegeGroups[key]) arpegeGroups[key] = [];
-    arpegeGroups[key].push(p);
-  });
-
-  if (Object.keys(arpegeGroups).length === 0) {
-    return `<div style="padding:40px 20px;text-align:center;color:var(--text2)">
-      <div style="font-size:40px;margin-bottom:12px">🎸</div>
-      <div style="font-size:14px;font-weight:500">Aucun arpège disponible</div>
-    </div>`;
-  }
-
-  const diffs = ['all','Basique','Technique','Complexe'];
-  const diffColors = {all:'',Basique:'diff-deb',Technique:'diff-int',Complexe:'diff-adv'};
-  let html = `<div class="filter-seg" style="margin-bottom:14px">`;
-  diffs.forEach(d => {
-    const active = state.diffFilter === d ? 'active' : '';
-    const colorClass = active && d !== 'all' ? diffColors[d] : '';
-    html += `<button class="${active} ${colorClass}" onclick="setDiffFilter('${d}')">${d === 'all' ? 'Tous' : d}</button>`;
-  });
-  html += `</div>`;
-
-  Object.entries(arpegeGroups).sort((a,b) => {
-    const na = parseInt(a[1][0].num, 10);
-    const nb = parseInt(b[1][0].num, 10);
-    return na - nb;
-  }).forEach(([key, pats]) => {
-    const base = pats[0];
-    if (state.diffFilter !== 'all' && base.difficulty !== state.diffFilter) return;
-    const isOpen = state.openCards[key];
-    const pct = getGroupPct(key);
-    const diffDot = {Basique:'#4a9e6b',Technique:'#c07830',Complexe:'#a03030'}[base.difficulty]||'#999';
-
-    html += `
-    <div class="card" id="card-${key}">
-      <div class="card-head" onclick="toggleCard('${key}')">
-        <div style="flex:1;min-width:0">
-          <div style="display:flex;align-items:center;gap:7px">
-            <span style="width:7px;height:7px;border-radius:50%;background:${diffDot};flex-shrink:0;display:inline-block"></span>
-            <h2 style="font-size:14px">${base.name}</h2>
-          </div>
-          <div class="progress-bar-wrap" style="margin-top:6px"><div id="grpbar-${key}" class="progress-bar" style="width:${pct}%;background:var(--blue)"></div></div>
-        </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">
-          <span id="grppct-${key}" style="font-size:11px;font-weight:600;color:var(--blue)">${pct > 0 ? pct+'%' : ''}</span>
-          <button onclick="toggleFavorite('${key}',event)"
-            style="background:none;border:none;cursor:pointer;padding:2px;display:flex;align-items:center">
-            ${heartSVG(!!state.favorites[key])}
-          </button>
-          <span style="color:var(--border);font-size:13px;line-height:1;margin:0 1px">·</span>
-          <span class="arrow ${isOpen?'open':''}">▶</span>
-        </div>
-      </div>
-      <div class="card-body ${isOpen?'open':''}">`;
-
-    html += renderPatternGroupBody(pats, key);
-    html += `</div></div>`;
-  });
-
-  return html;
-}
-
-
-/**
- * Met à jour le % de progression d'un groupe (sans couleur)
- * @param {string} groupKey - Clé du groupe (ex: 'A4P1')
- */
-function refreshDirPctsNoColor(groupKey) {
-  // Met à jour la progress bar et le % global avec 3 teintes pour la progress bar
-  const gPct = getGroupPct(groupKey);
-
-  // Mettre à jour le % affiché
-  const pctEl = document.getElementById('grppct-' + groupKey);
-  if (pctEl) { pctEl.textContent = gPct > 0 ? gPct + '%' : ''; }
-
-  // Mettre à jour la progress bar avec couleur selon progression
-  const barEl = document.getElementById('grpbar-' + groupKey);
-  if (barEl) {
-    barEl.style.width = gPct + '%';
-    // 3 teintes: bleu < 40%, orange 40-80%, vert >= 80%
-    const barColor = gPct >= 80 ? 'var(--green)' : gPct >= 40 ? 'var(--orange)' : 'var(--blue)';
-    barEl.style.background = barColor;
-  }
-}
-
-/**
- * Met à jour le % de progression d'un groupe par direction (avec couleur 3-teintes)
- * @param {string} groupKey - Clé du groupe (ex: 'A4P1')
- */
-function refreshDirPcts(groupKey) {
-  const pats = PATTERNS.filter(p => p.cat + 'P' + p.num === groupKey);
-
-  // % par direction (Up / Down / Mix)
-  ['U','D','M'].forEach(d => {
-    const dp = pats.find(p => p.dir === d);
-    if (!dp) return;
-    let tot = 0, don = 0;
-    INTERPS.forEach(i => TEMPOS.forEach(t => {
-      tot++;
-      if (state.progress[getProgressKey(dp.id, 1, d, i, t)]) don++;
-    }));
-    const pct = tot ? Math.round(don / tot * 100) : 0;
-    const el = document.getElementById('dirpct-' + groupKey + '-' + d);
-    if (el) el.textContent = pct > 0 ? pct + '%' : '';
-  });
-
-  // % global de la carte (toutes dirs)
-  const gPct = getGroupPct(groupKey);
-  const gColor = gPct >= 80 ? 'var(--green)' : gPct >= 40 ? 'var(--orange)' : gPct > 0 ? 'var(--blue)' : 'var(--border)';
-  const pctEl = document.getElementById('grppct-' + groupKey);
-  if (pctEl) { pctEl.textContent = gPct > 0 ? gPct + '%' : '—'; pctEl.style.color = gColor; }
-  const barEl = document.getElementById('grpbar-' + groupKey);
-  if (barEl) { barEl.style.width = gPct + '%'; barEl.style.background = gColor; }
-}
-
-
-
-// Mettre à jour le pourcentage de progression en direct pour les patterns spéciaux
-function refreshSpecialProgressPercent(patId) {
-  const patTrainEl = document.getElementById('pat-train-' + patId);
-  if (!patTrainEl) return;
-
-  let totalCells = 0, doneCells = 0;
-  TEMPOS.forEach(tempo => {
-    INTERPS.forEach(interp => {
-      const k = getProgressKey(patId, 1, 'U', interp, tempo);
-      totalCells++;
-      if (state.progress[k]) doneCells++;
-    });
-  });
-
-  const progressPercent = totalCells > 0 ? Math.round((doneCells / totalCells) * 100) : 0;
-  const percentEl = patTrainEl.querySelector('span:last-child');
-  if (percentEl) {
-    percentEl.textContent = progressPercent + '%';
-  }
-
-  // Mettre à jour aussi le pourcentage du header du groupe
-  const pat = PATTERNS.find(p => p.id === patId);
-  if (pat) {
-    const groupKey = pat.cat + 'P' + pat.num;
-    const headerPercentEl = document.getElementById('grppct-' + groupKey);
-    if (headerPercentEl) {
-      const groupPct = getGroupPct(groupKey);
-      headerPercentEl.textContent = groupPct + '%';
-    }
-  }
-}
-
-// ─── SUIVI SÉANCES ────────────────────────────────────────────────────────────
-
-/**
- * Enregistre une séance pour aujourd'hui (une fois par jour maximum)
- * Met à jour le compteur journalier en temps réel si showHeaderStats est activé
- */
-function logSession() {
-  const today = new Date().toISOString().slice(0,10);
-  let sessions = [];
-  try { sessions = JSON.parse(localStorage.getItem('dicoSessions') || '[]'); } catch(e) { console.warn('logSession parse:', e); }
-  if (!sessions.includes(today)) {
-    sessions.push(today);
-    try { localStorage.setItem('dicoSessions', JSON.stringify(sessions)); } catch(e) { console.warn('logSession save:', e); }
-    // Mise à jour en temps réel du compteur journalier si affiché
-    if (SETTINGS.showHeaderStats) updateHeaderStatsDisplay();
-  }
-}
-
-/**
- * Récupère la liste des jours avec séances (format ISO: YYYY-MM-DD)
- * @returns {Array<string>} Liste des dates
- */
-function getSessions() {
-  try { return JSON.parse(localStorage.getItem('dicoSessions') || '[]'); } catch(e) { return []; }
-}
-
-/**
- * Calcule les streaks courant et record à partir de la liste des séances
- * @param {Array<string>} sessions - Liste des dates au format ISO (YYYY-MM-DD)
- * @returns {Object} {current: number, record: number}
- */
-function computeStreak(sessions) {
-  if (!sessions.length) return { current: 0, record: 0 };
-  const set = new Set(sessions);
-  const today = new Date();
-  let current = 0;
-  for (let i = 0; i < 365; i++) {
-    const d = new Date(today); d.setDate(d.getDate() - i);
-    if (set.has(d.toISOString().slice(0,10))) current++;
-    else break;
-  }
-  // record streak
-  const sorted = [...sessions].sort();
-  let record = 0, run = 1;
-  for (let i = 1; i < sorted.length; i++) {
-    const prev = new Date(sorted[i-1]), cur = new Date(sorted[i]);
-    const diff = (cur - prev) / 86400000;
-    if (diff === 1) { run++; record = Math.max(record, run); }
-    else run = 1;
-  }
-  record = Math.max(record, current, sessions.length > 0 ? 1 : 0);
-  return { current, record };
-}
-
-/**
- * Construit les cellules de calendrier mensuel pour les séances
- * Réutilisable par renderSessionCalendar() et renderCalendarAccordion()
- * @param {Array<string>} sessions - Liste des dates au format ISO (YYYY-MM-DD)
- * @returns {string} HTML des cellules de calendrier
- */
 function buildCalendarCells(sessions) {
-  const now = new Date();
-  const year = now.getFullYear(), month = now.getMonth();
-  const firstDay = new Date(year, month, 1).getDay();
-  const daysInMonth = new Date(year, month + 1, 0).getDate();
-  const todayStr = now.toISOString().slice(0, 10);
-  const dayNames = ['L','M','M','J','V','S','D'];
   const set = new Set(sessions);
-  const startOffset = (firstDay + 6) % 7;
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const today = now.toISOString().slice(0, 10);
+  const startOffset = (new Date(year, month, 1).getDay() + 6) % 7; // lundi=0
 
-  let cells = '';
-  dayNames.forEach(d => {
-    cells += `<div style="text-align:center;font-size:9px;font-weight:700;color:var(--text2);padding-bottom:3px">${d}</div>`;
+  let html = '';
+  ['L','M','M','J','V','S','D'].forEach(d => {
+    html += `<div style="text-align:center;font-size:9px;font-weight:600;color:var(--text3);padding:2px 0">${d}</div>`;
   });
-  for (let i = 0; i < startOffset; i++) cells += `<div></div>`;
-  for (let d = 1; d <= daysInMonth; d++) {
-    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
-    const worked = set.has(dateStr), isToday = dateStr === todayStr;
-    let bg = 'transparent', color = 'var(--text2)', border = 'none', fw = '400';
-    if (worked)             { bg = 'var(--blue)'; color = '#fff'; fw = '700'; }
-    if (isToday && !worked) { border = '1.5px solid var(--blue)'; color = 'var(--blue)'; fw = '700'; }
-    if (isToday && worked)  { bg = 'var(--green)'; }
-    cells += `<div style="text-align:center;font-size:10px;font-weight:${fw};color:${color};
-      background:${bg};border:${border};border-radius:50%;
-      width:22px;height:22px;display:flex;align-items:center;justify-content:center;margin:0 auto">${d}</div>`;
+  for (let i = 0; i < startOffset; i++) html += '<div></div>';
+  for (let day = 1; day <= daysInMonth; day++) {
+    const dateStr = `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const has = set.has(dateStr);
+    const isToday = dateStr === today;
+    const bg = has ? 'var(--green)' : isToday ? 'var(--blue-light)' : 'var(--border)';
+    const col = has ? '#fff' : isToday ? 'var(--blue)' : 'var(--text3)';
+    html += `<div style="text-align:center;padding:3px 1px;border-radius:4px;background:${bg};color:${col};font-size:10px;font-weight:${isToday?'700':'400'}">${day}</div>`;
   }
-  return cells;
+  return html;
 }
 
 /**
