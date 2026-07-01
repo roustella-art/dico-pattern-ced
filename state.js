@@ -21,7 +21,6 @@ let state = {
 
   gammeActiveStrings: {}, // { "gammeP1": [true,true,true,true,true,true] } — [e,B,G,D,A,E]
   gammeSelectedDir: {},  // { "pentaTrans1": "1→2" } — direction active par gamme avec directions multiples
-  triadeStringGroup: {},  // { "triadeDim1": "GBe" } — groupe de cordes actif par triade
   rhythmicStringSelect: {}, // { "rhythmic-test": "A" } — corde sélectionnée pour les patterns stringSelector
 };
 
@@ -291,9 +290,6 @@ function loadState() {
     if (saved.gammeSelectedDir && typeof saved.gammeSelectedDir === 'object') {
       state.gammeSelectedDir = saved.gammeSelectedDir;
     }
-    if (saved.triadeStringGroup && typeof saved.triadeStringGroup === 'object') {
-      state.triadeStringGroup = saved.triadeStringGroup;
-    }
     if (saved.rhythmicStringSelect && typeof saved.rhythmicStringSelect === 'object') {
       state.rhythmicStringSelect = saved.rhythmicStringSelect;
     }
@@ -315,7 +311,6 @@ function saveState() {
       dailyChallengeOpen: state.dailyChallengeOpen,
       gammeActiveStrings:    state.gammeActiveStrings,
       gammeSelectedDir:      state.gammeSelectedDir,
-      triadeStringGroup:     state.triadeStringGroup,
       rhythmicStringSelect:  state.rhythmicStringSelect,
     }));
   } catch(e) { console.warn('saveState:', e); }
@@ -383,26 +378,6 @@ function getGroupPct(groupKey) {
         interpsToUse.forEach(i => TEMPOS.forEach(t => {
           total++;
           if (state.progress[getProgressKey(progressId, 1, 'U', i, t)]) done++;
-        }));
-      });
-    } else if (p.special && p.stringGroups) {
-      // Gamme spécialisée avec groupes de cordes (triades) : une progression par groupe
-      Object.keys(p.stringGroups).forEach(groupKey => {
-        const progressId = p.id + '__' + groupKey;
-        const interpsToUse = p.customInterps || INTERPS;
-        interpsToUse.forEach(i => TEMPOS.forEach(t => {
-          total++;
-          if (state.progress[getProgressKey(progressId, 1, 'U', i, t)]) done++;
-        }));
-      });
-    } else {
-      // Pour les gammes (special: true), utiliser 'U' ; sinon utiliser la direction du pattern
-      const dirs = p.special ? ['U'] : (p.dir ? [p.dir] : ['U','D','M']);
-      const interpsToUse = p.customInterps || INTERPS;
-      dirs.forEach(d => {
-        interpsToUse.forEach(i => TEMPOS.forEach(t => {
-          total++;
-          if (state.progress[getProgressKey(p.id, 1, d, i, t)]) done++;
         }));
       });
     }

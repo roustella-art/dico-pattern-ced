@@ -1066,71 +1066,12 @@ function setGammeForme(patId, forme) {
   }
 }
 
-function getTriadeStringGroup(patId) {
-  const pat = PATTERNS.find(p => p.id === patId);
-  if (!pat || !pat.stringGroups) return null;
-  const saved = state.triadeStringGroup && state.triadeStringGroup[patId];
-  const keys = Object.keys(pat.stringGroups);
-  return (saved && keys.includes(saved)) ? saved : keys[0];
-}
-
-function getTriadeActiveTab(pat) {
-  if (!pat.stringGroups) return pat.tab;
-  const groupKey = getTriadeStringGroup(pat.id);
-  return pat.stringGroups[groupKey] || Object.values(pat.stringGroups)[0];
-}
-
 function getValidInterp(pat) {
   if (!pat.customInterps) return PREVIEW.interp;
   if (pat.customInterps.includes(PREVIEW.interp)) return PREVIEW.interp;
   return pat.customInterps[0];  // Fallback à la première interprétation disponible
 }
 
-function setTriadeStringGroup(patId, groupKey) {
-  if (!state.triadeStringGroup) state.triadeStringGroup = {};
-  state.triadeStringGroup[patId] = groupKey;
-  saveState();
-  if (PREVIEW.patId === patId) previewStop();
-  const pat = PATTERNS.find(p => p.id === patId);
-  // Mettre à jour la tab affichée
-  const pre = document.getElementById('tab-pre-' + patId);
-  if (pre && pat) {
-    const rawTab = getTriadeActiveTab(pat);
-    let neckTab = rawTab;
-    if (!pat.disableHighNeck) {
-      neckTab = transformTab(rawTab, pat.id, true);
-    }
-    const filtered = neckTab;  // Pas de filtrage de cordes pour les triades
-    pre.innerHTML = tabWithSymbols(cleanTabDisplay(filtered), getValidInterp(pat));
-  }
-  // Live refresh de la progression
-  if (pat) {
-    const progEl = document.getElementById('gamme-prog-' + patId);
-    if (progEl) {
-      const { html, progressPercent } = buildGammeProgGrid(pat);
-      progEl.innerHTML = html;
-      // Mettre à jour le % affiché dans l'en-tête de la carte
-      const trainEl = document.getElementById('pat-train-' + patId);
-      if (trainEl) {
-        const pctSpan = trainEl.querySelector('span:last-child');
-        if (pctSpan) pctSpan.textContent = progressPercent > 0 ? progressPercent + '%' : '';
-      }
-    }
-  }
-  // Mettre à jour l'apparence des boutons de groupe
-  if (pat && pat.stringGroups) {
-    Object.keys(pat.stringGroups).forEach(gk => {
-      const btn = document.getElementById('triade-group-btn-' + patId + '-' + gk);
-      if (btn) {
-        const isActive = gk === groupKey;
-        btn.style.background  = isActive ? 'var(--blue)'   : 'transparent';
-        btn.style.color       = isActive ? '#fff'          : 'var(--text2)';
-        btn.style.borderColor = isActive ? 'var(--blue)'   : 'var(--border)';
-        btn.style.fontWeight  = isActive ? '700'           : '600';
-      }
-    });
-  }
-}
 
 // ─── SÉLECTEUR DE CORDE (patterns stringSelector) ────────────────────────────
 // Permet de jouer un pattern mono-corde sur n'importe quelle corde choisie
@@ -2199,7 +2140,7 @@ function openSettings(tab) {
           <button class="sf-btn" onclick="doImportJSON()">↑ Importer JSON</button>
         </div>
         <button class="sf-reset" onclick="resetApp()">Réinitialiser l'app</button>
-        <div class="sf-version">v5.0</div>
+        <div class="sf-version">v5.1</div>
       </div>
     </div>
   </div>`;

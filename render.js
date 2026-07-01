@@ -282,7 +282,6 @@ function buildProgGridRows(progressId, dir, dirColor, interpsToUse = INTERPS) {
  */
 function buildGammeProgGrid(p) {
   const selectedDir = p.hasDirectionTabs ? getGammeSelectedDir(p.id) : null;
-  const selectedGroup = p.stringGroups ? getTriadeStringGroup(p.id) : null;
 
   // Créer un progressId distinct pour chaque direction/groupe
   let progressId = p.id;
@@ -299,9 +298,6 @@ function buildGammeProgGrid(p) {
       progressId = p.id + '__' + selectedDir.replace(/[→↔]/g, '-');
       badgeText = selectedDir;
     }
-  } else if (p.stringGroups && selectedGroup) {
-    progressId = p.id + '__' + selectedGroup;
-    badgeText = selectedGroup;
   }
 
   const dirColor = (p.hasDirectionTabs && p.versionTabs && selectedDir && DIR_BTN_COLORS[selectedDir])
@@ -405,27 +401,6 @@ function renderPatternGroupBody(pats, key) {
       }
     }
 
-    // ── Sélecteur de groupes de cordes (triades avec stringGroups) ───────────
-    let stringGroupsHtml = '';
-    if (p.stringGroups && Object.keys(p.stringGroups).length > 1) {
-      const selectedGroup = getTriadeStringGroup(p.id);
-      const groupKeys = Object.keys(p.stringGroups);
-      stringGroupsHtml = `
-        <div style="display:flex;gap:6px;margin-bottom:10px">
-          ${groupKeys.map(gk => {
-            const isActive = gk === selectedGroup;
-            const btnId = 'triade-group-btn-' + p.id + '-' + gk;
-            return `<button id="${btnId}"
-              onclick="setTriadeStringGroup('${p.id}', '${gk}')"
-              style="flex:1;font-size:13px;font-weight:${isActive?'700':'600'};padding:7px 8px;border-radius:8px;border:2px solid;cursor:pointer;transition:all .15s;text-align:center;
-                background:${isActive ? 'var(--blue)' : 'transparent'};
-                color:${isActive ? '#fff' : 'var(--text2)'};
-                border-color:${isActive ? 'var(--blue)' : 'var(--border)'}">
-              ${gk}
-            </button>`;
-          }).join('')}
-        </div>`;
-    }
 
     // ── Sélecteur de cordes (gammes uniquement) ──────────────────────────────
     // Affichage : E A D G B e (du grave à l'aigu = ordre guitare)
@@ -464,10 +439,6 @@ function renderPatternGroupBody(pats, key) {
     let rawTabForDisplay;
     if (p.hasDirectionTabs) {
       rawTabForDisplay = getGammeActiveTab(p);
-    } else if (p.stringGroups) {
-      rawTabForDisplay = getTriadeActiveTab(p);
-    } else {
-      rawTabForDisplay = getEffectiveTab(getTabForNeckPosition(p));
     }
 
     let neckTabForDisplay = rawTabForDisplay;
@@ -477,8 +448,7 @@ function renderPatternGroupBody(pats, key) {
       neckTabForDisplay = _useStaticHigh ? applyStaticTabTransform(rawTabForDisplay) : transformTab(rawTabForDisplay, p.id, !!p.special);
     }
 
-    // Filtrer les cordes uniquement pour les gammes sans stringGroups
-    const filteredTabForDisplay = (p.stringGroups || p.disableStringSelector)
+    const filteredTabForDisplay = p.disableStringSelector
       ? neckTabForDisplay
       : applyGammeStringFilter(neckTabForDisplay, activeStrings);
     const tabIsPlaying = PREVIEW.patId === p.id;
@@ -515,7 +485,6 @@ function renderPatternGroupBody(pats, key) {
     return `
       <div style="margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--border)">
         ${dirTabsHtml}
-        ${stringGroupsHtml}
         <div id="pat-train-${p.id}" style="font-size:13px;color:var(--text2);opacity:.7;padding:0 1px 6px;letter-spacing:.1px;display:flex;justify-content:space-between;align-items:center">
           <span>— pattern spécial —</span>
           <span style="font-weight:600;color:var(--blue);font-size:12px">${progressPercent > 0 ? progressPercent+'%' : ''}</span>

@@ -495,9 +495,17 @@ function skRenderStepCascade(assignments) {
 function skIsStructural(a) { return a.isMeasure || a.isRepeatStart || a.isRepeatEnd || a.isStop; }
 
 function skMirrorOf(assignments) {
-  return assignments.slice().reverse().map(a =>
-    skIsStructural(a) ? { ...a } : a.isRest ? { ...a } : { ...a, notes: [...a.notes].reverse() }
-  );
+  // Les repeatCounts sont sur les isRepeatEnd ; après inversion ils doivent
+  // migrer vers les nouveaux isRepeatEnd (anciens isRepeatStart), en ordre inverse.
+  const repeatCounts = assignments.filter(a => a.isRepeatEnd).map(a => a.repeatCount || 2);
+  let rcIdx = repeatCounts.length - 1;
+  return assignments.slice().reverse().map(a => {
+    if (a.isRepeatEnd)   return { isRepeatStart: true };
+    if (a.isRepeatStart) return { isRepeatEnd: true, repeatCount: repeatCounts[rcIdx--] || 2 };
+    if (skIsStructural(a)) return { ...a };
+    if (a.isRest) return { ...a };
+    return { ...a, notes: [...a.notes].reverse() };
+  });
 }
 
 function skBuildMeasure2(assignments) {
@@ -788,11 +796,17 @@ function playShaker() {
   // Trainer — état local de la boucle
   let trainLoopCount = 0;
   let trainPhase = 1; // 1 = montée, -1 = descente (pyramide)
+  // BPM pré-calculé pour le prochain cycle audio (distinct de PREVIEW.bpm qui suit le cycle en cours)
+  let nextScheduledBpm = HCTRL.bpm;
 
   // Boucle principale
   let loopStart = patStart;
+  PREVIEW.audioCycleBpm = HCTRL.bpm;
   const scheduleLoop = () => {
     if (!skIsPlaying || PREVIEW.patId !== '__shaker__') return;
+
+    // BPM de ce cycle = ce qui avait été pré-calculé au cycle précédent
+    PREVIEW.audioCycleBpm = nextScheduledBpm;
 
     events.forEach(e => {
       if (typeof pluckNote === 'function') {
@@ -820,14 +834,23 @@ function playShaker() {
       }
       if (newBpm !== oldBpm) {
         HCTRL.bpm = newBpm;
-        PREVIEW.bpm = newBpm;
-        const hbpm = document.getElementById('header-bpm-val');
-        if (hbpm) {
-          hbpm.textContent = newBpm;
-          hbpm.style.color = newBpm >= SETTINGS.trainBpmMax ? '#ef5350' : '#4dd0e1';
-        }
-        // Recalculer les timings audio pour le prochain cycle
-        // (le curseur se resynchronise seul via scheduleCycle dynamique)
+        nextScheduledBpm = newBpm; // sera appliqué au cycle suivant
+        // PREVIEW.bpm, header et pastille mis à jour au début du prochain cycle
+        // pour rester synchronisés avec l'audio en cours
+        const nextCycleStart = loopStart; // loopStart a déjà été avancé au prochain cycle
+        const displayDelay = Math.max(0, (nextCycleStart - ctx.currentTime) * 1000);
+        setTimeout(() => {
+          if (!skIsPlaying) return;
+          PREVIEW.bpm = newBpm;
+          const hbpm = document.getElementById('header-bpm-val');
+          if (hbpm) {
+            hbpm.textContent = newBpm;
+            hbpm.style.color = newBpm >= SETTINGS.trainBpmMax ? '#ef5350' : '#4dd0e1';
+          }
+          // Re-ancrer la pastille sur le nouveau cycle pour éviter la dérive accumulée
+          if (typeof startPulseTicker === 'function') startPulseTicker(nextCycleStart);
+        }, displayDelay);
+        // Pré-calculer les timings audio pour le prochain cycle au nouveau BPM
         quarter   = 60.0 / newBpm;
         ({ events, totalTime, hasStop } = skToTimedEvents(seq, quarter));
       }
@@ -841,14 +864,14 @@ function playShaker() {
     const delay = Math.max(0, (loopStart - ctx.currentTime - 0.15) * 1000);
     skLoopTimer = setTimeout(scheduleLoop, delay);
   };
-  scheduleLoop();
-
-  // Clic + pulse header
+  // Clic + pulse header — avant scheduleLoop pour éviter que le trainer ne change PREVIEW.bpm avant init
   if (PREVIEW.click && typeof startClickLoop === 'function') startClickLoop(patStart);
   if (typeof startPulseTicker === 'function') startPulseTicker(patStart);
 
-  // Curseur de lecture
+  // Curseur de lecture — idem, avant scheduleLoop
   skStartCursor(events, totalTime, patStart, ctx);
+
+  scheduleLoop();
 }
 
 function skStartCursor(eventsIgnored, totalTimeIgnored, patStart, ctx) {
@@ -922,8 +945,8 @@ function skStartCursor(eventsIgnored, totalTimeIgnored, patStart, ctx) {
   function scheduleCycle(t0) {
     if (!skIsPlaying || PREVIEW.patId !== '__shaker__') return;
 
-    // Recalcul dynamique du timing à chaque cycle — suit les changements de BPM du trainer
-    const q = 60 / PREVIEW.bpm;
+    // Utiliser le BPM du cycle audio en cours (pas le BPM courant qui peut déjà être à jour)
+    const q = 60 / (PREVIEW.audioCycleBpm || PREVIEW.bpm);
     const { events: ev1c, totalTime: d1c, hasStop: stop1 } = skToTimedEvents(skExpandRepeats(m1), q);
     const { events: ev2c, totalTime: d2c, hasStop: stop2 } = m2exp ? skToTimedEvents(skExpandRepeats(m2), q) : { events: [], totalTime: 0, hasStop: false };
     const cycleHasStop = stop1 || stop2;
@@ -1157,12 +1180,13 @@ function skBuildLibraryBody() {
   return Object.entries(grouped).map(([folder, items]) => `
     <div class="sk-lib-folder-label">${folder}</div>
     ${items.map(([name, p]) => {
-      const active  = name === skCurrentPreset;
-      const pinIcon = p.pinned ? '★' : '☆';
-      const steps   = p.steps || [];
+      const active    = name === skCurrentPreset;
+      const isBuiltIn = name in SK_DEFAULT_PRESETS;
+      const pinIcon   = p.pinned ? '★' : '☆';
+      const steps     = p.steps || [];
       const noteCount = steps.filter(s => s.patKey && s.patKey !== 'rest').length;
       return `
-    <div class="sk-lib-item${active ? ' active' : ''}">
+    <div class="sk-lib-item${active ? ' active' : ''}${isBuiltIn ? ' built-in' : ''}">
       <div class="sk-lib-item-main" onclick="skLoadPresetByName('${name.replace(/'/g,"\\'")}')">
         <div class="sk-lib-item-name">${name}</div>
         <div class="sk-lib-item-meta">${noteCount} pas · ${folder}</div>
@@ -1170,7 +1194,7 @@ function skBuildLibraryBody() {
       <button class="sk-lib-pin${p.pinned ? ' pinned' : ''}" onclick="skTogglePin('${name.replace(/'/g,"\\'")}')">
         ${pinIcon}
       </button>
-      <button class="sk-lib-del" onclick="skDeletePresetByName('${name.replace(/'/g,"\\'")}')">✕</button>
+      ${isBuiltIn ? '' : `<button class="sk-lib-del" onclick="skDeletePresetByName('${name.replace(/'/g,"\\'")}')">✕</button>`}
     </div>`;
     }).join('')}
   `).join('');
@@ -1189,7 +1213,8 @@ function skRenderLibrary() {
   ])];
 
   // Rangée principale : dossiers réels sans les sous-dossiers, + noms de groupes
-  const topFolders = allFolders.filter(f => !subFolderSet.has(f));
+  // 'Mes créations' est toujours visible au premier niveau
+  const topFolders = allFolders.filter(f => f === 'Mes créations' || !subFolderSet.has(f));
   Object.keys(groups).forEach(g => {
     if (!topFolders.includes(g)) topFolders.push(g);
   });
@@ -1205,17 +1230,20 @@ function skRenderLibrary() {
       const isActive = skLibFolder === f
         || (!skLibFolder && f === 'Tous')
         || (isGroup && f === activeGroup);
+      const esc = f.replace(/'/g, "\\'");
       return `<button class="sk-lib-folder-btn${isActive ? ' active' : ''}${isGroup ? ' sk-lib-group-btn' : ''}"
-        onclick="skSetLibFolder('${f}')">${f}${isGroup ? ' ›' : ''}</button>`;
+        onclick="skSetLibFolder('${esc}')">${f}${isGroup ? ' ›' : ''}</button>`;
     }).join('');
 
   // Rangée sous-dossiers — visible uniquement si un groupe est actif
   const subRow = sheet.querySelector('.sk-lib-subfolders');
   if (activeGroup) {
     subRow.style.display = 'flex';
-    subRow.innerHTML = groups[activeGroup].map(f => `
-      <button class="sk-lib-folder-btn sk-lib-subfolder-btn${skLibFolder === f ? ' active' : ''}"
-        onclick="skSetLibFolder('${f}')">${f}</button>`).join('');
+    subRow.innerHTML = groups[activeGroup].map(f => {
+      const esc = f.replace(/'/g, "\\'");
+      return `<button class="sk-lib-folder-btn sk-lib-subfolder-btn${skLibFolder === f ? ' active' : ''}"
+        onclick="skSetLibFolder('${esc}')">${f}</button>`;
+    }).join('');
   } else {
     subRow.style.display = 'none';
     subRow.innerHTML = '';
@@ -1232,8 +1260,12 @@ function skOpenSaveDialog() {
   const folders = [...new Set([...db.folders,
     ...Object.values(db.presets).map(p => p.folder).filter(Boolean)])];
 
+  // Pré-sélectionner le dossier du preset courant si possible
+  const currentPresetFolder = skCurrentPreset ? db.presets[skCurrentPreset]?.folder : null;
+  const defaultFolder = currentPresetFolder || 'Mes créations';
+
   const folderOpts = folders.map(f =>
-    `<option value="${f}"${f==='Mes créations'?' selected':''}>${f}</option>`).join('');
+    `<option value="${f}"${f === defaultFolder ? ' selected' : ''}>${f}</option>`).join('');
 
   const groupOpts = `<option value="">— aucun —</option>` +
     Object.keys(groups).map(g => `<option value="${g}">${g}</option>`).join('');
@@ -1251,7 +1283,8 @@ function skOpenSaveDialog() {
       <div class="sk-dialog-field">
         <label class="sk-dialog-label">Dossier</label>
         <div style="display:flex;gap:6px">
-          <select id="sk-save-folder" class="sk-dialog-input" style="flex:1">${folderOpts}</select>
+          <select id="sk-save-folder" class="sk-dialog-input" style="flex:1"
+            onchange="skSyncGroupFromFolder(this.value)">${folderOpts}</select>
           <button class="sk-dialog-new-folder" onclick="skPromptNewFolder()">+ Nouveau</button>
         </div>
       </div>
@@ -1268,19 +1301,22 @@ function skOpenSaveDialog() {
       </div>
     </div>`;
   document.getElementById('sk-save-dialog').style.display = 'block';
-  // Pré-sélectionner le groupe auquel appartient déjà le dossier courant
-  const currentFolder = document.getElementById('sk-save-folder')?.value;
-  const sel = document.getElementById('sk-save-group');
-  if (sel && currentFolder) {
-    const match = Object.entries(groups).find(([, children]) => children.includes(currentFolder));
-    if (match) sel.value = match[0];
-  }
+  skSyncGroupFromFolder(defaultFolder);
   setTimeout(() => document.getElementById('sk-save-name')?.select(), 100);
 }
 
 function skCloseSaveDialog() {
   const d = document.getElementById('sk-save-dialog');
   if (d) { d.style.display = 'none'; d.innerHTML = ''; }
+}
+
+function skSyncGroupFromFolder(folder) {
+  const db = skLoadPresetsV2();
+  const groups = db.groups || {};
+  const sel = document.getElementById('sk-save-group');
+  if (!sel) return;
+  const match = Object.entries(groups).find(([, children]) => children.includes(folder));
+  sel.value = match ? match[0] : '';
 }
 
 function skPromptNewFolder() {
@@ -1332,9 +1368,12 @@ function skConfirmSave() {
   skCurrentPreset = name;
   skBuildFavBar();
   skCloseSaveDialog();
+  const libSheet = document.getElementById('sk-library-sheet');
+  if (libSheet && libSheet.classList.contains('open')) skRenderLibrary();
 }
 
 function skDeletePresetByName(name) {
+  if (name in SK_DEFAULT_PRESETS) return; // presets intégrés non supprimables
   if (!confirm(`Supprimer "${name}" ?`)) return;
   const db = skLoadPresetsV2();
   delete db.presets[name];
@@ -2165,6 +2204,28 @@ const SK_DEFAULT_PRESETS = {
   ],
 
   // ═══════════════════════════════════════════════════════════════════════════
+  // B8P1 — BUMBLEBEE
+  // A2P1↑ sur N, A5P2 (1-2-3-2-1) sur N+1, A1P1 rebond sur N — shift D→G→B
+  // ═══════════════════════════════════════════════════════════════════════════
+  'B8P1 Bumblebee': [
+    { string:'e', patKey:'repeat-start', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+    { string:'D', patKey:'A2P1', forme:'1-2', dir:'U', startFret:7, active:true, duration:'1/16' },
+    { string:'G', patKey:'A5P2', forme:'1-2-3-2-1', dir:'U', startFret:4, active:true, duration:'1/16' },
+    { string:'D', patKey:'A1P1', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
+    { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16', repeatCount:4 },
+    { string:'e', patKey:'repeat-start', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+    { string:'G', patKey:'A2P1', forme:'1-2', dir:'U', startFret:7, active:true, duration:'1/16' },
+    { string:'B', patKey:'A5P2', forme:'1-2-3-2-1', dir:'U', startFret:5, active:true, duration:'1/16' },
+    { string:'G', patKey:'A1P1', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
+    { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16', repeatCount:4 },
+    { string:'e', patKey:'repeat-start', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+    { string:'B', patKey:'A2P1', forme:'1-2', dir:'U', startFret:7, active:true, duration:'1/16' },
+    { string:'e', patKey:'A5P2', forme:'1-2-3-2-1', dir:'U', startFret:4, active:true, duration:'1/16' },
+    { string:'B', patKey:'A1P1', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
+    { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16', repeatCount:4 },
+  ],
+
+  // ═══════════════════════════════════════════════════════════════════════════
   // C MAJEURE — GAMMES (montées uniquement, descente via mode Inversé)
   // ═══════════════════════════════════════════════════════════════════════════
 
@@ -2497,6 +2558,7 @@ const SK_OBSOLETE_PRESETS = [
   'C Maj Forme E','C Maj Forme E (8va)','C Maj Forme E ét.',
   'C Penta Forme E','C Penta Forme E (8va)','C Penta Forme E ét.',
   'C Maj Forme D','C Maj Forme D ét.','C Penta Forme D','C Penta Forme D ét.',
+  'B8P3 Bumblebee',
 ];
 
 function skSeedDefaultPresets() {
@@ -2510,7 +2572,7 @@ function skSeedDefaultPresets() {
   if (!db.folders.includes('Sol Majeur'))            db.folders.splice(3, 0, 'Sol Majeur');
   Object.entries(SK_DEFAULT_PRESETS).forEach(([name, steps]) => {
     let folder = 'Exemples';
-    if (name.startsWith('B6P1'))                                        folder = 'Patterns multi-cordes';
+    if (name.startsWith('B6P1') || name.startsWith('B8P1'))              folder = 'Patterns multi-cordes';
     else if (name.startsWith('Do Majeur') || name.startsWith('Do Penta'))   folder = 'Do Majeur';
     else if (name.startsWith('Sol Majeur') || name.startsWith('Sol Penta')) folder = 'Sol Majeur';
     if (!db.presets[name]) db.presets[name] = { folder, pinned:false, createdAt:0 };
