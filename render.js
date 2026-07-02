@@ -347,7 +347,7 @@ function renderPatternGroupBody(pats, key) {
       const btnStyle = (isActive) =>
         `flex:1;font-size:13px;font-weight:${isActive?'700':'600'};padding:6px 10px;border-radius:8px;border:1px solid ${isActive?'var(--blue)':'var(--border)'};cursor:pointer;background:${isActive?'var(--blue)':'transparent'};color:${isActive?'#fff':'var(--text2)'};transition:all .15s`;
 
-      if (p.versionTabs && p.formeTabs) {
+      if (p.versionTabs && p.formeTabs && (p.versionTabs.length > 1 || p.formeTabs.length > 1)) {
         // Segment pour version + dropdown pour formes
         const selectedForme = getGammeSelectedForme(p.id);
         const isPenta = getGammePenta(p.id);
@@ -438,7 +438,7 @@ function renderPatternGroupBody(pats, key) {
     // ── Tab avec filtre de cordes actif ──────────────────────────────────────
     let rawTabForDisplay;
     if (p.hasDirectionTabs) {
-      rawTabForDisplay = getGammeActiveTab(p);
+      rawTabForDisplay = getEffectiveTab(getGammeActiveTab(p));
     }
 
     let neckTabForDisplay = rawTabForDisplay;
@@ -673,12 +673,13 @@ function dirLabel(d) {
 function renderPatterns() {
   if (!state.patternSort) state.patternSort = 'progressif';
 
-  const sorts = ['progressif','alphabetique','aleatoire'];
-  const sortLabels = {progressif:'Progressif', alphabetique:'Alphabétique', aleatoire:'Aléatoire'};
+  const sorts = ['progressif','alphabetique','aleatoire','favoris'];
+  const sortLabels = {progressif:'Progressif', alphabetique:'Alphabétique', aleatoire:'Aléatoire', favoris:'Favoris'};
   let html = `<div class="filter-seg">`;
   sorts.forEach(s => {
     const active = state.patternSort === s ? 'active' : '';
-    html += `<button class="${active} sort-${s}" onclick="setPatternSort('${s}')">${sortLabels[s]}</button>`;
+    const favStyle = s === 'favoris' && active ? 'style="background:#E91E63;border-color:#E91E63;color:#fff"' : s === 'favoris' ? 'style="color:#E91E63"' : '';
+    html += `<button class="${active} sort-${s}" onclick="setPatternSort('${s}')" ${favStyle}>${sortLabels[s]}</button>`;
   });
   html += `</div>`;
 
@@ -728,6 +729,9 @@ function renderPatterns() {
     const lowProgress = sortedEntries.filter(([key]) => getGroupPct(key) < 40);
     const shuffled = lowProgress.sort(() => Math.random() - 0.5);
     sortedEntries = shuffled.slice(0, 2);
+  } else if (state.patternSort === 'favoris') {
+    sortedEntries = sortedEntries.filter(([key]) => !!state.favorites[key]);
+    sortedEntries.sort((a, b) => a[0].localeCompare(b[0]));
   }
 
   sortedEntries.forEach(([key, pats]) => {
@@ -739,15 +743,14 @@ function renderPatterns() {
     const pct = getGroupPct(key); // toutes directions confondues
     const allIds = pats.map(p=>p.id).join(',');
 
-    const diffDot = {Basique:'#4a9e6b',Technique:'#c07830',Complexe:'#a03030'}[base.difficulty]||'#999';
+    const diffBorder = {Basique:'#4a9e6b',Technique:'#d49800',Complexe:'#d63031'}[base.difficulty]||'var(--border)';
     const isConsolidated = !!(base.hasDirectionTabs && base.versionTabs);
 
     html += `
-    <div class="card ${isConsolidated ? 'card-consolidated' : ''}" id="card-${key}">
+    <div class="card" id="card-${key}" style="border-left:4px solid ${diffBorder}">
       <div class="card-head" onclick="toggleCard('${key}')">
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:7px">
-            <span style="width:7px;height:7px;border-radius:50%;background:${diffDot};flex-shrink:0;display:inline-block"></span>
             <h2 style="font-size:14px;margin:0;font-weight:700">${key}</h2>
             <span style="color:var(--text);opacity:.3;font-size:13px;font-weight:300">·</span>
             <span style="font-size:13px;color:var(--text);opacity:.65;font-style:italic;font-weight:400">${base.name}</span>
@@ -917,17 +920,40 @@ function renderGlobalProgress() {
     groups[key].push(p);
   });
 
-  const cats = ['A4','A3','A2','A5','A6','B8','B6'];
-  const catLabels = {A4:'A4 — 4 notes',A3:'A3 — 3 notes',A2:'A2 — 2 notes',A5:'A5 — 5 notes',A6:'A6 — triade ×2',B8:'B8 — 2 cordes ×8',B6:'B6 — multi-cordes'};
+  const cats = ['A4','A3','A2','A5','A6','A8','B8','B6'];
+  const catLabels = {A4:'A4 — 4 notes',A3:'A3 — 3 notes',A2:'A2 — 2 notes',A5:'A5 — 5 notes',A6:'A6 — triade ×2',A8:'A8 — 8 notes',B8:'B8 — 2 cordes ×8',B6:'B6 — multi-cordes'};
 
-  // Total global
+  // Total global — même logique que getGroupPct pour avoir les vraies clés
   let totalAll = 0, doneAll = 0;
-  PATTERNS.forEach(p => {
-    const mode = p.dir;
-    [1].forEach(f => INTERPS.forEach(i => TEMPOS.forEach(t => {
-      totalAll++;
-      if (state.progress[getProgressKey(p.id, f, mode, i, t)]) doneAll++;
-    })));
+  const allGroupKeys = [...new Set(PATTERNS.map(p => p.cat + 'P' + p.num))];
+  allGroupKeys.forEach(gkey => {
+    PATTERNS.filter(p => p.cat + 'P' + p.num === gkey).forEach(p => {
+      const interpsToUse = p.customInterps || INTERPS;
+      if (p.hasDirectionTabs && p.versionTabs && p.formeTabs) {
+        p.versionTabs.forEach(vk => {
+          p.formeTabs.forEach(fk => {
+            const pid = p.id + '__' + vk + '_' + fk;
+            interpsToUse.forEach(i => TEMPOS.forEach(t => {
+              totalAll++;
+              if (state.progress[getProgressKey(pid, 1, 'U', i, t)]) doneAll++;
+            }));
+          });
+        });
+      } else if (p.special && p.hasDirectionTabs && p.directions) {
+        Object.keys(p.directions).forEach(dirKey => {
+          const pid = p.id + '__' + dirKey.replace(/[→↔]/g, '-');
+          interpsToUse.forEach(i => TEMPOS.forEach(t => {
+            totalAll++;
+            if (state.progress[getProgressKey(pid, 1, 'U', i, t)]) doneAll++;
+          }));
+        });
+      } else if (p.dir) {
+        interpsToUse.forEach(i => TEMPOS.forEach(t => {
+          totalAll++;
+          if (state.progress[getProgressKey(p.id, 1, p.dir, i, t)]) doneAll++;
+        }));
+      }
+    });
   });
   const globalPct = totalAll > 0 ? Math.round(doneAll / totalAll * 100) : 0;
 
@@ -979,7 +1005,22 @@ function renderGlobalProgress() {
   html += renderCalendarAccordion();
   html += `</div></details>`;
 
-  // ═══ 2 — DÉTAIL PAR PATTERN ══════════════════════════════════════════════════
+  // ═══ 2 — PROGRESSION GLOBALE ═════════════════════════════════════════════════
+  html += `
+  <div style="background:var(--blue);border-radius:var(--radius);padding:13px 16px;margin-bottom:10px">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
+      <div>
+        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:rgba(244,238,226,.6)">Global</div>
+        <div style="font-size:19px;font-weight:800;color:var(--header-text)">Progression</div>
+      </div>
+      <div style="font-size:28px;font-weight:800;color:${globalPct>0?'var(--header-text)':'rgba(244,238,226,.35)'}">${globalPct}%</div>
+    </div>
+    <div style="height:4px;background:rgba(244,238,226,.2);border-radius:2px">
+      <div style="height:4px;background:var(--orange);border-radius:2px;width:${globalPct}%"></div>
+    </div>
+  </div>`;
+
+  // ═══ 3 — DÉTAIL PAR PATTERN ══════════════════════════════════════════════════
   html += `<details class="prog-acc"><summary>Détail par pattern</summary><div class="prog-acc-body">`;
   html += `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px">`;
 
@@ -996,48 +1037,6 @@ function renderGlobalProgress() {
         <div style="font-size:16px;font-weight:800;color:${color}">${pct}%</div>
       </button>
       ${isFav ? '<div style="position:absolute;top:2px;right:2px;padding:2px;line-height:0;pointer-events:none"><svg width="13" height="13" viewBox="0 0 24 24"><path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" fill="#E91E63" stroke="#E91E63" stroke-width="2.5"/></svg></div>' : ''}
-    </div>`;
-  });
-
-  html += `</div></div></details>`;
-
-  // ═══ 3 — PROGRESSION GLOBALE ═════════════════════════════════════════════════
-  html += `<details class="prog-acc">
-    <summary>Progression globale<span class="prog-sum-stat" style="color:var(--blue)">${globalPct}%</span></summary>
-    <div class="prog-acc-body">`;
-  html += `
-  <div style="background:var(--blue);border-radius:var(--radius);padding:13px 16px;margin-bottom:10px">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
-      <div>
-        <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:rgba(244,238,226,.6)">Global</div>
-        <div style="font-size:19px;font-weight:800;color:var(--header-text)">Progression</div>
-      </div>
-      <div style="font-size:28px;font-weight:800;color:${globalPct>0?'var(--header-text)':'rgba(244,238,226,.35)'}">${globalPct}%</div>
-    </div>
-    <div style="height:4px;background:rgba(244,238,226,.2);border-radius:2px">
-      <div style="height:4px;background:var(--orange);border-radius:2px;width:${globalPct}%"></div>
-    </div>
-  </div>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:4px">`;
-
-  cats.forEach(cat => {
-    const catPatterns = PATTERNS.filter(p => p.cat === cat);
-    if (catPatterns.length === 0) return;
-    let t = 0, d = 0;
-    catPatterns.forEach(p => {
-      const mode = p.dir;
-      [1].forEach(f => INTERPS.forEach(i => TEMPOS.forEach(tempo => {
-        t++;
-        if (state.progress[getProgressKey(p.id, f, mode, i, tempo)]) d++;
-      })));
-    });
-    const pct = t > 0 ? Math.round(d / t * 100) : 0;
-    const color = pct >= 80 ? 'var(--green)' : pct >= 40 ? 'var(--orange)' : 'var(--blue)';
-    html += `
-    <div style="background:var(--card);border-radius:10px;padding:10px 12px;box-shadow:0 1px 4px rgba(0,0,0,.06)">
-      <div style="font-size:11px;color:var(--text2);margin-bottom:4px">${catLabels[cat]}</div>
-      <div style="font-size:22px;font-weight:800;color:${color}">${pct}%</div>
-      <div class="progress-bar-wrap" style="margin-top:6px"><div class="progress-bar" style="width:${pct}%;background:${color}"></div></div>
     </div>`;
   });
 

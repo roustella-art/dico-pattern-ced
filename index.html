@@ -153,7 +153,7 @@
   .card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:10px;overflow:hidden}
   .card.card-penta{border-left:4px solid var(--blue-light)}
   .card.card-gamme-maj{border-left:4px solid var(--blue)}
-  .card.card-consolidated{border-left:4px solid #7c6aad}
+  .card.card-consolidated{border-left:none}
   .card-head{padding:13px 14px;display:flex;align-items:center;justify-content:space-between;cursor:pointer;user-select:none}
   .card-head h2{font-size:15px;font-weight:700}
   .card-head .badge{font-size:11px;font-weight:700;padding:2px 8px;border-radius:20px;background:var(--blue-light);color:var(--blue)}
@@ -176,8 +176,8 @@
   .filter-seg button:last-child{border-right:none}
   .filter-seg button.active{background:var(--blue);color:#fff;font-weight:600}
   .filter-seg button.active.diff-deb{background:#4a9e6b}
-  .filter-seg button.active.diff-int{background:#c07830}
-  .filter-seg button.active.diff-adv{background:#a03030}
+  .filter-seg button.active.diff-int{background:#d49800}
+  .filter-seg button.active.diff-adv{background:#d63031}
   .filter-seg button.active.diff-challenge{background:#7B5EA7}
   .filter-seg button.active.sort-progressif{background:#2e7d9a}
   .filter-seg button.active.sort-alphabetique{background:#6a5acd}
@@ -403,6 +403,7 @@
       <button id="shuffle-toggle-btn" class="h-icon-btn" onclick="toggleShuffleMode()" title="Mode shuffle/swing" style="font-size:10px;font-weight:700;letter-spacing:.3px">SH</button>
       <button id="string-group-btn" class="h-icon-btn" onclick="cycleStringGroup()" title="Groupe de cordes — DGBE · ADGB · EADG" style="font-size:9px;font-weight:700;letter-spacing:.3px;min-width:34px">DGBE</button>
       <button id="neck-toggle-btn" class="h-icon-btn" onclick="toggleNeckPosition()" title="Basculer mid/high neck" style="font-size:10px;font-weight:700">mid</button>
+      <button id="loop-ext-btn" class="h-icon-btn" onclick="cycleLoopExt()" title="Loop étendu — Base · −1 · +1 · +2 · +3 · +4" style="font-size:10px;font-weight:700;letter-spacing:.3px">L+0</button>
       <button class="h-icon-btn" id="gear-btn"
         onclick="openSettings()"
         aria-label="Réglages" title="Réglages">
@@ -429,7 +430,7 @@
           <button onclick="headerBpmChange(+5)" aria-label="+5 BPM">+</button>
         </div>
         <div id="header-pulse" class="metro-pulse"></div>
-        <button id="header-train-btn" onclick="trainBtnClick()" style="font-size:9px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;flex-shrink:0;cursor:pointer;padding:0 6px;height:32px;display:flex;align-items:center;justify-content:center;border-radius:5px;border:1.5px solid rgba(77,208,225,.4);background:transparent;color:rgba(244,238,226,.45);-webkit-tap-highlight-color:transparent;transition:all .15s" title="1 clic = mode entraînement · 2 clics = mode pyramide">Train.</button>
+        <button id="header-train-btn" onclick="trainBtnClick()" style="font-size:15px;font-weight:400;flex-shrink:0;cursor:pointer;padding:0 8px;height:32px;display:flex;align-items:center;justify-content:center;gap:2px;border-radius:5px;border:1.5px solid rgba(244,238,226,.25);background:transparent;color:rgba(244,238,226,.45);-webkit-tap-highlight-color:transparent;transition:all .15s;letter-spacing:1px" title="1 clic = montée BPM · 2 clics = mode pyramide"><span id="train-icon-up">↗</span><span id="train-icon-tri">△</span></button>
       </div>
       <div style="display:flex;align-items:center;gap:6px">
       </div>
@@ -974,7 +975,7 @@ function _refreshGammeTabAndProg(patId) {
   if (!pat) return;
   const pre = document.getElementById('tab-pre-' + patId);
   if (pre) {
-    const rawTab = getGammeActiveTab(pat);
+    const rawTab = getEffectiveTab(getGammeActiveTab(pat));
     const _useStaticHigh3 = pat.directionsHigh && SETTINGS.neckPosition === 'high';
     const neckTab = pat.disableHighNeck ? rawTab : (_useStaticHigh3 ? applyStaticTabTransform(rawTab) : transformTab(rawTab, pat.id, !!pat.special));
     const filtered = applyGammeStringFilter(neckTab, getGammeActiveStrings(patId));
@@ -1454,19 +1455,24 @@ function trainBtnClick() {
 
 function syncTrainBtnUI() {
   const btn = document.getElementById('header-train-btn');
+  const iconUp  = document.getElementById('train-icon-up');
+  const iconTri = document.getElementById('train-icon-tri');
   if (!btn) return;
   if (!SETTINGS.trainMode) {
-    btn.style.color = 'rgba(244,238,226,.45)';
     btn.style.borderColor = 'rgba(244,238,226,.25)';
     btn.style.background = 'transparent';
+    if (iconUp)  { iconUp.style.color  = 'rgba(244,238,226,.45)'; }
+    if (iconTri) { iconTri.style.color = 'rgba(244,238,226,.45)'; }
   } else if (!SETTINGS.trainPyramide) {
-    btn.style.color = '#4dd0e1';
     btn.style.borderColor = 'rgba(77,208,225,.4)';
-    btn.style.background = 'rgba(77,208,225,.12)';
+    btn.style.background = 'rgba(77,208,225,.08)';
+    if (iconUp)  { iconUp.style.color  = '#4dd0e1'; }
+    if (iconTri) { iconTri.style.color = 'rgba(244,238,226,.25)'; }
   } else {
-    btn.style.color = 'var(--orange)';
     btn.style.borderColor = 'rgba(212,98,46,.4)';
-    btn.style.background = 'rgba(212,98,46,.12)';
+    btn.style.background = 'rgba(212,98,46,.08)';
+    if (iconUp)  { iconUp.style.color  = 'rgba(244,238,226,.25)'; }
+    if (iconTri) { iconTri.style.color = 'var(--orange)'; }
   }
 }
 
@@ -1520,6 +1526,21 @@ function updateHeaderUI() {
     const inLabo = state.tab === 'shaker';
     stringBtn.style.opacity        = inLabo ? '0.3' : '';
     stringBtn.style.pointerEvents  = inLabo ? 'none' : '';
+  }
+
+  // Bouton Loop étendu (Row 1)
+  const loopExtBtn = document.getElementById('loop-ext-btn');
+  if (loopExtBtn) {
+    loopExtBtn.classList.toggle('hidden', !SETTINGS.showLoopExtBtn);
+    const n = SETTINGS.loopExt;
+    const active = n !== 0;
+    loopExtBtn.textContent   = n === -1 ? 'L−1' : n === 0 ? 'L+0' : `L+${n}`;
+    loopExtBtn.style.background  = active ? 'var(--orange)' : 'rgba(244,238,226,.08)';
+    loopExtBtn.style.borderColor = active ? 'var(--orange)' : 'rgba(244,238,226,.12)';
+    loopExtBtn.style.color       = active ? '#fff' : 'var(--header-text)';
+    const inLabo = state.tab === 'shaker';
+    loopExtBtn.style.opacity       = inLabo ? '0.3' : '';
+    loopExtBtn.style.pointerEvents = inLabo ? 'none' : '';
   }
 
   // Bouton Shuffle (Row 1)
@@ -2121,6 +2142,7 @@ function openSettings(tab) {
             { key:'showShuffleBtn',  label:'Shuffle (SH)',       hint:'Bouton pour activer/désactiver le mode swing' },
             { key:'showStringBtn',   label:'Groupe de cordes',   hint:'Basculer DGBE · ADGB · EADG depuis le header' },
             { key:'showNeckBtn',     label:'Mid / High',         hint:'Basculer la position du manche depuis le header' },
+            { key:'showLoopExtBtn',  label:'Loop étendu',        hint:'Cycler Base · −1 · +1 · +2 · +3 depuis le header' },
             { key:'showHeaderStats', label:'Stats streak', hint:'Afficher la série, le record et le total (🔥⚡📅)' },
           ].map(item => `
           <div class="switch-row">
@@ -2140,7 +2162,7 @@ function openSettings(tab) {
           <button class="sf-btn" onclick="doImportJSON()">↑ Importer JSON</button>
         </div>
         <button class="sf-reset" onclick="resetApp()">Réinitialiser l'app</button>
-        <div class="sf-version">v5.1</div>
+        <div class="sf-version">v5.2</div>
       </div>
     </div>
   </div>`;
@@ -2546,6 +2568,15 @@ function updateDualRangeTrack() {
     startEl.style.zIndex = swap ? 5 : 3;
     maxEl.style.zIndex   = swap ? 3 : 5;
   }
+}
+
+function cycleLoopExt() {
+  const vals = [-1, 0, 1, 2, 3, 4];
+  const idx  = vals.indexOf(SETTINGS.loopExt);
+  const next = vals[(idx + 1) % vals.length];
+  setLoopExt(next);
+  updateHeaderUI();
+  render();
 }
 
 function setLoopExt(n) {

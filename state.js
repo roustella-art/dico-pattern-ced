@@ -42,6 +42,7 @@ const SETTINGS = {
   showDiffFilter: false,   // afficher filtre Basique/Technique/Complexe sous le tri patterns
   showNeckBtn: false,      // afficher/masquer le bouton mid/high dans le header
   showShuffleBtn: false,   // afficher bouton Shuffle dans la row 1 du header
+  showLoopExtBtn: false,   // afficher bouton Loop étendu dans la row 1 du header
   showStringBtn: false,    // afficher bouton groupe de cordes dans la row 1 du header
   showSubdivBtn: false,    // afficher bouton subdivision rythmique dans le header
   showTrain: false,        // afficher bouton Train. dans le header
@@ -80,6 +81,7 @@ function loadSettings() {
     if (s.showDiffFilter !== undefined) SETTINGS.showDiffFilter = s.showDiffFilter;
     if (s.showNeckBtn !== undefined) SETTINGS.showNeckBtn = s.showNeckBtn;
     if (s.showShuffleBtn !== undefined) SETTINGS.showShuffleBtn = s.showShuffleBtn;
+    if (s.showLoopExtBtn !== undefined) SETTINGS.showLoopExtBtn = s.showLoopExtBtn;
     if (s.showStringBtn  !== undefined) SETTINGS.showStringBtn  = s.showStringBtn;
     if (s.showSubdivBtn !== undefined) SETTINGS.showSubdivBtn = s.showSubdivBtn;
     if (s.showTrain !== undefined) SETTINGS.showTrain = s.showTrain;
@@ -129,6 +131,7 @@ function saveSettings() {
       showDiffFilter: SETTINGS.showDiffFilter,
       showNeckBtn: SETTINGS.showNeckBtn,
       showShuffleBtn: SETTINGS.showShuffleBtn,
+      showLoopExtBtn: SETTINGS.showLoopExtBtn,
       showStringBtn:  SETTINGS.showStringBtn,
       showSubdivBtn: SETTINGS.showSubdivBtn,
       showTrain: SETTINGS.showTrain,

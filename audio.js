@@ -1001,7 +1001,7 @@ function setPreviewInterp(interp) {
       // Triades avec groupes : utiliser le tab du groupe sélectionné
       let rawTab;
       if (pat.hasDirectionTabs) {
-        rawTab = getGammeActiveTab(pat);
+        rawTab = getEffectiveTab(getGammeActiveTab(pat));
       } else if (pat.stringGroups) {
         rawTab = getTriadeActiveTab(pat);
       } else {
@@ -1417,7 +1417,7 @@ function previewPlay(patId) {
   // Triades avec groupes de cordes : utiliser le tab du groupe sélectionné
   let effectiveTabStr;
   if (pat.hasDirectionTabs) {
-    effectiveTabStr = getGammeActiveTab(pat);
+    effectiveTabStr = getEffectiveTab(getGammeActiveTab(pat));
   } else if (pat.stringGroups) {
     effectiveTabStr = getTriadeActiveTab(pat);
   } else if (pat.stringSelector) {
@@ -1552,7 +1552,7 @@ function previewPlay(patId) {
   // Triades avec groupes de cordes : utiliser le tab du groupe sélectionné
   let effectiveTabForCursor;
   if (pat.hasDirectionTabs) {
-    effectiveTabForCursor = getGammeActiveTab(pat);
+    effectiveTabForCursor = getEffectiveTab(getGammeActiveTab(pat));
   } else if (pat.stringGroups) {
     effectiveTabForCursor = getTriadeActiveTab(pat);
   } else if (pat.stringSelector) {

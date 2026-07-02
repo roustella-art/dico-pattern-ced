@@ -151,7 +151,7 @@ function skRefreshStepSummary(i) {
   const patName = st.patKey || '—';
   const formeName = st.forme || '';
   nameEl.textContent = isRest
-    ? '⊘ Pause'
+    ? '— Silence'
     : (patName !== '—'
         ? `${patName}${formeName ? ' / '+formeName : ''} · ${st.string} · ${st.dir==='U'?'↑':'↓'} · ${DUR_LABELS[dur]||dur}`
         : '— choisir un pattern —');
@@ -270,7 +270,7 @@ function skBuildStepsUI(keepOpen) {
       : isRepeatStart ? `|: Renvoie début`
       : isRepeatEnd   ? `:|  Renvoie fin · ×${st.repeatCount || 2}`
       : isStop        ? `‖ Stop`
-      : isRest        ? `⊘ Pause · ${DUR_LABELS[dur]||dur}`
+      : isRest        ? `— Silence · ${DUR_LABELS[dur]||dur}`
       : (patName !== '—'
           ? `${patName}${formeName ? ' / '+formeName : ''} · ${st.string} · ${st.dir==='U'?'↑':'↓'} · ${DUR_LABELS[dur]||dur}`
           : '— choisir un pattern —');
@@ -319,7 +319,7 @@ function skBuildStepsUI(keepOpen) {
           <div class="sk-control-label">Pattern</div>
           <select class="sk-pat-select" onchange="skSetStepPat(${i},this.value)">
             <option value="" ${!st.patKey && !isRest && !isStructural ? 'selected':''}>— choisir —</option>
-            <option value="rest"         ${isRest        ? 'selected':''}>⊘ Pause</option>
+            <option value="rest"         ${isRest        ? 'selected':''}>— Silence</option>
             <option value="measure"      ${isMeasure     ? 'selected':''}>∣ Mesure</option>
             <option value="repeat-start" ${isRepeatStart ? 'selected':''}>|: Renvoie début</option>
             <option value="repeat-end"   ${isRepeatEnd   ? 'selected':''}>:| Renvoie fin</option>
@@ -610,7 +610,7 @@ function skUpdateInfoBar(assignments) {
   const durLabels = { '1/4':'noires', '1/8':'croches', '1/16':'double-croches', '1/8t':'triolets', '6:16':'sextolets' };
   const durText   = durations.size === 1 ? ' · ' + (durLabels[soundAssignments[0]?.duration] || '') : ' · mixte';
   let html = `<span class="sk-info-chip ok">${noteSteps.length} pas · ${noteCount} notes${durText}</span>`;
-  if (restSteps.length) html += `<span class="sk-info-chip rest">${restSteps.length} pause${restSteps.length > 1 ? 's':''}</span>`;
+  if (restSteps.length) html += `<span class="sk-info-chip rest">${restSteps.length} silence${restSteps.length > 1 ? 's':''}</span>`;
   if (measureSteps.length) html += `<span class="sk-info-chip rest">${measureSteps.length} mesure${measureSteps.length > 1 ? 's':''}</span>`;
   if (inactive)         html += `<span class="sk-info-chip warn">${inactive} inactif${inactive > 1 ? 's':''}</span>`;
   bar.innerHTML = html;
@@ -2064,24 +2064,24 @@ const SK_DEFAULT_PRESETS = {
     { string:'e', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
   ],
   'Arpège Em (sweep)': [
-    { string:'E', patKey:'A1P1', forme:'standard', dir:'U', startFret:7,  active:true, duration:'1/16' },
+    { string:'E', patKey:'A1P0', forme:'standard', dir:'U', startFret:7,  active:true, duration:'1/16' },
     { string:'A', patKey:'A2P1', forme:'1-4',      dir:'U', startFret:7,  active:true, duration:'1/16' },
-    { string:'D', patKey:'A1P1', forme:'standard', dir:'U', startFret:9,  active:true, duration:'1/16' },
-    { string:'G', patKey:'A1P1', forme:'standard', dir:'U', startFret:9,  active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P1', forme:'standard', dir:'U', startFret:8,  active:true, duration:'1/16' },
-    { string:'e', patKey:'A1P1', forme:'standard', dir:'U', startFret:12, active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P1', forme:'standard', dir:'D', startFret:8,  active:true, duration:'1/16' },
-    { string:'G', patKey:'A1P1', forme:'standard', dir:'D', startFret:9,  active:true, duration:'1/16' },
-    { string:'D', patKey:'A1P1', forme:'standard', dir:'D', startFret:9,  active:true, duration:'1/16' },
+    { string:'D', patKey:'A1P0', forme:'standard', dir:'U', startFret:9,  active:true, duration:'1/16' },
+    { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:9,  active:true, duration:'1/16' },
+    { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:8,  active:true, duration:'1/16' },
+    { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:12, active:true, duration:'1/16' },
+    { string:'B', patKey:'A1P0', forme:'standard', dir:'D', startFret:8,  active:true, duration:'1/16' },
+    { string:'G', patKey:'A1P0', forme:'standard', dir:'D', startFret:9,  active:true, duration:'1/16' },
+    { string:'D', patKey:'A1P0', forme:'standard', dir:'D', startFret:9,  active:true, duration:'1/16' },
     { string:'A', patKey:'A2P1', forme:'1-4',      dir:'D', startFret:7,  active:true, duration:'1/16' },
     { string:'E', patKey:'A2P1', forme:'1-5',      dir:'D', startFret:3,  active:true, duration:'1/16' },
   ],
   'Triades Dim (GBe)': [
     { string:'G', patKey:'A2P1', forme:'1-4', dir:'U', startFret:4, active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P1', forme:'standard', dir:'U', startFret:6, active:true, duration:'1/16' },
+    { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:6, active:true, duration:'1/16' },
     { string:'e', patKey:'A2P1', forme:'1-4', dir:'U', startFret:4, active:true, duration:'1/16' },
     { string:'G', patKey:'A2P1', forme:'1-4', dir:'U', startFret:7, active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P1', forme:'standard', dir:'U', startFret:9, active:true, duration:'1/16' },
+    { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:9, active:true, duration:'1/16' },
     { string:'e', patKey:'A2P1', forme:'1-4', dir:'U', startFret:7, active:true, duration:'1/16' },
   ],
 
@@ -2113,16 +2113,16 @@ const SK_DEFAULT_PRESETS = {
 
   // ── ARPÈGES ───────────────────────────────────────────────────────────────────
   'Arpège Am (sweep)': [
-    { string:'E', patKey:'A1P1', forme:'standard', dir:'U', startFret:5,  active:true, duration:'1/16' },
-    { string:'A', patKey:'A1P1', forme:'standard', dir:'U', startFret:7,  active:true, duration:'1/16' },
-    { string:'D', patKey:'A1P1', forme:'standard', dir:'U', startFret:7,  active:true, duration:'1/16' },
+    { string:'E', patKey:'A1P0', forme:'standard', dir:'U', startFret:5,  active:true, duration:'1/16' },
+    { string:'A', patKey:'A1P0', forme:'standard', dir:'U', startFret:7,  active:true, duration:'1/16' },
+    { string:'D', patKey:'A1P0', forme:'standard', dir:'U', startFret:7,  active:true, duration:'1/16' },
     { string:'G', patKey:'A2P1', forme:'1-5',      dir:'U', startFret:5,  active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P1', forme:'standard', dir:'U', startFret:5,  active:true, duration:'1/16' },
-    { string:'e', patKey:'A1P1', forme:'standard', dir:'U', startFret:5,  active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P1', forme:'standard', dir:'D', startFret:5,  active:true, duration:'1/16' },
+    { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:5,  active:true, duration:'1/16' },
+    { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:5,  active:true, duration:'1/16' },
+    { string:'B', patKey:'A1P0', forme:'standard', dir:'D', startFret:5,  active:true, duration:'1/16' },
     { string:'G', patKey:'A2P1', forme:'1-5',      dir:'D', startFret:5,  active:true, duration:'1/16' },
-    { string:'D', patKey:'A1P1', forme:'standard', dir:'D', startFret:7,  active:true, duration:'1/16' },
-    { string:'A', patKey:'A1P1', forme:'standard', dir:'D', startFret:7,  active:true, duration:'1/16' },
+    { string:'D', patKey:'A1P0', forme:'standard', dir:'D', startFret:7,  active:true, duration:'1/16' },
+    { string:'A', patKey:'A1P0', forme:'standard', dir:'D', startFret:7,  active:true, duration:'1/16' },
     { string:'E', patKey:'A2P1', forme:'1-4',      dir:'D', startFret:5,  active:true, duration:'1/16' },
   ],
 
@@ -2160,46 +2160,46 @@ const SK_DEFAULT_PRESETS = {
   // ═══════════════════════════════════════════════════════════════════════════
   'B6P1 (1-2-3)': [
     { string:'D', patKey:'A3P1', forme:'1-2-3', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A1P1', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+    { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
     { string:'D', patKey:'A2P1', forme:'1-2',   dir:'D', startFret:6, active:true, duration:'1/16' },
     { string:'G', patKey:'A3P1', forme:'1-2-3', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P1', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+    { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
     { string:'G', patKey:'A2P1', forme:'1-2',   dir:'D', startFret:6, active:true, duration:'1/16' },
     { string:'B', patKey:'A3P1', forme:'1-2-3', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'e', patKey:'A1P1', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+    { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
     { string:'B', patKey:'A2P1', forme:'1-2',   dir:'D', startFret:6, active:true, duration:'1/16' },
   ],
   'B6P1 (1-2-4)': [
     { string:'D', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A1P1', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+    { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
     { string:'D', patKey:'A2P1', forme:'1-3',   dir:'D', startFret:6, active:true, duration:'1/16' },
     { string:'G', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P1', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+    { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
     { string:'G', patKey:'A2P1', forme:'1-3',   dir:'D', startFret:6, active:true, duration:'1/16' },
     { string:'B', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'e', patKey:'A1P1', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+    { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
     { string:'B', patKey:'A2P1', forme:'1-3',   dir:'D', startFret:6, active:true, duration:'1/16' },
   ],
   'B6P1 (1-3-4)': [
     { string:'D', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A1P1', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+    { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
     { string:'D', patKey:'A2P1', forme:'1-2',   dir:'D', startFret:7, active:true, duration:'1/16' },
     { string:'G', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P1', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+    { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
     { string:'G', patKey:'A2P1', forme:'1-2',   dir:'D', startFret:7, active:true, duration:'1/16' },
     { string:'B', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'e', patKey:'A1P1', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+    { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
     { string:'B', patKey:'A2P1', forme:'1-2',   dir:'D', startFret:7, active:true, duration:'1/16' },
   ],
   'B6P1 (1-3-5)': [
     { string:'D', patKey:'A3P1', forme:'1-3-5', dir:'U', startFret:4, active:true, duration:'1/16' },
-    { string:'G', patKey:'A1P1', forme:'standard', dir:'U', startFret:4, active:true, duration:'1/16' },
+    { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:4, active:true, duration:'1/16' },
     { string:'D', patKey:'A2P1', forme:'1-3',   dir:'D', startFret:6, active:true, duration:'1/16' },
     { string:'G', patKey:'A3P1', forme:'1-3-5', dir:'U', startFret:4, active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P1', forme:'standard', dir:'U', startFret:4, active:true, duration:'1/16' },
+    { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:4, active:true, duration:'1/16' },
     { string:'G', patKey:'A2P1', forme:'1-3',   dir:'D', startFret:6, active:true, duration:'1/16' },
     { string:'B', patKey:'A3P1', forme:'1-3-5', dir:'U', startFret:4, active:true, duration:'1/16' },
-    { string:'e', patKey:'A1P1', forme:'standard', dir:'U', startFret:4, active:true, duration:'1/16' },
+    { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:4, active:true, duration:'1/16' },
     { string:'B', patKey:'A2P1', forme:'1-3',   dir:'D', startFret:6, active:true, duration:'1/16' },
   ],
 
@@ -2211,17 +2211,17 @@ const SK_DEFAULT_PRESETS = {
     { string:'e', patKey:'repeat-start', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
     { string:'D', patKey:'A2P1', forme:'1-2', dir:'U', startFret:7, active:true, duration:'1/16' },
     { string:'G', patKey:'A5P2', forme:'1-2-3-2-1', dir:'U', startFret:4, active:true, duration:'1/16' },
-    { string:'D', patKey:'A1P1', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
+    { string:'D', patKey:'A1P0', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
     { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16', repeatCount:4 },
     { string:'e', patKey:'repeat-start', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
     { string:'G', patKey:'A2P1', forme:'1-2', dir:'U', startFret:7, active:true, duration:'1/16' },
     { string:'B', patKey:'A5P2', forme:'1-2-3-2-1', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A1P1', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
+    { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
     { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16', repeatCount:4 },
     { string:'e', patKey:'repeat-start', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
     { string:'B', patKey:'A2P1', forme:'1-2', dir:'U', startFret:7, active:true, duration:'1/16' },
     { string:'e', patKey:'A5P2', forme:'1-2-3-2-1', dir:'U', startFret:4, active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P1', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
+    { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
     { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16', repeatCount:4 },
   ],
 
@@ -2231,26 +2231,26 @@ const SK_DEFAULT_PRESETS = {
 
   // ── Pos. ouverte ─────────────────────────────────────────────────────────
   'Do Majeur Forme C': [
-    { string:'A', patKey:'A1P1', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
+    { string:'A', patKey:'A1P0', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
     { string:'D', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:0, active:true, duration:'1/16' },
     { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
     { string:'B', patKey:'A2P1', forme:'1-2',      dir:'U', startFret:0, active:true, duration:'1/16' },
   ],
   'Do Majeur Forme C étendue': [
-    { string:'A', patKey:'A1P1', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
+    { string:'A', patKey:'A1P0', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
     { string:'D', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:0, active:true, duration:'1/16' },
     { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
     { string:'B', patKey:'A3P1', forme:'1-2-4',    dir:'U', startFret:0, active:true, duration:'1/16' },
     { string:'e', patKey:'A3P1', forme:'1-2-4',    dir:'U', startFret:0, active:true, duration:'1/16' },
   ],
   'Do Penta Forme C': [
-    { string:'A', patKey:'A1P1', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
+    { string:'A', patKey:'A1P0', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
     { string:'D', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
     { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P1', forme:'standard', dir:'U', startFret:1, active:true, duration:'1/16' },
+    { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:1, active:true, duration:'1/16' },
   ],
   'Do Penta Forme C étendue': [
-    { string:'A', patKey:'A1P1', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
+    { string:'A', patKey:'A1P0', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
     { string:'D', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
     { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
     { string:'B', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:1, active:true, duration:'1/16' },
@@ -2285,7 +2285,7 @@ const SK_DEFAULT_PRESETS = {
 
   // ── Forme G (pos. 8) ─────────────────────────────────────────────────────
   'Do Majeur Forme G': [
-    { string:'E', patKey:'A1P1', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
+    { string:'E', patKey:'A1P0', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
     { string:'A', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:5, active:true, duration:'1/16' },
     { string:'D', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:5, active:true, duration:'1/16' },
     { string:'G', patKey:'A2P1', forme:'1-2',      dir:'U', startFret:4, active:true, duration:'1/16' },
@@ -2296,7 +2296,7 @@ const SK_DEFAULT_PRESETS = {
     { string:'e', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
   ],
   'Do Majeur Forme G étendue': [
-    { string:'E', patKey:'A1P1', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
+    { string:'E', patKey:'A1P0', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
     { string:'A', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:5, active:true, duration:'1/16' },
     { string:'D', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:5, active:true, duration:'1/16' },
     { string:'G', patKey:'A3P1', forme:'1-2-4',    dir:'U', startFret:4, active:true, duration:'1/16' },
@@ -2304,10 +2304,10 @@ const SK_DEFAULT_PRESETS = {
     { string:'e', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:5, active:true, duration:'1/16' },
   ],
   'Do Penta Forme G': [
-    { string:'E', patKey:'A1P1', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
+    { string:'E', patKey:'A1P0', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
     { string:'A', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:5, active:true, duration:'1/16' },
     { string:'D', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A1P1', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+    { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
   ],
   'Do Penta Forme G (8va)': [
     { string:'G', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
@@ -2315,7 +2315,7 @@ const SK_DEFAULT_PRESETS = {
     { string:'e', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
   ],
   'Do Penta Forme G étendue': [
-    { string:'E', patKey:'A1P1', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
+    { string:'E', patKey:'A1P0', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
     { string:'A', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:5, active:true, duration:'1/16' },
     { string:'D', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:5, active:true, duration:'1/16' },
     { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:5, active:true, duration:'1/16' },
@@ -2330,7 +2330,7 @@ const SK_DEFAULT_PRESETS = {
     { string:'D', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:7, active:true, duration:'1/16' },
   ],
   'Do Majeur Forme E (8va)': [
-    { string:'D', patKey:'A1P1', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
+    { string:'D', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
     { string:'G', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:7,  active:true, duration:'1/16' },
     { string:'B', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:8,  active:true, duration:'1/16' },
     { string:'e', patKey:'A2P1', forme:'1-2',      dir:'U', startFret:7,  active:true, duration:'1/16' },
@@ -2349,10 +2349,10 @@ const SK_DEFAULT_PRESETS = {
     { string:'D', patKey:'A2P1', forme:'1-4', dir:'U', startFret:7, active:true, duration:'1/16' },
   ],
   'Do Penta Forme E (8va)': [
-    { string:'D', patKey:'A1P1', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
+    { string:'D', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
     { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:7,  active:true, duration:'1/16' },
     { string:'B', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:8,  active:true, duration:'1/16' },
-    { string:'e', patKey:'A1P1', forme:'standard', dir:'U', startFret:8,  active:true, duration:'1/16' },
+    { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:8,  active:true, duration:'1/16' },
   ],
   'Do Penta Forme E étendue': [
     { string:'E', patKey:'A2P1', forme:'1-3', dir:'U', startFret:8, active:true, duration:'1/16' },
@@ -2393,10 +2393,10 @@ const SK_DEFAULT_PRESETS = {
 
   // ── Forme G (pos. ouverte) ────────────────────────────────────────────────
   'Sol Majeur Forme G': [
-    { string:'E', patKey:'A1P1', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
+    { string:'E', patKey:'A1P0', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
     { string:'A', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:0, active:true, duration:'1/16' },
     { string:'D', patKey:'A3P1', forme:'1-3-5',    dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'G', patKey:'A1P1', forme:'standard', dir:'U', startFret:0, active:true, duration:'1/16' },
+    { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:0, active:true, duration:'1/16' },
   ],
   'Sol Majeur Forme G (8va)': [
     { string:'G', patKey:'A2P1', forme:'1-3',   dir:'U', startFret:0, active:true, duration:'1/16' },
@@ -2404,7 +2404,7 @@ const SK_DEFAULT_PRESETS = {
     { string:'e', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:0, active:true, duration:'1/16' },
   ],
   'Sol Majeur Forme G étendue': [
-    { string:'E', patKey:'A1P1', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
+    { string:'E', patKey:'A1P0', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
     { string:'A', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:0, active:true, duration:'1/16' },
     { string:'D', patKey:'A3P1', forme:'1-3-5',    dir:'U', startFret:0, active:true, duration:'1/16' },
     { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
@@ -2412,10 +2412,10 @@ const SK_DEFAULT_PRESETS = {
     { string:'e', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:0, active:true, duration:'1/16' },
   ],
   'Sol Penta Forme G': [
-    { string:'E', patKey:'A1P1', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
+    { string:'E', patKey:'A1P0', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
     { string:'A', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
     { string:'D', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'G', patKey:'A1P1', forme:'standard', dir:'U', startFret:0, active:true, duration:'1/16' },
+    { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:0, active:true, duration:'1/16' },
   ],
   'Sol Penta Forme G (8va)': [
     { string:'G', patKey:'A2P1', forme:'1-3', dir:'U', startFret:0, active:true, duration:'1/16' },
@@ -2423,7 +2423,7 @@ const SK_DEFAULT_PRESETS = {
     { string:'e', patKey:'A2P1', forme:'1-4', dir:'U', startFret:0, active:true, duration:'1/16' },
   ],
   'Sol Penta Forme G étendue': [
-    { string:'E', patKey:'A1P1', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
+    { string:'E', patKey:'A1P0', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
     { string:'A', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
     { string:'D', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
     { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
@@ -2438,7 +2438,7 @@ const SK_DEFAULT_PRESETS = {
     { string:'D', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:2, active:true, duration:'1/16' },
   ],
   'Sol Majeur Forme E (8va)': [
-    { string:'D', patKey:'A1P1', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+    { string:'D', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
     { string:'G', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:2, active:true, duration:'1/16' },
     { string:'B', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:3, active:true, duration:'1/16' },
     { string:'e', patKey:'A2P1', forme:'1-2',      dir:'U', startFret:2, active:true, duration:'1/16' },
@@ -2457,10 +2457,10 @@ const SK_DEFAULT_PRESETS = {
     { string:'D', patKey:'A2P1', forme:'1-4', dir:'U', startFret:2, active:true, duration:'1/16' },
   ],
   'Sol Penta Forme E (8va)': [
-    { string:'D', patKey:'A1P1', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+    { string:'D', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
     { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:2, active:true, duration:'1/16' },
     { string:'B', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'e', patKey:'A1P1', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
+    { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
   ],
   'Sol Penta Forme E étendue': [
     { string:'E', patKey:'A2P1', forme:'1-3', dir:'U', startFret:3, active:true, duration:'1/16' },
@@ -2497,26 +2497,26 @@ const SK_DEFAULT_PRESETS = {
 
   // ── Forme C (pos. 7–10) ──────────────────────────────────────────────────
   'Sol Majeur Forme C': [
-    { string:'A', patKey:'A1P1', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
+    { string:'A', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
     { string:'D', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:7,  active:true, duration:'1/16' },
     { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:7,  active:true, duration:'1/16' },
     { string:'B', patKey:'A2P1', forme:'1-2',      dir:'U', startFret:7,  active:true, duration:'1/16' },
   ],
   'Sol Majeur Forme C étendue': [
-    { string:'A', patKey:'A1P1', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
+    { string:'A', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
     { string:'D', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:7,  active:true, duration:'1/16' },
     { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:7,  active:true, duration:'1/16' },
     { string:'B', patKey:'A3P1', forme:'1-2-4',    dir:'U', startFret:7,  active:true, duration:'1/16' },
     { string:'e', patKey:'A3P1', forme:'1-2-4',    dir:'U', startFret:7,  active:true, duration:'1/16' },
   ],
   'Sol Penta Forme C': [
-    { string:'A', patKey:'A1P1', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
+    { string:'A', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
     { string:'D', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:7,  active:true, duration:'1/16' },
     { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:7,  active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P1', forme:'standard', dir:'U', startFret:8,  active:true, duration:'1/16' },
+    { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:8,  active:true, duration:'1/16' },
   ],
   'Sol Penta Forme C étendue': [
-    { string:'A', patKey:'A1P1', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
+    { string:'A', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
     { string:'D', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:7,  active:true, duration:'1/16' },
     { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:7,  active:true, duration:'1/16' },
     { string:'B', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:8,  active:true, duration:'1/16' },
@@ -2564,6 +2564,10 @@ const SK_OBSOLETE_PRESETS = [
 function skSeedDefaultPresets() {
   const db = skLoadPresetsV2();
   SK_OBSOLETE_PRESETS.forEach(n => { delete db.presets[n]; });
+  // Migration A1P1 → A1P0 : corriger tous les presets stockés
+  Object.values(db.presets).forEach(p => {
+    if (p.steps) p.steps.forEach(s => { if (s.patKey === 'A1P1') s.patKey = 'A1P0'; });
+  });
   // Migration : supprimer l'ancien dossier plat, ajouter les sous-dossiers
   db.folders = db.folders.filter(f => f !== 'Gammes Majeur');
   if (!db.folders.includes('Exemples'))              db.folders.unshift('Exemples');
