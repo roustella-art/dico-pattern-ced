@@ -32,8 +32,8 @@ const STRING_LINES = ['e','B','G','D','A','E'];
 //                     EADG = +2 (pattern descendu de 2 lignes : G,D,A,E)
 const STRING_SHIFTS = { DGBE: 0, ADGB: 1, EADG: 2 };
 
-const PREVIEW_SOUND_KEYS = ['doux','piano','guitare'];
-const PREVIEW_SOUND_LABELS = { doux:'Doux', piano:'Piano', guitare:'Guitare' };
+const PREVIEW_SOUND_KEYS = ['doux','nylon','electrique','epiano'];
+const PREVIEW_SOUND_LABELS = { doux:'Doux', nylon:'Nylon', electrique:'Élec.', epiano:'E-Piano' };
 
 const SETTINGS = {
   stringGroup: 'DGBE',     // 'DGBE' | 'ADGB' | 'EADG'

@@ -1390,7 +1390,7 @@ function skBuildPresetSelect() { skBuildFavBar(); }
 const SK_PROG_KEY    = 'shaker_progress';
 let skCurrentPreset = '';
 
-const SK_MODE_COLORS = { strict:'#1e5f8a', mirror:'#1a5a6a', inverse:'#5a3a7a' };
+const SK_MODE_COLORS = { strict:'#2a7de1', mirror:'#c0392b', inverse:'#8e44ad' };
 const SK_MODE_LABELS = { strict:'Strict', mirror:'Inversé', inverse:'Miroir' };
 
 function skSetInterp(i) {
@@ -1477,6 +1477,23 @@ function skExportPresets() {
   URL.revokeObjectURL(url);
 }
 
+// Exporte toute la bibliothèque (tous les presets + dossiers + groupes) en un seul fichier JSON
+function skExportAllPresets() {
+  const db = skLoadPresetsV2();
+  if (!db.presets || !Object.keys(db.presets).length) {
+    alert('Aucun preset enregistré à exporter.');
+    return;
+  }
+  const json = JSON.stringify(db, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const date = new Date().toISOString().slice(0, 10);
+  a.href = url; a.download = `labo-bibliotheque-${date}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function skImportPresets() {
   document.getElementById('sk-import-file')?.click();
 }
@@ -1558,12 +1575,12 @@ function renderShaker() {
 .sk-fav-chip:active  { opacity: .7; }
 .sk-fav-empty { font-size: 11px; color: var(--text2); font-style: italic; padding: 4px 0; }
 .sk-lib-open-btn {
-  width: 100%; border: 1.5px dashed var(--border); background: transparent;
-  border-radius: 10px; padding: 11px; font-size: 13px; color: var(--text2);
+  width: 100%; border: none; background: var(--blue);
+  border-radius: 10px; padding: 12px; font-size: 13px; font-weight: 600; color: #fff;
   cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
-  margin-bottom: 20px; transition: all .15s;
+  margin-bottom: 20px; transition: opacity .15s;
 }
-.sk-lib-open-btn:active { background: var(--border); }
+.sk-lib-open-btn:active { opacity: .75; }
 
 /* ── LIBRARY SHEET ── */
 .sk-library-overlay {
@@ -1829,9 +1846,9 @@ function renderShaker() {
   font-size: 12px; font-weight: 500; color: var(--text2); cursor: pointer;
 }
 .sk-seg button + button { border-left: 1px solid var(--border); }
-.sk-seg button.active.sk-mode-strict  { background: #1e5f8a; color: #fff; font-weight: 700; }
-.sk-seg button.active.sk-mode-mirror  { background: #1a5a6a; color: #fff; font-weight: 700; }
-.sk-seg button.active.sk-mode-inverse { background: var(--blue); color: #fff; font-weight: 700; }
+.sk-seg button.active.sk-mode-strict  { background: #2a7de1; color: #fff; font-weight: 700; }
+.sk-seg button.active.sk-mode-mirror  { background: #c0392b; color: #fff; font-weight: 700; }
+.sk-seg button.active.sk-mode-inverse { background: #8e44ad; color: #fff; font-weight: 700; }
 .sk-seg button.active.sk-mode-patron  { background: var(--orange); color: #fff; font-weight: 700; }
 
 /* Patron offset */
@@ -1968,7 +1985,7 @@ function renderShaker() {
   <div class="sk-steps-list" id="sk-steps-list"></div>
   <div style="display:flex;gap:8px;margin-bottom:10px">
     <button class="sk-add-step-btn" id="sk-add-step-btn" onclick="skAddStep()" ${skSteps.length >= SK_MAX_STEPS ? 'disabled' : ''} style="flex:1;margin-bottom:0">＋ Ajouter un pas</button>
-    <button class="sk-btn" id="sk-global-edit-btn" onclick="skToggleGlobalPanel()" style="flex:0 0 auto;padding:10px 14px;font-size:14px" title="Édition globale">⚙</button>
+    <button class="sk-btn" id="sk-global-edit-btn" onclick="skToggleGlobalPanel()" style="flex:0 0 auto;padding:10px 14px;font-size:14px" title="Édition globale"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
     <button class="sk-btn sk-btn-clear" onclick="skClearAll()" style="flex:0 0 auto;padding:10px 16px;font-size:12px">Reset</button>
   </div>
 
@@ -2008,8 +2025,9 @@ function renderShaker() {
   <div class="sk-section-label" style="margin-top:6px">
     Presets
     <span style="float:right;display:flex;gap:10px;align-items:center">
-      <button class="sk-fav-io-btn" onclick="skImportPresets()" title="Importer depuis un fichier JSON">⬆ Importer</button>
-      <button class="sk-fav-io-btn" onclick="skExportPresets()" title="Exporter tous les presets en JSON">⬇ Exporter</button>
+      <button class="sk-fav-io-btn" onclick="skImportPresets()" title="Importer depuis un fichier JSON"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Importer</button>
+      <button class="sk-fav-io-btn" onclick="skExportPresets()" title="Exporter la séquence courante en JSON"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 16 12 21 17 16"/><line x1="12" y1="21" x2="12" y2="9"/></svg>Exporter</button>
+      <button class="sk-fav-io-btn" onclick="skExportAllPresets()" title="Exporter toute la bibliothèque (tous les presets) en un seul JSON"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Tout exporter</button>
       <button class="sk-fav-save-btn" onclick="skOpenSaveDialog()">＋ Sauvegarder</button>
     </span>
   </div>
@@ -2018,8 +2036,8 @@ function renderShaker() {
     <span class="sk-fav-empty">Épingle des presets depuis la bibliothèque ★</span>
   </div>
   <button class="sk-lib-open-btn" onclick="skOpenLibrary()">
-    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg>
-    Ouvrir la bibliothèque
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+    Bibliothèque
   </button>
 
 </div>

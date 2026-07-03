@@ -523,7 +523,8 @@ function parseTabNotesSpecial(tabStr) {
 function getActiveSound() {
   const s = SETTINGS.previewSound || 'doux';
   if (s !== 'auto') return s;
-  return ['doux','piano','guitare'][(PREVIEW.cycleIdx || 0) % 3];
+  const all = ['doux','piano','guitare','nylon','electrique','epiano'];
+  return all[(PREVIEW.cycleIdx || 0) % all.length];
 }
 
 function pluckNote(ctx, masterGain, freq, time, gainMult = 1.0, freqEnd = null, bendDur = null) {
@@ -592,6 +593,99 @@ function pluckNote(ctx, masterGain, freq, time, gainMult = 1.0, freqEnd = null, 
     starts.push(() => { osc.start(time); osc.stop(time + 1.0); });
     nodes.push(osc, lp);
     endTime = time + 1.0;
+  }
+  else if (sound === 'nylon' || sound === 'electrique') {
+    // ── Karplus-Strong réel — buffer de bruit filtré en boucle (corde pincée physique)
+    //   nylon      : amortissement fort, filtre doux → guitare classique
+    //   electrique : amortissement faible, plus brillant + résonance → clean électrique
+    const isElec = sound === 'electrique';
+    const sr = ctx.sampleRate;
+    const dur = isElec ? 0.85 : 0.65;
+    const N = Math.max(2, Math.round(sr / freq));
+    const buf = ctx.createBuffer(1, Math.ceil(sr * dur), sr);
+    const data = buf.getChannelData(0);
+    // Excitation initiale : bruit adouci (pick doux) — un passage de moyenne pour le nylon
+    const ring = new Float32Array(N);
+    for (let i = 0; i < N; i++) ring[i] = Math.random() * 2 - 1;
+    if (!isElec) {
+      for (let i = 1; i < N; i++) ring[i] = (ring[i] + ring[i - 1]) * 0.5;
+    }
+    // Boucle KS : moyenne des 2 derniers échantillons × facteur d'amortissement
+    const damp = isElec ? 0.9955 : 0.991;
+    let idx = 0;
+    for (let i = 0; i < data.length; i++) {
+      data[i] = ring[idx];
+      const next = (idx + 1) % N;
+      ring[idx] = (ring[idx] + ring[next]) * 0.5 * damp;
+      idx = next;
+    }
+    const srcNode = ctx.createBufferSource();
+    srcNode.buffer = buf;
+    // Bend : ramp du playbackRate (le pitch du buffer suit)
+    if (freqEnd !== null && bendDur !== null) {
+      srcNode.playbackRate.setValueAtTime(1, time);
+      srcNode.playbackRate.exponentialRampToValueAtTime(freqEnd / freq, time + bendDur);
+    }
+    if (isElec) {
+      // Résonance de caisse/ampli : bandpass léger en parallèle du lowpass
+      const bp = ctx.createBiquadFilter();
+      bp.type = 'peaking';
+      bp.frequency.value = 750;
+      bp.Q.value = 1.1;
+      bp.gain.value = 3.5;
+      srcNode.connect(bp); bp.connect(filt);
+      filt.frequency.value = 4800; filt.Q.value = 0.4;
+      nodes.push(bp);
+    } else {
+      srcNode.connect(filt);
+      filt.frequency.value = Math.min(freq * 6, 3200); filt.Q.value = 0.3;
+    }
+    env.gain.setValueAtTime(0.0001, time);
+    env.gain.linearRampToValueAtTime((isElec ? 0.5 : 0.6) * gainMult, time + 0.002);
+    env.gain.setValueAtTime((isElec ? 0.5 : 0.6) * gainMult, time + dur * 0.35);
+    env.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+    starts.push(() => { srcNode.start(time); srcNode.stop(time + dur); });
+    nodes.push(srcNode);
+    endTime = time + dur;
+  }
+  else if (sound === 'epiano') {
+    // ── E-Piano (Rhodes) — FM 2 opérateurs : porteuse sine + modulateur sine (tine)
+    //   ratio 14:1 sur l'attaque pour le "cling" métallique, qui s'éteint vite
+    const car = ctx.createOscillator();
+    car.type = 'sine';
+    car.frequency.value = freq;
+    if (freqEnd !== null && bendDur !== null) {
+      car.frequency.setValueAtTime(freq, time);
+      car.frequency.exponentialRampToValueAtTime(freqEnd, time + bendDur);
+    }
+    // Modulateur "tine" — haut ratio, index qui chute très vite après l'attaque
+    const mod = ctx.createOscillator();
+    mod.type = 'sine';
+    mod.frequency.value = freq * 14;
+    const modGain = ctx.createGain();
+    modGain.gain.setValueAtTime(freq * 3.5, time);
+    modGain.gain.exponentialRampToValueAtTime(freq * 0.02, time + 0.18);
+    mod.connect(modGain); modGain.connect(car.frequency);
+    // Barre de résonance : sine à l'octave, discret
+    const oct = ctx.createOscillator();
+    oct.type = 'sine';
+    oct.frequency.value = freq * 2;
+    const octGain = ctx.createGain();
+    octGain.gain.setValueAtTime(0.09 * gainMult, time);
+    octGain.gain.exponentialRampToValueAtTime(0.0001, time + 0.7);
+    oct.connect(octGain); octGain.connect(filt);
+    car.connect(filt);
+    filt.frequency.value = Math.min(freq * 10, 7500); filt.Q.value = 0.3;
+    env.gain.setValueAtTime(0.0001, time);
+    env.gain.linearRampToValueAtTime(0.42 * gainMult, time + 0.003);
+    env.gain.exponentialRampToValueAtTime(0.0001, time + 1.4);
+    starts.push(() => {
+      car.start(time); car.stop(time + 1.5);
+      mod.start(time); mod.stop(time + 1.5);
+      oct.start(time); oct.stop(time + 0.8);
+    });
+    nodes.push(car, mod, modGain, oct, octGain);
+    endTime = time + 1.5;
   }
   else {
     // ── Doux (par défaut) — triangle + sine octave + lowpass : le son original

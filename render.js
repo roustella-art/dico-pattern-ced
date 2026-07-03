@@ -389,15 +389,17 @@ function renderPatternGroupBody(pats, key) {
             <div style="display:flex;gap:6px">${versionRow}${pentaBtn}</div>
           </div>`;
       } else {
-        // Sélecteur simple (patterns existants)
+        // Sélecteur simple (patterns existants) — masqué s'il n'y a qu'une seule option
         const dirKeys = Object.keys(p.directions);
-        dirTabsHtml = `
+        if (dirKeys.length > 1) {
+          dirTabsHtml = `
           <div style="display:flex;gap:6px;margin-bottom:10px">
             ${dirKeys.map(dk => {
               const btnId = 'gamme-dir-btn-' + p.id + '-' + dk.replace(/[→↔]/g, '_');
               return `<button id="${btnId}" onclick="setGammeDirection('${p.id}','${dk}')" style="${btnStyle(dk===selectedDir)}">${dk}</button>`;
             }).join('')}
           </div>`;
+        }
       }
     }
 
@@ -1259,6 +1261,12 @@ function renderJournal() {
     <button onclick="if(confirm('Effacer tout le journal ?')) { PATTERN_JOURNAL=[]; savePatternJournal(); render(); }" style="flex:1;padding:10px;background:var(--red);color:#fff;border:none;border-radius:8px;font-weight:600;cursor:pointer;font-size:13px">
       🗑 Réinitialiser le journal
     </button>
+  </div>
+
+  <div style="margin-top:32px;text-align:right;color:var(--text3);font-size:11px;line-height:1.7">
+    <div style="font-weight:600;font-size:12px;color:var(--text2)">Dico Pattern</div>
+    <div>© 2026 · Développé par Cédric RAOU</div>
+    <div>Dijon <span style="font-size:13px">🇫🇷</span></div>
   </div>`;
 
   return html;

@@ -1516,7 +1516,7 @@ function updateHeaderUI() {
   const stringBtn = document.getElementById('string-group-btn');
   if (stringBtn) {
     stringBtn.classList.toggle('hidden', !SETTINGS.showStringBtn);
-    const STRING_COL = { DGBE:'#56864A', ADGB:'#1a7fa6', EADG:'#D4622E' };
+    const STRING_COL = { DGBE:'#0F4C5C', ADGB:'#56864A', EADG:'#D4622E' };
     const col = STRING_COL[SETTINGS.stringGroup] || 'rgba(244,238,226,.08)';
     stringBtn.textContent       = SETTINGS.stringGroup;
     stringBtn.style.background  = col;
@@ -1599,6 +1599,19 @@ function toggleHeaderEl(key, value) {
   SETTINGS[key] = value;
   saveSettings();
   updateHeaderUI();
+}
+
+function toggleAllHeaderEls(value) {
+  ['showTrain','showCountin','showClick','showSubdivBtn','showMetroSolo',
+   'showShuffleBtn','showStringBtn','showNeckBtn','showLoopExtBtn','showHeaderStats']
+    .forEach(key => { SETTINGS[key] = value; });
+  saveSettings();
+  updateHeaderUI();
+  // Resync les toggles visuels dans le panneau
+  document.querySelectorAll('#pane-header .toggle-switch').forEach(btn => {
+    btn.classList.toggle('on', value);
+    btn.setAttribute('aria-checked', value);
+  });
 }
 
 // Cycle DGBE → ADGB → EADG → DGBE …
@@ -1874,28 +1887,27 @@ function openSettings(tab) {
         <div class="group">
           <label class="group-label">Volumes</label>
           <div class="vol-ctrl">
-            <div class="vol-head">
-              <span class="vol-label">Tablature</span>
-              <span class="vol-val" id="pat-vol-val" style="color:var(--blue)">${SETTINGS.patVolume}%</span>
+            <div style="text-align:center;margin-bottom:0px;display:flex;justify-content:center;gap:5px;align-items:baseline">
+              <span class="vol-label" style="font-size:12px">Tablature</span>
+              <span class="vol-val" id="pat-vol-val" style="color:var(--blue);font-size:12px">${SETTINGS.patVolume}%</span>
             </div>
             <div class="vol-body">
-              <div class="vol-bar"><div class="vol-bar-fill" id="pat-vol-bar" style="width:${SETTINGS.patVolume}%;background:var(--blue)"></div></div>
               <button class="control-btn cb-sm" onclick="adjustVolume('patVolume',-5)" aria-label="Baisser volume tablature">−</button>
+              <div class="vol-bar" style="flex:1"><div class="vol-bar-fill" id="pat-vol-bar" style="width:${SETTINGS.patVolume}%;background:var(--blue)"></div></div>
               <button class="control-btn cb-sm" onclick="adjustVolume('patVolume',+5)" aria-label="Monter volume tablature">+</button>
             </div>
           </div>
           <div class="vol-ctrl">
-            <div class="vol-head">
-              <span class="vol-label">Clic métronome</span>
-              <span class="vol-val" id="click-vol-val" style="color:var(--orange)">${SETTINGS.clickVolume}%</span>
+            <div style="text-align:center;margin-bottom:0px;display:flex;justify-content:center;gap:5px;align-items:baseline">
+              <span class="vol-label" style="font-size:12px">Clic</span>
+              <span class="vol-val" id="click-vol-val" style="color:var(--orange);font-size:12px">${SETTINGS.clickVolume}%</span>
             </div>
             <div class="vol-body">
-              <div class="vol-bar"><div class="vol-bar-fill" id="click-vol-bar" style="width:${SETTINGS.clickVolume}%;background:var(--orange)"></div></div>
               <button class="control-btn cb-sm" onclick="adjustVolume('clickVolume',-5)" aria-label="Baisser volume clic">−</button>
+              <div class="vol-bar" style="flex:1"><div class="vol-bar-fill" id="click-vol-bar" style="width:${SETTINGS.clickVolume}%;background:var(--orange)"></div></div>
               <button class="control-btn cb-sm" onclick="adjustVolume('clickVolume',+5)" aria-label="Monter volume clic">+</button>
             </div>
           </div>
-          <div class="hint">Régle l'équilibre entre le son de la tab et le clic du métronome.</div>
         </div>
 
         <div class="group">
@@ -1905,7 +1917,6 @@ function openSettings(tab) {
               <button data-val="${k}" class="${SETTINGS.previewSound===k?'active':''}" onclick="setPreviewSound('${k}')">${PREVIEW_SOUND_LABELS[k]}</button>
             `).join('')}
           </div>
-          <div class="hint">Doux = son original · Piano = 5 harmoniques · Guitare = corde plumée (Karplus-Strong) · Mix = rotation auto à chaque boucle.</div>
         </div>
       </div>
 
@@ -1915,37 +1926,36 @@ function openSettings(tab) {
           <label class="group-label">Presets tempo</label>
           <div style="display:flex;flex-direction:column;gap:12px">
             ${TEMPOS.map(t => '<div class="vol-ctrl" style="margin-bottom:0">'
-              + '<div class="vol-head">'
-              + '<span class="vol-label" style="display:flex;align-items:center;gap:6px">' + t.icon + '<span style="color:' + t.color + '">' + t.range + '</span></span>'
-              + '<span class="vol-val" id="preset-' + t.key + '-val" style="color:' + t.color + '">' + SETTINGS.tempoPresets[t.key] + '</span>'
+              + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:2px">'
+              + '<span class="vol-label" style="font-size:12px;display:flex;align-items:center;gap:4px">' + t.icon + '<span style="color:' + t.color + '">' + t.key.charAt(0).toUpperCase() + t.key.slice(1) + '</span><span style="color:var(--text2);font-weight:400">' + t.range + '</span></span>'
+              + '<span class="vol-val" id="preset-' + t.key + '-val" style="color:' + t.color + ';font-size:12px">' + SETTINGS.tempoPresets[t.key] + '</span>'
               + '</div>'
               + '<div class="vol-body">'
-              + '<div class="vol-bar"><div class="vol-bar-fill" id="preset-' + t.key + '-bar" style="width:' + Math.max(0, Math.min(100, Math.round((SETTINGS.tempoPresets[t.key] - t.rangeMin) / (t.rangeMax - t.rangeMin) * 100))) + '%;background:' + t.color + '"></div></div>'
               + '<button class="control-btn cb-sm" onclick="adjustTempoPreset(\'' + t.key + '\',-5)" aria-label="Baisser ' + t.range + '">−</button>'
+              + '<div class="vol-bar" style="flex:1"><div class="vol-bar-fill" id="preset-' + t.key + '-bar" style="width:' + Math.max(0, Math.min(100, Math.round((SETTINGS.tempoPresets[t.key] - t.rangeMin) / (t.rangeMax - t.rangeMin) * 100))) + '%;background:' + t.color + '"></div></div>'
               + '<button class="control-btn cb-sm" onclick="adjustTempoPreset(\'' + t.key + '\',+5)" aria-label="Monter ' + t.range + '">+</button>'
               + '</div></div>'
             ).join('')}
           </div>
-          <div class="hint">Toucher une ligne dans le tableau règle directement le BPM.</div>
         </div>
 
         <div class="group">
           <label class="group-label">Valeur rythmique de référence</label>
           <div style="display:flex;gap:6px">
-            <button class="subdiv-btn" data-subdiv="2" onclick="setClickSubdiv(2)" aria-label="Croche – 8" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:8px;border:1.5px solid rgba(28,45,51,.18);background:rgba(28,45,51,.07);color:var(--text2);cursor:pointer;transition:all .12s;${SETTINGS.clickSubdiv===2 ? 'border-color:#1a7fa6;background:#1a7fa6;color:#fff;' : ''}">
-              <span style="font-size:14px;font-weight:800;line-height:1.1">8</span>
+            <button class="subdiv-btn" data-subdiv="2" onclick="setClickSubdiv(2)" aria-label="Croche" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:8px;border:1.5px solid ${SETTINGS.clickSubdiv===2 ? '#1a7fa6' : 'rgba(28,45,51,.18)'};background:${SETTINGS.clickSubdiv===2 ? '#1a7fa6' : 'rgba(28,45,51,.07)'};color:${SETTINGS.clickSubdiv===2 ? '#fff' : 'var(--text2)'};cursor:pointer;transition:all .12s">
+              ${getSubdivSVG(2)}
               <span style="font-size:9px;font-weight:500;opacity:.75">croche</span>
             </button>
-            <button class="subdiv-btn" data-subdiv="3" onclick="setClickSubdiv(3)" aria-label="Triolet – 3:8" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:8px;border:1.5px solid rgba(28,45,51,.18);background:rgba(28,45,51,.07);color:var(--text2);cursor:pointer;transition:all .12s;${SETTINGS.clickSubdiv===3 ? 'border-color:#56864A;background:#56864A;color:#fff;' : ''}">
-              <span style="font-size:14px;font-weight:800;line-height:1.1">3:8</span>
+            <button class="subdiv-btn" data-subdiv="3" onclick="setClickSubdiv(3)" aria-label="Triolet" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:8px;border:1.5px solid ${SETTINGS.clickSubdiv===3 ? '#56864A' : 'rgba(28,45,51,.18)'};background:${SETTINGS.clickSubdiv===3 ? '#56864A' : 'rgba(28,45,51,.07)'};color:${SETTINGS.clickSubdiv===3 ? '#fff' : 'var(--text2)'};cursor:pointer;transition:all .12s">
+              ${getSubdivSVG(3)}
               <span style="font-size:9px;font-weight:500;opacity:.75">triolet</span>
             </button>
-            <button class="subdiv-btn" data-subdiv="4" onclick="setClickSubdiv(4)" aria-label="Double croche – 16" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:8px;border:1.5px solid rgba(28,45,51,.18);background:rgba(28,45,51,.07);color:var(--text2);cursor:pointer;transition:all .12s;${SETTINGS.clickSubdiv===4 ? 'border-color:#C8952A;background:#C8952A;color:#fff;' : ''}">
-              <span style="font-size:14px;font-weight:800;line-height:1.1">16</span>
+            <button class="subdiv-btn" data-subdiv="4" onclick="setClickSubdiv(4)" aria-label="Double croche" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:8px;border:1.5px solid ${SETTINGS.clickSubdiv===4 ? '#C8952A' : 'rgba(28,45,51,.18)'};background:${SETTINGS.clickSubdiv===4 ? '#C8952A' : 'rgba(28,45,51,.07)'};color:${SETTINGS.clickSubdiv===4 ? '#fff' : 'var(--text2)'};cursor:pointer;transition:all .12s">
+              ${getSubdivSVG(4)}
               <span style="font-size:9px;font-weight:500;opacity:.75">double croche</span>
             </button>
-            <button class="subdiv-btn" data-subdiv="6" onclick="setClickSubdiv(6)" aria-label="Sextolet – 6:16" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:8px;border:1.5px solid rgba(28,45,51,.18);background:rgba(28,45,51,.07);color:var(--text2);cursor:pointer;transition:all .12s;${SETTINGS.clickSubdiv===6 ? 'border-color:#7B5EA7;background:#7B5EA7;color:#fff;' : ''}">
-              <span style="font-size:14px;font-weight:800;line-height:1.1">6:16</span>
+            <button class="subdiv-btn" data-subdiv="6" onclick="setClickSubdiv(6)" aria-label="Sextolet" style="flex:1;display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 4px;border-radius:8px;border:1.5px solid ${SETTINGS.clickSubdiv===6 ? '#7B5EA7' : 'rgba(28,45,51,.18)'};background:${SETTINGS.clickSubdiv===6 ? '#7B5EA7' : 'rgba(28,45,51,.07)'};color:${SETTINGS.clickSubdiv===6 ? '#fff' : 'var(--text2)'};cursor:pointer;transition:all .12s">
+              ${getSubdivSVG(6)}
               <span style="font-size:9px;font-weight:500;opacity:.75">sextolet</span>
             </button>
           </div>
@@ -1955,26 +1965,23 @@ function openSettings(tab) {
         <div class="group">
           <label class="group-label">Shuffle / Swing</label>
           <div class="switch-row" style="border-bottom:none;padding-top:0">
-            <div>
-              <div class="sr-label">Mode swing</div>
-              <div class="sr-hint">Interprétation longue-courte (swing 0.67 = triolet)</div>
-            </div>
-            <button class="toggle-switch tog-orange ${SETTINGS.shuffleMode ? 'on' : ''}" role="switch" aria-checked="${!!SETTINGS.shuffleMode}" aria-label="Mode swing" onclick="toggleShuffleMode()"></button>
+            <div class="sr-hint">Interprétation longue-courte (swing 0.67 = triolet)</div>
+            <button onclick="toggleShuffleMode()" aria-label="Mode swing" style="font-size:10px;font-weight:700;letter-spacing:.3px;padding:0 10px;height:32px;border-radius:6px;border:1.5px solid ${SETTINGS.shuffleMode ? '#FF6B35' : 'var(--border)'};background:${SETTINGS.shuffleMode ? 'rgba(255,107,53,.15)' : 'var(--card)'};color:${SETTINGS.shuffleMode ? '#FF6B35' : 'var(--text2)'};cursor:pointer;transition:all .15s">SH</button>
           </div>
-          <div class="hint">La progression est trackée séparément — nouveau défi, nouvelle vision.</div>
         </div>
 
         <div class="group">
           <label class="group-label">Mode Entraînement</label>
           <div class="switch-row" style="border-bottom:none;padding-top:0;margin-bottom:${SETTINGS.trainMode ? '6px' : '0'}">
-            <div>
-              <div class="sr-label">Tempo progressif</div>
-              <div class="sr-hint">Augmente le tempo automatiquement au fil des boucles</div>
-            </div>
-            <button class="toggle-switch tog-green ${SETTINGS.trainMode ? 'on' : ''}" role="switch" aria-checked="${!!SETTINGS.trainMode}" aria-label="Mode entraînement" onclick="toggleTrainMode()"></button>
+            <div class="sr-hint">Augmente le tempo automatiquement au fil des boucles</div>
+            <button onclick="trainBtnClick()" aria-label="Mode entraînement" style="font-size:14px;font-weight:400;padding:0 10px;height:32px;border-radius:6px;border:1.5px solid ${SETTINGS.trainMode ? (SETTINGS.trainPyramide ? 'rgba(212,98,46,.4)' : 'rgba(77,208,225,.4)') : 'var(--border)'};background:${SETTINGS.trainMode ? (SETTINGS.trainPyramide ? 'rgba(212,98,46,.12)' : 'rgba(77,208,225,.12)') : 'var(--card)'};cursor:pointer;transition:all .15s;letter-spacing:1px;display:flex;align-items:center;gap:2px"><span style="color:${SETTINGS.trainMode && !SETTINGS.trainPyramide ? '#4dd0e1' : 'var(--text2)'}">↗</span><span style="color:${SETTINGS.trainPyramide ? 'var(--orange)' : 'var(--text2)'}">△</span></button>
           </div>
           ${SETTINGS.trainMode ? `
           <div style="display:flex;flex-direction:column;gap:4px;margin-bottom:8px">
+            ${SETTINGS.trainPyramide ? `<div style="padding:7px 10px;border-radius:8px;background:rgba(212,98,46,.06);margin-bottom:2px">
+              <span style="font-size:11px;font-weight:700;color:var(--orange)">Mode pyramide</span>
+              <span style="font-size:11px;color:var(--text2)"> — Au plafond, le tempo redescend jusqu'au départ.</span>
+            </div>` : ''}
             <div class="control-row">
               <span class="control-label">
                 <svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" style="color:#4dd0e1">
@@ -2018,35 +2025,18 @@ function openSettings(tab) {
                 ${[1,2,3,4,5].map(n => `<button data-val="${n}" class="${SETTINGS.trainLoopEvery===n?'active':''}" onclick="setTrainLoopEvery(${n})">${n}</button>`).join('')}
               </div>
             </div>
-            <div class="switch-row" style="margin-top:8px;padding:10px;border-bottom:none;border-radius:8px;background:rgba(212,98,46,.06)">
-              <div>
-                <div class="sr-label" style="color:var(--orange)">Mode pyramide</div>
-                <div class="sr-hint">Au plafond, le tempo redescend jusqu'au départ.</div>
-              </div>
-              <button class="toggle-switch tog-orange ${SETTINGS.trainPyramide ? 'on' : ''}" role="switch" aria-checked="${!!SETTINGS.trainPyramide}" aria-label="Mode pyramide" onclick="toggleTrainPyramide(!SETTINGS.trainPyramide); this.classList.toggle('on'); this.setAttribute('aria-checked', !!SETTINGS.trainPyramide)"></button>
-            </div>
           </div>` : ''}
-          ${SETTINGS.trainMode ? `<div class="hint">+${SETTINGS.trainBpmStep} BPM toutes les ${SETTINGS.trainLoopEvery} boucle${SETTINGS.trainLoopEvery > 1 ? 's' : ''}. Le tempo repart à ${SETTINGS.trainBpmStart} bpm à chaque nouveau pattern.</div>` : ''}
         </div>
       </div>
 
       <!-- ═══ PANE : AFFICHAGE — Cordes / Case / Loop étendu ═══ -->
       <div id="pane-affichage" style="display:${settingsTab==='affichage'?'block':'none'}">
-        <div class="group">
-          <label class="group-label">Filtre de difficulté (Patterns)</label>
-          <div class="switch-row" style="border-bottom:none;padding-top:0">
-            <div>
-              <div class="sr-label">Afficher Basique / Technique / Complexe</div>
-            </div>
-            <button class="toggle-switch ${SETTINGS.showDiffFilter ? 'on' : ''}" role="switch" aria-checked="${SETTINGS.showDiffFilter ? 'true' : 'false'}" aria-label="Filtre difficulté" onclick="SETTINGS.showDiffFilter=!SETTINGS.showDiffFilter;saveSettings();this.classList.toggle('on');this.setAttribute('aria-checked',String(SETTINGS.showDiffFilter));render()"></button>
-          </div>
-        </div>
 
         <div class="group">
           <label class="group-label">Loop étendu</label>
           <div class="seg" id="seg-loop-ext">
             ${[-1,0,1,2,3,4].map(n => `
-              <button data-val="${n}" class="${SETTINGS.loopExt===n?'active':''}" onclick="setLoopExt(${n})">${n === -1 ? '−1' : n === 0 ? 'Base' : '+'+n}</button>
+              <button data-val="${n}" class="${SETTINGS.loopExt===n?'active':''}" onclick="setLoopExt(${n})" style="${SETTINGS.loopExt===n && n!==0 ? 'background:var(--orange);border-color:var(--orange);color:#fff' : ''}">${n === -1 ? '−1' : n === 0 ? 'Base' : '+'+n}</button>
             `).join('')}
           </div>
           <div class="hint">−1 = retour même niveau · Base = pattern original · +1 à +4 = extension en pyramide. Affecte les tabs et la preview audio.</div>
@@ -2055,9 +2045,7 @@ function openSettings(tab) {
         <div class="group">
           <label class="group-label">Groupe de cordes</label>
           <div class="seg" id="seg-string-group" ${state.tab==='shaker'?'style="opacity:.3;pointer-events:none"':''}>
-            ${['DGBE','ADGB','EADG'].map(g => `
-              <button data-val="${g}" class="${SETTINGS.stringGroup===g?'active':''}" onclick="setStringGroup('${g}')">${g}</button>
-            `).join('')}
+            ${(()=>{ const STRING_COL={DGBE:'#56864A',ADGB:'#1a7fa6',EADG:'#D4622E'}; return ['DGBE','ADGB','EADG'].map(g => { const active=SETTINGS.stringGroup===g; return `<button data-val="${g}" class="${active?'active':''}" onclick="setStringGroup('${g}')" style="${active?`background:${STRING_COL[g]};border-color:${STRING_COL[g]};color:#fff`:''}">${g}</button>`; }).join(''); })()}
           </div>
           <div class="hint">DGBE = version de base (cordes 1 à 4). ADGB et EADG déplacent le pattern vers les cordes graves.${state.tab==='shaker'?' <em>(non disponible en Shaker)</em>':''}</div>
         </div>
@@ -2070,7 +2058,8 @@ function openSettings(tab) {
               Mid-neck
             </button>
             <button data-position="high" onclick="setNeckPosition('high')"
-              class="neck-btn ${SETTINGS.neckPosition === 'high' ? 'active' : ''}">
+              class="neck-btn ${SETTINGS.neckPosition === 'high' ? 'active' : ''}"
+              style="${SETTINGS.neckPosition === 'high' ? 'background:var(--orange);border-color:var(--orange);color:#fff' : ''}">
               High-neck
             </button>
           </div>
@@ -2078,26 +2067,13 @@ function openSettings(tab) {
         </div>
 
         <div class="group">
-          <label class="group-label">Mode sombre</label>
-          <div class="switch-row" style="border-bottom:none;padding-top:0">
-            <div>
-              <div class="sr-label">Mode sombre</div>
-              <div class="sr-hint">Fond foncé et texte clair pour une meilleure lecture la nuit</div>
-            </div>
-            <button class="toggle-switch ${SETTINGS.darkMode ? 'on' : ''}" role="switch" aria-checked="${SETTINGS.darkMode ? 'true' : 'false'}" aria-label="Mode sombre" onclick="toggleDarkMode(); this.classList.toggle('on'); this.setAttribute('aria-checked', String(SETTINGS.darkMode))"></button>
-          </div>
-        </div>
-
-        <div class="group">
           <label class="group-label">Couleur des tablatures</label>
-          <div style="display:grid;grid-template-columns:repeat(5,1fr);gap:8px;margin-top:8px">
-            <button onclick="setTabColor('#fff');this.parentElement.querySelectorAll('button').forEach(b=>b.style.border='');this.style.border='2px solid var(--blue)'" style="width:100%;height:36px;background:#1a1a2e;border:${SETTINGS.tabColor==='#fff'?'2px solid var(--blue)':'1px solid #ccc'};border-radius:6px;cursor:pointer;font-size:10px;color:#fff;transition:all .15s" title="Blanc">Blanc</button>
-            <button onclick="setTabColor('#a8d8a8');this.parentElement.querySelectorAll('button').forEach(b=>b.style.border='');this.style.border='2px solid var(--blue)'" style="width:100%;height:36px;background:#1a1a2e;border:${SETTINGS.tabColor==='#a8d8a8'?'2px solid var(--blue)':'1px solid #ccc'};border-radius:6px;cursor:pointer;font-size:10px;color:#a8d8a8;transition:all .15s" title="Vert">Vert</button>
-            <button onclick="setTabColor('#4dd0e1');this.parentElement.querySelectorAll('button').forEach(b=>b.style.border='');this.style.border='2px solid var(--blue)'" style="width:100%;height:36px;background:#1a1a2e;border:${SETTINGS.tabColor==='#4dd0e1'?'2px solid var(--blue)':'1px solid #ccc'};border-radius:6px;cursor:pointer;font-size:10px;color:#4dd0e1;transition:all .15s" title="Cyan">Cyan</button>
-            <button onclick="setTabColor('#ff9966');this.parentElement.querySelectorAll('button').forEach(b=>b.style.border='');this.style.border='2px solid var(--blue)'" style="width:100%;height:36px;background:#1a1a2e;border:${SETTINGS.tabColor==='#ff9966'?'2px solid var(--blue)':'1px solid #ccc'};border-radius:6px;cursor:pointer;font-size:10px;color:#ff9966;transition:all .15s" title="Orange">Orange</button>
-            <button onclick="setTabColor('#d0d0d0');this.parentElement.querySelectorAll('button').forEach(b=>b.style.border='');this.style.border='2px solid var(--blue)'" style="width:100%;height:36px;background:#1a1a2e;border:${SETTINGS.tabColor==='#d0d0d0'?'2px solid var(--blue)':'1px solid #ccc'};border-radius:6px;cursor:pointer;font-size:10px;color:#d0d0d0;transition:all .15s" title="Gris">Gris</button>
+          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px">
+            <button onclick="setTabColor('#fff');this.parentElement.querySelectorAll('button').forEach(b=>b.querySelector('span').style.opacity='0');this.querySelector('span').style.opacity='1'" style="width:100%;height:40px;background:#1a1a2e;border:1px solid #ccc;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;color:#fff;transition:all .15s;position:relative" title="Blanc">Blanc<span style="position:absolute;top:2px;right:4px;font-size:10px;opacity:${SETTINGS.tabColor==='#fff'?'1':'0'}">✓</span></button>
+            <button onclick="setTabColor('#a8d8a8');this.parentElement.querySelectorAll('button').forEach(b=>b.querySelector('span').style.opacity='0');this.querySelector('span').style.opacity='1'" style="width:100%;height:40px;background:#1a1a2e;border:1px solid #ccc;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;color:#a8d8a8;transition:all .15s;position:relative" title="Vert">Vert<span style="position:absolute;top:2px;right:4px;font-size:10px;opacity:${SETTINGS.tabColor==='#a8d8a8'?'1':'0'}">✓</span></button>
+            <button onclick="setTabColor('#4dd0e1');this.parentElement.querySelectorAll('button').forEach(b=>b.querySelector('span').style.opacity='0');this.querySelector('span').style.opacity='1'" style="width:100%;height:40px;background:#1a1a2e;border:1px solid #ccc;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;color:#4dd0e1;transition:all .15s;position:relative" title="Cyan">Cyan<span style="position:absolute;top:2px;right:4px;font-size:10px;opacity:${SETTINGS.tabColor==='#4dd0e1'?'1':'0'}">✓</span></button>
+            <button onclick="setTabColor('#f5e642');this.parentElement.querySelectorAll('button').forEach(b=>b.querySelector('span').style.opacity='0');this.querySelector('span').style.opacity='1'" style="width:100%;height:40px;background:#1a1a2e;border:1px solid #ccc;border-radius:6px;cursor:pointer;font-size:13px;font-weight:600;color:#f5e642;transition:all .15s;position:relative" title="Jaune">Jaune<span style="position:absolute;top:2px;right:4px;font-size:10px;opacity:${SETTINGS.tabColor==='#f5e642'?'1':'0'}">✓</span></button>
           </div>
-          <div class="hint">Sélectionnez la couleur de votre choix pour les tablatures ASCII. Les changements s'appliquent immédiatement.</div>
         </div>
 
         <div class="group">
@@ -2108,42 +2084,45 @@ function openSettings(tab) {
             <button onclick="setTabSize(16);this.parentElement.querySelectorAll('button').forEach(b=>b.style.border='1px solid var(--border)');this.style.border='2px solid var(--blue)'" style="width:100%;height:40px;background:var(--card);border:${SETTINGS.tabSize===16?'2px solid var(--blue)':'1px solid var(--border)'};border-radius:6px;cursor:pointer;color:var(--text);transition:all .15s;font-family:'Courier New',monospace;font-size:16px;font-weight:600">L</button>
             <button onclick="setTabSize(20);this.parentElement.querySelectorAll('button').forEach(b=>b.style.border='1px solid var(--border)');this.style.border='2px solid var(--blue)'" style="width:100%;height:40px;background:var(--card);border:${SETTINGS.tabSize===20?'2px solid var(--blue)':'1px solid var(--border)'};border-radius:6px;cursor:pointer;color:var(--text);transition:all .15s;font-family:'Courier New',monospace;font-size:20px;font-weight:600">XL</button>
           </div>
-          <div class="hint">Les changements s'appliquent immédiatement sur toutes les tablatures.</div>
+        </div>
+
+        <div class="group">
+          <label class="group-label">Filtre de difficulté (Patterns)</label>
+          <div class="switch-row" style="border-bottom:none;padding-top:0">
+            <div><div class="sr-label">Afficher Basique / Technique / Complexe</div></div>
+            <button class="toggle-switch ${SETTINGS.showDiffFilter ? 'on' : ''}" role="switch" aria-checked="${SETTINGS.showDiffFilter ? 'true' : 'false'}" aria-label="Filtre difficulté" onclick="SETTINGS.showDiffFilter=!SETTINGS.showDiffFilter;saveSettings();this.classList.toggle('on');this.setAttribute('aria-checked',String(SETTINGS.showDiffFilter));render()"></button>
+          </div>
+        </div>
+
+        <div class="group">
+          <label class="group-label">Mode sombre</label>
+          <div class="switch-row" style="border-bottom:none;padding-top:0">
+            <div><div class="sr-hint">Fond foncé et texte clair pour une meilleure lecture la nuit</div></div>
+            <button class="toggle-switch ${SETTINGS.darkMode ? 'on' : ''}" role="switch" aria-checked="${SETTINGS.darkMode ? 'true' : 'false'}" aria-label="Mode sombre" onclick="toggleDarkMode(); this.classList.toggle('on'); this.setAttribute('aria-checked', String(SETTINGS.darkMode))"></button>
+          </div>
         </div>
 
       </div>
 
       <!-- ═══ PANE : HEADER — Personnalisation de la barre d'en-tête ═══ -->
       <div id="pane-header" style="display:${settingsTab==='header'?'block':'none'}">
-        <div class="hint" style="margin-bottom:14px">Choisissez les éléments à afficher dans la barre d'en-tête. Les boutons s'adaptent automatiquement à l'espace disponible.</div>
-
-        <div class="group">
-          <label class="group-label">Ligne métronome</label>
-          ${[
-            { key:'showTrain',    label:'Mode entraînement',    hint:'Bouton Train. pour activer le mode progressif' },
-            { key:'showCountin',  label:'Décompte',             hint:'Décompte 4 temps avant la lecture' },
-            { key:'showClick',    label:'Clic métronome',       hint:'Métronome avec clic audible' },
-            { key:'showSubdivBtn',label:'Subdivision rythmique',hint:'Bouton ÷N pour changer la subdivision (croches, triolets, doubles croches, sextolets)' },
-            { key:'showMetroSolo',label:'Métronome solo',       hint:'Démarrer le métronome indépendamment' },
-          ].map(item => `
-          <div class="switch-row">
-            <div>
-              <div class="sr-label">${item.label}</div>
-              <div class="sr-hint">${item.hint}</div>
-            </div>
-            <button class="toggle-switch ${SETTINGS[item.key] ? 'on' : ''}" role="switch" aria-checked="${!!SETTINGS[item.key]}" aria-label="${item.label}"
-              onclick="toggleHeaderEl('${item.key}', !SETTINGS['${item.key}']); this.classList.toggle('on'); this.setAttribute('aria-checked', !!SETTINGS['${item.key}'])"></button>
-          </div>`).join('')}
+        <div style="display:flex;gap:8px;margin-bottom:14px">
+          <button onclick="toggleAllHeaderEls(true)" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;cursor:pointer">Tout activer</button>
+          <button onclick="toggleAllHeaderEls(false)" style="flex:1;padding:8px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:12px;cursor:pointer">Tout désactiver</button>
         </div>
 
-        <div class="group" style="margin-top:12px">
-          <label class="group-label">Ligne titre</label>
+        <div class="group">
           ${[
+            { key:'showTrain',    label:'Mode entraînement',    hint:'Active le mode progressif' },
+            { key:'showCountin',  label:'Décompte',             hint:'Décompte 4 temps avant la lecture' },
+            { key:'showClick',    label:'Clic métronome',       hint:'Métronome avec clic audible' },
+            { key:'showSubdivBtn',label:'Subdivision rythmique',hint:'Change la subdivision (croches, triolets, doubles croches, sextolets)' },
+            { key:'showMetroSolo',label:'Métronome solo',       hint:'Démarre le métronome indépendamment' },
             { key:'showShuffleBtn',  label:'Shuffle (SH)',       hint:'Bouton pour activer/désactiver le mode swing' },
             { key:'showStringBtn',   label:'Groupe de cordes',   hint:'Basculer DGBE · ADGB · EADG depuis le header' },
             { key:'showNeckBtn',     label:'Mid / High',         hint:'Basculer la position du manche depuis le header' },
             { key:'showLoopExtBtn',  label:'Loop étendu',        hint:'Cycler Base · −1 · +1 · +2 · +3 depuis le header' },
-            { key:'showHeaderStats', label:'Stats streak', hint:'Afficher la série, le record et le total (🔥⚡📅)' },
+            { key:'showHeaderStats', label:'Stats streak',       hint:'Afficher la série, le record et le total' },
           ].map(item => `
           <div class="switch-row">
             <div>
@@ -2162,11 +2141,23 @@ function openSettings(tab) {
           <button class="sf-btn" onclick="doImportJSON()">↑ Importer JSON</button>
         </div>
         <button class="sf-reset" onclick="resetApp()">Réinitialiser l'app</button>
-        <div class="sf-version">v5.2</div>
+        <div class="sf-version">v5.3</div>
       </div>
     </div>
   </div>`;
   document.body.insertAdjacentHTML('beforeend', html);
+  syncStringGroupSettingsUI();
+}
+
+function syncStringGroupSettingsUI() {
+  const STRING_COL = { DGBE:'#0F4C5C', ADGB:'#56864A', EADG:'#D4622E' };
+  const g = SETTINGS.stringGroup;
+  document.querySelectorAll('#seg-string-group button').forEach(b => {
+    const isActive = b.dataset.val === g;
+    b.style.background  = isActive ? STRING_COL[b.dataset.val] : '';
+    b.style.borderColor = isActive ? STRING_COL[b.dataset.val] : '';
+    b.style.color       = isActive ? '#fff' : '';
+  });
 }
 
 function switchSettingsTab(tab) {
@@ -2289,6 +2280,13 @@ function setStringGroup(g) {
   if (STRING_SHIFTS[g] === undefined) return;
   SETTINGS.stringGroup = g;
   refreshSettingsSeg('seg-string-group', g);
+  const STRING_COL = { DGBE:'#0F4C5C', ADGB:'#56864A', EADG:'#D4622E' };
+  document.querySelectorAll('#seg-string-group button').forEach(b => {
+    const isActive = b.dataset.val === g;
+    b.style.background  = isActive ? STRING_COL[b.dataset.val] : '';
+    b.style.borderColor = isActive ? STRING_COL[b.dataset.val] : '';
+    b.style.color       = isActive ? '#fff' : '';
+  });
   applySettingsAndRender();
 }
 
@@ -2320,7 +2318,12 @@ function setNeckPosition(pos) {
   if (!['mid', 'high'].includes(pos)) return;
   SETTINGS.neckPosition = pos;
   document.querySelectorAll('.neck-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.position === pos);
+    const isActive = btn.dataset.position === pos;
+    const isHigh = btn.dataset.position === 'high';
+    btn.classList.toggle('active', isActive);
+    btn.style.background   = isActive && isHigh ? 'var(--orange)' : '';
+    btn.style.borderColor  = isActive && isHigh ? 'var(--orange)' : '';
+    btn.style.color        = isActive && isHigh ? '#fff' : '';
   });
   if (state.tab === 'shaker') { saveSettings(); updateHeaderUI(); setTimeout(() => skGenerateAndShow(), 0); }
   else { applySettingsAndRender(); }
@@ -2392,6 +2395,7 @@ function setTrainLoopEvery(n) {
 function toggleTrainPyramide(value) {
   SETTINGS.trainPyramide = (value !== undefined) ? value : !SETTINGS.trainPyramide;
   saveSettings();
+  syncTrainBtnUI();
 }
 
 function toggleDarkMode() {
@@ -2426,7 +2430,7 @@ function applyTabSize() {
 }
 
 function setTabColor(color) {
-  if (['#fff', '#a8d8a8', '#4dd0e1', '#ff9966', '#d0d0d0'].includes(color)) {
+  if (['#fff', '#a8d8a8', '#4dd0e1', '#f5e642'].includes(color)) {
     SETTINGS.tabColor = color;
     saveSettings();
     document.documentElement.style.setProperty('--tab-color', color);
@@ -2584,6 +2588,13 @@ function setLoopExt(n) {
   SETTINGS.loopExt = n;
   saveSettings();
   refreshSettingsSeg('seg-loop-ext', String(n));
+  document.querySelectorAll('#seg-loop-ext button').forEach(b => {
+    const isActive = parseInt(b.dataset.val) === n;
+    const isBase = n === 0;
+    b.style.background  = isActive && !isBase ? 'var(--orange)' : '';
+    b.style.borderColor = isActive && !isBase ? 'var(--orange)' : '';
+    b.style.color       = isActive && !isBase ? '#fff' : '';
+  });
   // Stopper la preview en cours (le tab change, audio obsolète)
   if (PREVIEW.patId) previewStop();
   // Ré-afficher tous les tabs ouverts avec la nouvelle extension
