@@ -11,6 +11,7 @@ const SK_STRING_OPTIONS = ['e','B','G','D','A','E'];
 const SK_OPEN_FREQS     = { E:82.41, A:110.0, D:146.83, G:196.0, B:246.94, e:329.63 };
 const SK_MAX_STEPS      = 60;
 const SK_DURATION_MULT  = { '1/4':1, '1/8':0.5, '1/16':0.25, '1/8t':1/3, '6:16':1/6 };
+const SK_DURATION_MINW  = { '1/4':9, '1/8':5, '1/16':3, '1/8t':4, '6:16':2 };
 const SK_REST_TAB_WIDTH = 4;
 const SK_PRESETS_KEY    = 'shaker_presets';
 
@@ -233,7 +234,8 @@ function skBuildStepsUI(keepOpen) {
     const isStop        = st.patKey === 'stop';
     const isStructural  = isMeasure || isRepeatStart || isRepeatEnd || isStop;
     const isRest        = st.patKey === 'rest';
-    const formes        = (!isRest && !isStructural && st.patKey) ? skGetFormes(st.patKey) : [];
+    const isMuted       = st.patKey === 'muted';
+    const formes        = (!isRest && !isMuted && !isStructural && st.patKey) ? skGetFormes(st.patKey) : [];
     const dur           = st.duration || '1/4';
     const patName       = st.patKey || '—';
     const formeName     = st.forme || (formes[0] || '');
@@ -271,6 +273,7 @@ function skBuildStepsUI(keepOpen) {
       : isRepeatEnd   ? `:|  Renvoie fin · ×${st.repeatCount || 2}`
       : isStop        ? `‖ Stop`
       : isRest        ? `— Silence · ${DUR_LABELS[dur]||dur}`
+      : isMuted       ? `✕ Note muté · ${st.string || 'e'} · ${DUR_LABELS[dur]||dur}`
       : (patName !== '—'
           ? `${patName}${formeName ? ' / '+formeName : ''} · ${st.string} · ${st.dir==='U'?'↑':'↓'} · ${DUR_LABELS[dur]||dur}`
           : '— choisir un pattern —');
@@ -278,7 +281,8 @@ function skBuildStepsUI(keepOpen) {
     const structClass = isRepeatStart ? ' sk-repeat-start-card'
       : isRepeatEnd ? ' sk-repeat-end-card'
       : isMeasure ? ' sk-measure-card'
-      : isStop ? ' sk-stop-card' : '';
+      : isStop ? ' sk-stop-card'
+      : isMuted ? ' sk-muted-card' : '';
 
     return `
 <div class="sk-step-card${isOpen ? ' open' : ''}${st.active ? '' : ' inactive'}${structClass}">
@@ -320,6 +324,7 @@ function skBuildStepsUI(keepOpen) {
           <select class="sk-pat-select" onchange="skSetStepPat(${i},this.value)">
             <option value="" ${!st.patKey && !isRest && !isStructural ? 'selected':''}>— choisir —</option>
             <option value="rest"         ${isRest        ? 'selected':''}>— Silence</option>
+            <option value="muted"        ${isMuted       ? 'selected':''}>✕ Note muté</option>
             <option value="measure"      ${isMeasure     ? 'selected':''}>∣ Mesure</option>
             <option value="repeat-start" ${isRepeatStart ? 'selected':''}>|: Renvoie début</option>
             <option value="repeat-end"   ${isRepeatEnd   ? 'selected':''}>:| Renvoie fin</option>
@@ -328,15 +333,15 @@ function skBuildStepsUI(keepOpen) {
             ${pinnedPresets}
           </select>
         </div>
-        ${isRest ? `
+        ${(isRest || isMuted) ? `
         <div class="sk-ctrl-block" style="flex:0 0 auto">
           <div class="sk-control-label">Durée</div>
           <select class="sk-dur-select" onchange="skSetStepDuration(${i},this.value)">
-            <option value="1/4"  ${dur==='1/4'  ? 'selected':''}>1/4</option>
-            <option value="1/8"  ${dur==='1/8'  ? 'selected':''}>1/8</option>
-            <option value="1/16" ${dur==='1/16' ? 'selected':''}>1/16</option>
-            <option value="1/8t" ${dur==='1/8t' ? 'selected':''}>Trio</option>
-            <option value="6:16" ${dur==='6:16' ? 'selected':''}>6:16</option>
+            <option value="1/4"  ${dur==='1/4'  ? 'selected':''}>♩ Noire</option>
+            <option value="1/8"  ${dur==='1/8'  ? 'selected':''}>♪ Croche</option>
+            <option value="1/16" ${dur==='1/16' ? 'selected':''}>♬ D.croche</option>
+            <option value="1/8t" ${dur==='1/8t' ? 'selected':''}>T Triolet</option>
+            <option value="6:16" ${dur==='6:16' ? 'selected':''}>⑥ Sextolet</option>
           </select>
         </div>` : `
         <div class="sk-ctrl-block" style="flex:0 0 auto">
@@ -349,7 +354,15 @@ function skBuildStepsUI(keepOpen) {
         </div>`}
       </div>
 
-      ${!isRest ? `
+      ${isMuted ? `
+      <div class="sk-control-row">
+        <div class="sk-ctrl-block">
+          <div class="sk-control-label">Corde</div>
+          <select class="sk-str-select" onchange="skSetStepString(${i},this.value)">${strOptions}</select>
+        </div>
+      </div>
+      ` : ''}
+      ${(!isRest && !isMuted) ? `
       <div class="sk-control-row">
         <div class="sk-ctrl-block">
           <div class="sk-control-label">Corde de départ</div>
@@ -399,6 +412,9 @@ function skBuildAssignments() {
     if (st.patKey === 'stop')          return { isStop: true };
     if (st.patKey === 'rest') {
       return { string:null, notes:[], isRest:true, duration: st.duration || '1/4' };
+    }
+    if (st.patKey === 'muted') {
+      return { string: st.string || 'e', notes:[], isMuted:true, duration: st.duration || '1/16' };
     }
     if (!st.patKey) return null;
     const forme = st.forme || 'standard';
@@ -464,10 +480,13 @@ function skSplitBlocks(assignments) {
 }
 
 function skRenderBlock({ steps, repeatCount, isStop }) {
-  const stepWidths = steps.map(a =>
-    a.isRest ? SK_REST_TAB_WIDTH :
-    a.notes.reduce((sum, n) => sum + 2 + String(n).length, 0)
-  );
+  const stepWidths = steps.map(a => {
+    const dw = a.duration === '6:16' ? 1 : 2;
+    const contentW = a.isRest ? SK_REST_TAB_WIDTH :
+      a.isMuted ? dw + 1 :
+      a.notes.reduce((sum, n) => sum + dw + String(n).length, 0);
+    return Math.max(contentW, SK_DURATION_MINW[a.duration || '1/4'] || 2);
+  });
   let pos = 0;
   const stepStarts = stepWidths.map(w => { const s = pos; pos += w; return s; });
   const totalWidth = pos;
@@ -476,8 +495,15 @@ function skRenderBlock({ steps, repeatCount, isStop }) {
   const lines = SK_DISPLAY_ORDER.map(s => {
     const chars = Array(totalWidth).fill('-');
     steps.forEach((a, i) => {
-      if (a.isRest || a.string !== s) return;
-      a.notes.map(n => '--' + n).join('').split('').forEach((c, j) => {
+      if (a.isRest) return;
+      const dw = a.duration === '6:16' ? 1 : 2;
+      const dash = '-'.repeat(dw);
+      if (a.isMuted && a.string === s) {
+        (dash + 'X').split('').forEach((c, j) => { chars[stepStarts[i] + j] = c; });
+        return;
+      }
+      if (a.string !== s) return;
+      a.notes.map(n => dash + n).join('').split('').forEach((c, j) => {
         chars[stepStarts[i] + j] = c;
       });
     });
@@ -541,9 +567,6 @@ function skGenerateAndShow() {
   const noteCount = displayAssignments.filter(a => !a.isRest && !skIsStructural(a)).reduce((s,a) => s + a.notes.length, 0);
   const m2 = skBuildMeasure2(assignments);
 
-  const m1info = skPlayMode === 'mirror'
-    ? `Mesure 1 — ${noteCount} notes · descendant`
-    : `Mesure 1 — ${noteCount} notes · ${assignments.length} pas`;
   const presetTag = skCurrentPreset
     ? `<span class="sk-tab-preset-name">${skCurrentPreset}</span>`
     : '';
@@ -560,7 +583,7 @@ function skGenerateAndShow() {
     </div>`).join('');
 
   let html = `
-    <div class="sk-tab-measure-header">${presetTag}<span>${m1info}</span></div>
+    <div class="sk-tab-measure-header">${presetTag}</div>
     ${renderMeasureBlocks(displayAssignments, 1)}`;
 
   if (m2) {
@@ -710,6 +733,32 @@ function skFretFreq(string, fret) {
   return (SK_OPEN_FREQS[string] || SK_OPEN_FREQS.e) * Math.pow(2, fret / 12);
 }
 
+function skMutedChunk(ctx, masterGain, time) {
+  const dur = 0.045;
+  const bufSize = Math.ceil(ctx.sampleRate * dur);
+  const buf  = ctx.createBuffer(1, bufSize, ctx.sampleRate);
+  const data = buf.getChannelData(0);
+  for (let i = 0; i < bufSize; i++) data[i] = Math.random() * 2 - 1;
+
+  const src = ctx.createBufferSource();
+  src.buffer = buf;
+
+  const bp  = ctx.createBiquadFilter();
+  bp.type = 'bandpass';
+  bp.frequency.value = 700;
+  bp.Q.value = 1.8;
+
+  const env = ctx.createGain();
+  env.gain.setValueAtTime(0.0001, time);
+  env.gain.linearRampToValueAtTime(1.2, time + 0.003);
+  env.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+
+  src.connect(bp); bp.connect(env); env.connect(masterGain);
+  src.start(time); src.stop(time + dur + 0.01);
+  const msUntilClean = Math.max(300, (time - ctx.currentTime + dur + 0.05) * 1000);
+  setTimeout(() => { try { src.disconnect(); bp.disconnect(); env.disconnect(); } catch(e){} }, msUntilClean);
+}
+
 function skToTimedEvents(arr, baseNoteDur) {
   let t = 0;
   let globalIdx = 0; // index global pour le shuffle inter-pas
@@ -720,7 +769,11 @@ function skToTimedEvents(arr, baseNoteDur) {
     if (skIsStructural(a)) continue; // séparateurs visuels uniquement, pas de son
     const mult = SK_DURATION_MULT[a.duration || '1/4'];
     const nd   = baseNoteDur * mult;
-    if (!a.isRest && a.notes.length) {
+    if (a.isMuted) {
+      events.push({ isMuted: true, string: a.string, startTime: t, dur: nd });
+      globalIdx += 1;
+      t += nd;
+    } else if (!a.isRest && a.notes.length) {
       a.notes.forEach((n, j) => {
         const g = globalIdx + j;
         // Nudge basé sur la position globale : note impaire (g%2===1) = swinguée de 0.34×nd
@@ -764,6 +817,9 @@ function playShaker() {
   PREVIEW.bpm        = HCTRL.bpm;
   PREVIEW.clickNotes = SETTINGS.clickSubdiv || 4;
   skIsPlaying        = true;
+
+  // Journal + streak : chaque lancement de lecture Labo compte comme une session
+  addLaboJournalEntry(skCurrentPreset, HCTRL.bpm, SETTINGS.trainMode, SETTINGS.trainPyramide, SETTINGS.shuffleMode);
 
   const m2    = skBuildMeasure2(skLastAssignments);
   const m1exp = skExpandRepeats(skLastAssignments);
@@ -809,7 +865,9 @@ function playShaker() {
     PREVIEW.audioCycleBpm = nextScheduledBpm;
 
     events.forEach(e => {
-      if (typeof pluckNote === 'function') {
+      if (e.isMuted) {
+        skMutedChunk(ctx, masterGain, loopStart + e.startTime);
+      } else if (typeof pluckNote === 'function') {
         pluckNote(ctx, masterGain, skFretFreq(e.string, e.fret), loopStart + e.startTime);
       }
     });
@@ -896,19 +954,28 @@ function skStartCursor(eventsIgnored, totalTimeIgnored, patStart, ctx) {
       const preId = `sk-tab-pre-${mIdx}-${bi}`;
       const curId = `sk-cursor-${mIdx}-${bi}`;
       const reps  = block.repeatCount || 1;
-      const stepWidths = block.steps.map(a =>
-        a.isRest ? SK_REST_TAB_WIDTH :
-        a.notes.reduce((sum, n) => sum + 2 + String(n).length, 0)
-      );
+      const stepWidths = block.steps.map(a => {
+        const dw = a.duration === '6:16' ? 1 : 2;
+        const contentW = a.isRest ? SK_REST_TAB_WIDTH :
+          a.isMuted ? dw + 1 :
+          a.notes.reduce((sum, n) => sum + dw + String(n).length, 0);
+        return Math.max(contentW, SK_DURATION_MINW[a.duration || '1/4'] || 2);
+      });
       let p = 0;
       const stepStarts = stepWidths.map(w => { const s = p; p += w; return s; });
       for (let r = 0; r < reps; r++) {
         block.steps.forEach((a, i) => {
-          if (a.isRest || !a.notes.length) return;
+          if (a.isRest) return;
+          const dw = a.duration === '6:16' ? 1 : 2;
+          if (a.isMuted) {
+            cols.push({ col: 3 + stepStarts[i] + dw, preId, curId });
+            return;
+          }
+          if (!a.notes.length) return;
           let noteCharPos = 0;
           a.notes.forEach(n => {
-            cols.push({ col: 3 + stepStarts[i] + noteCharPos + 2, preId, curId });
-            noteCharPos += 2 + String(n).length;
+            cols.push({ col: 3 + stepStarts[i] + noteCharPos + dw, preId, curId });
+            noteCharPos += dw + String(n).length;
           });
         });
       }
@@ -1388,7 +1455,17 @@ function skBuildPresetSelect() { skBuildFavBar(); }
 
 // ── PROGRESSION TABLE ─────────────────────────────────────────────────────────
 const SK_PROG_KEY    = 'shaker_progress';
+const SK_NOTES_KEY   = 'shaker_notes';
 let skCurrentPreset = '';
+
+function skLoadNotes() {
+  try { return JSON.parse(localStorage.getItem(SK_NOTES_KEY) || '{}'); } catch(e) { return {}; }
+}
+function skSaveNote(presetName, text) {
+  const notes = skLoadNotes();
+  notes[presetName] = text;
+  try { localStorage.setItem(SK_NOTES_KEY, JSON.stringify(notes)); } catch(e) {}
+}
 
 const SK_MODE_COLORS = { strict:'#2a7de1', mirror:'#c0392b', inverse:'#8e44ad' };
 const SK_MODE_LABELS = { strict:'Strict', mirror:'Inversé', inverse:'Miroir' };
@@ -1447,6 +1524,8 @@ function skRenderProgTable(presetName) {
     return row;
   }).join('');
 
+  const currentNote = skLoadNotes()[presetName] || '';
+
   wrap.innerHTML = `
     <div style="font-size:11px;font-weight:600;color:var(--text2);letter-spacing:.4px;text-transform:uppercase;margin:12px 0 6px;padding-left:1px">Remplis le tableau</div>
     <div class="prog-grid" style="margin-bottom:10px">
@@ -1456,7 +1535,12 @@ function skRenderProgTable(presetName) {
           style="cursor:pointer;transition:all .15s;${PREVIEW.interp===i ? 'background:var(--orange);color:#fff;' : 'background:var(--blue);color:rgba(255,255,255,.75);'}">${INTERP_LABELS[i]}</th>`).join('')}
       </tr></thead>
       <tbody>${gridRows}</tbody></table>
-    </div>`;
+    </div>
+    <textarea placeholder="Notes personnelles…"
+      style="width:100%;min-height:52px;padding:8px 10px;font-size:12px;font-family:-apple-system,sans-serif;
+        color:var(--text);background:var(--card);border:1px solid var(--border);border-radius:8px;
+        resize:vertical;outline:none;line-height:1.5;box-sizing:border-box;margin-top:4px"
+      onblur="skSaveNote('${safeName}', this.value)">${currentNote}</textarea>`;
 }
 
 function skSavePreset()  { skOpenSaveDialog(); }
@@ -1466,7 +1550,8 @@ function skDeletePreset() { if (skCurrentPreset) skDeletePresetByName(skCurrentP
 function skExportPresets() {
   if (!skSteps.length) { alert('Aucun pas à exporter — compose d\'abord une séquence.'); return; }
   const name = skCurrentPreset || 'sequence';
-  const payload = { name, steps: skSteps };
+  const noteText = skLoadNotes()[name] || '';
+  const payload = { name, steps: skSteps, ...(noteText ? { notes: noteText } : {}) };
   const json = JSON.stringify(payload, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
@@ -1516,6 +1601,7 @@ function skHandleImportFile(e) {
       }
       db.presets[name] = { steps: imported.steps, folder: 'Mes créations', pinned: false, createdAt: Date.now() };
       skSavePresetsV2(db);
+      if (imported.notes) skSaveNote(name, imported.notes);
       skCurrentPreset = name;
       skSteps = imported.steps.map(s => ({ ...s }));
       skSeqCollapsed = true;
@@ -1736,6 +1822,10 @@ function renderShaker() {
   border-right: 3px solid rgba(239, 83, 80, 0.7);
 }
 .sk-step-card.sk-stop-card .sk-step-badge { background: rgba(239, 83, 80, 0.75); }
+.sk-step-card.sk-muted-card {
+  background: rgba(188, 143, 80, 0.08); border-color: rgba(188, 143, 80, 0.35);
+}
+.sk-step-card.sk-muted-card .sk-step-badge { background: rgba(188, 143, 80, 0.75); }
 
 .sk-active-toggle {
   border: 1.5px solid var(--border); background: transparent; cursor: pointer;
@@ -2013,7 +2103,6 @@ function renderShaker() {
       <div class="sk-empty-state">Ajoute au moins un pas pour composer ton exercice</div>
     </div>
   </div>
-  <div id="sk-prog-wrap"></div>
 
   <div class="sk-section-label" style="margin-top:14px">Mode de lecture</div>
   <div class="sk-seg" id="sk-mode-seg" style="margin-bottom:14px">
@@ -2021,6 +2110,8 @@ function renderShaker() {
     <button class="sk-mode-mirror ${skPlayMode==='mirror'?'active':''}"   onclick="skSetPlayMode('mirror')">Inversé</button>
     <button class="sk-mode-inverse ${skPlayMode==='inverse'?'active':''}" onclick="skSetPlayMode('inverse')">Miroir</button>
   </div>
+
+  <div id="sk-prog-wrap"></div>
 
   <div class="sk-section-label" style="margin-top:6px">
     Presets
@@ -2611,4 +2702,15 @@ function skInit() {
   if (skLastAssignments.length) skGenerateAndShow();
   else if (skSteps.length)      skGenerateAndShow();
   skRenderProgTable(skCurrentPreset);
+
+  // Stop auto dès qu'une interaction est détectée (hors zones exclues)
+  document.addEventListener('mousedown', (e) => {
+    if (!skIsPlaying) return;
+    const t = e.target;
+    if (t.closest('header'))        return; // BPM, métronome, trainer, raccourcis header
+    if (t.closest('#sk-prog-wrap')) return; // tableau de progression (coches)
+    if (t.closest('textarea'))      return; // notes personnelles
+    if (t.closest('#sk-tab-wrap'))  return; // la tab gère elle-même play/stop
+    stopShaker();
+  }, true); // capture : intercepté avant tout stopPropagation()
 }

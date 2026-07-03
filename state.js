@@ -243,6 +243,33 @@ function addJournalEntry(patId, bpm, trainMode, pyramideMode, shuffleMode) {
   savePatternJournal();
 }
 
+/**
+ * Enregistre une nouvelle lecture de séquence Labo (Shaker) dans le journal
+ * @param {string} presetName - Nom du preset joué (ou 'Séquence Labo' si non sauvegardé)
+ * @param {number} bpm - Tempo à la lecture
+ * @param {boolean} trainMode - Mode train/progression activé
+ * @param {boolean} pyramideMode - Mode pyramide activé
+ * @param {boolean} shuffleMode - Mode shuffle/swing activé
+ */
+function addLaboJournalEntry(presetName, bpm, trainMode, pyramideMode, shuffleMode) {
+  const now = new Date();
+  const checkedCount = Object.values(state.progress || {}).filter(v => v === true).length;
+
+  const entry = {
+    timestamp: now.getTime(),
+    patId: '__shaker__',
+    patName: presetName || 'Séquence Labo',
+    bpm: bpm,
+    trainMode: trainMode || false,
+    pyramideMode: pyramideMode || false,
+    shuffleMode: shuffleMode || false,
+    checkedCount: checkedCount,
+    isLabo: true,
+  };
+  PATTERN_JOURNAL.push(entry);
+  savePatternJournal();
+}
+
 function getSessions() {
   const dates = new Set();
   (PATTERN_JOURNAL || []).forEach(entry => {

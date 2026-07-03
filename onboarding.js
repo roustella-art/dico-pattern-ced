@@ -41,11 +41,11 @@ const ONBOARDING_CONFIG = {
       title: "Quel style de guitariste vous inspire ?",
       type: 'select',
       options: [
-        { value: 'cobain', label: "🎸 Kurt Cobain (Grunge/Alt-rock)", score: 1 },
-        { value: 'page', label: "🔵 Jimmy Page (Blues-rock)", score: 2 },
-        { value: 'django', label: "🎶 Django Reinhardt (Jazz/Swing)", score: 2 },
-        { value: 'malmsteen', label: "⚡ Yngwie Malmsteen (Neoclassical metal)", score: 4 },
-        { value: 'none', label: "❓ Je n'en connais aucun", score: 1 },
+        { value: 'cobain', label: "Kurt Cobain — Grunge / Alt-rock", score: 1 },
+        { value: 'page', label: "Jimmy Page — Blues-rock", score: 2 },
+        { value: 'django', label: "Django Reinhardt — Jazz / Swing", score: 2 },
+        { value: 'malmsteen', label: "Yngwie Malmsteen — Neoclassical metal", score: 4 },
+        { value: 'none', label: "Je n'en connais aucun", score: 1 },
       ],
     },
   ],
@@ -70,7 +70,7 @@ const ONBOARDING_CONFIG = {
       label: "Django Reinhardt",
       description: "Jazz/Swing — Sophistication et nuance",
       styleScore: 2,
-      tempoMultiplier: 1.1, // Tempos plus rapides
+      tempoMultiplier: 1.2, // Tempos plus rapides
       subdivMultiplier: 1.2, // Préfère les triolets
     },
     malmsteen: {
@@ -84,43 +84,20 @@ const ONBOARDING_CONFIG = {
       label: "Pas d'inspiration particulière",
       description: "On va trouver votre style ensemble !",
       styleScore: 1,
-      tempoMultiplier: 1.0,
+      tempoMultiplier: 0.8,
       subdivMultiplier: 1.0,
     },
   },
 
   // Presets de base (avant ajustements)
+  // subdivCap : plafond de subdivision — empêche le multiplicateur de style de dépasser cette valeur
   basePresets: {
-    0: { // Score 0-1 (très débutant)
-      tempoPresets: { lent: 40, cool: 60, chaud: 80 },
-      clickSubdiv: 2, // 8 (croches)
-      label: 'Débutant 🌱',
-    },
-    1: { // Score 2-3 (débutant/intermédiaire)
-      tempoPresets: { lent: 50, cool: 70, chaud: 90 },
-      clickSubdiv: 2, // 8
-      label: 'Débutant+ 🌿',
-    },
-    2: { // Score 4-5 (intermédiaire)
-      tempoPresets: { lent: 60, cool: 80, chaud: 100 },
-      clickSubdiv: 4, // 16 (doubles croches)
-      label: 'Intermédiaire ⚡',
-    },
-    3: { // Score 6-7 (intermédiaire+)
-      tempoPresets: { lent: 70, cool: 90, chaud: 110 },
-      clickSubdiv: 4, // 16
-      label: 'Intermédiaire+ 🔥',
-    },
-    4: { // Score 8-9 (avancé)
-      tempoPresets: { lent: 80, cool: 100, chaud: 120 },
-      clickSubdiv: 6, // 6:16 (sextolets)
-      label: 'Avancé 🔥',
-    },
-    5: { // Score 10+ (virtuose)
-      tempoPresets: { lent: 100, cool: 120, chaud: 150 },
-      clickSubdiv: 6, // 6:16
-      label: 'Virtuose 🚀',
-    },
+    0: { tempoPresets: { lent: 40, cool: 60, chaud: 80 },  clickSubdiv: 2, subdivCap: 4, label: 'Débutant' },
+    1: { tempoPresets: { lent: 50, cool: 70, chaud: 90 },  clickSubdiv: 2, subdivCap: 4, label: 'Débutant+' },
+    2: { tempoPresets: { lent: 60, cool: 80, chaud: 100 }, clickSubdiv: 4, subdivCap: 6, label: 'Intermédiaire' },
+    3: { tempoPresets: { lent: 70, cool: 90, chaud: 110 }, clickSubdiv: 4, subdivCap: 6, label: 'Intermédiaire+' },
+    4: { tempoPresets: { lent: 80, cool: 100, chaud: 120 },clickSubdiv: 4, subdivCap: 4, label: 'Avancé' },
+    5: { tempoPresets: { lent: 100, cool: 120, chaud: 150 },clickSubdiv: 4, subdivCap: 4, label: 'Virtuose' },
   },
 };
 
@@ -154,26 +131,39 @@ function calculatePresets() {
   const profileData = ONBOARDING_CONFIG.profiles[profile];
   const profileScore = profileData?.styleScore || 0;
 
-  // Score total (0-10)
-  const totalScore = Math.min(10, (yearScore + hoursScore + profileScore) / 3 * 2);
+  // Score total (0-10) — années/heures pèsent 80% du niveau, le style de guitariste seulement 20%
+  // (le style ajuste surtout le tempo/subdivision, il ne doit pas plafonner un joueur expérimenté)
+  const yearMaxScore  = Math.max(...yearQuestion.options.map(o => o.score));
+  const hoursMaxScore = Math.max(...hoursQuestion.options.map(o => o.score));
+  const profileMaxScore = Math.max(...Object.values(ONBOARDING_CONFIG.profiles).map(p => p.styleScore));
+  const experienceNorm = (yearScore / yearMaxScore + hoursScore / hoursMaxScore) / 2;
+  const profileNorm = profileScore / profileMaxScore;
+  const totalScore = Math.min(10, (experienceNorm * 0.8 + profileNorm * 0.2) * 10);
 
   // Déterminer le preset de base
   const basePreset = ONBOARDING_CONFIG.basePresets[Math.floor(totalScore / 2)];
 
-  // Appliquer les ajustements du profil
+  // Appliquer les ajustements du profil, puis clamp sur la plage propre à chaque tempo (TEMPOS)
+  const clampToRange = (val, key) => {
+    const t = TEMPOS.find(x => x.key === key);
+    if (!t) return val;
+    return Math.min(t.rangeMax, Math.max(t.rangeMin, val));
+  };
   const adjustedTempos = {
-    lent: Math.round(basePreset.tempoPresets.lent * profileData.tempoMultiplier),
-    cool: Math.round(basePreset.tempoPresets.cool * profileData.tempoMultiplier),
-    chaud: Math.round(basePreset.tempoPresets.chaud * profileData.tempoMultiplier),
+    lent:  clampToRange(Math.round(basePreset.tempoPresets.lent  * profileData.tempoMultiplier), 'lent'),
+    cool:  clampToRange(Math.round(basePreset.tempoPresets.cool  * profileData.tempoMultiplier), 'cool'),
+    chaud: clampToRange(Math.round(basePreset.tempoPresets.chaud * profileData.tempoMultiplier), 'chaud'),
   };
 
   // Pour la subdivision, c'est plus discret (rester dans les valeurs valides: 2, 3, 4, 6)
+  // Le plafond subdivCap du preset empêche le style de dépasser la subdivision voulue pour ce niveau
   let subdivAdjusted = basePreset.clickSubdiv;
   if (profileData.subdivMultiplier > 1.1 && basePreset.clickSubdiv === 4) {
     subdivAdjusted = 6; // Passer à sextolets pour Malmsteen
   } else if (profileData.subdivMultiplier > 1.0 && basePreset.clickSubdiv === 2) {
     subdivAdjusted = 4; // Passer à doubles croches
   }
+  subdivAdjusted = Math.min(subdivAdjusted, basePreset.subdivCap ?? 6);
 
   return {
     tempoPresets: adjustedTempos,
@@ -219,12 +209,15 @@ function showOnboarding() {
   content.id = 'onboarding-content';
   content.style.cssText = `
     background: var(--bg);
-    border-radius: 16px;
+    border-radius: 20px;
     padding: 32px 24px;
-    max-width: 420px;
-    box-shadow: 0 20px 60px rgba(0,0,0,.3);
+    width: 90%;
+    max-width: 400px;
+    max-height: 90vh;
+    overflow-y: auto;
+    box-shadow: 0 24px 64px rgba(0,0,0,.35);
     color: var(--text);
-    animation: fadeIn .3s ease;
+    animation: fadeIn .25s ease;
   `;
 
   modal.appendChild(content);
@@ -249,26 +242,19 @@ function showOnboardingScreen() {
 
 function showWelcomeScreen(container) {
   container.innerHTML = `
-    <div style="text-align: center">
-      <div style="font-size: 56px; margin-bottom: 16px">${ONBOARDING_CONFIG.welcome.emoji}</div>
-      <h1 style="font-size: 26px; font-weight: 700; margin: 0 0 12px; line-height: 1.2">
+    <div style="text-align:center">
+      <div style="width:80px;height:80px;border-radius:50%;background:rgba(15,76,92,.1);display:flex;align-items:center;justify-content:center;margin:0 auto 24px">
+        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      </div>
+      <h1 style="font-size:24px;font-weight:800;margin:0 0 10px;line-height:1.2;color:var(--text)">
         ${ONBOARDING_CONFIG.welcome.title}
       </h1>
-      <p style="color: var(--text2); font-size: 14px; margin: 0 0 28px; line-height: 1.6">
+      <p style="color:var(--text2);font-size:13px;margin:0 0 32px;line-height:1.7">
         ${ONBOARDING_CONFIG.welcome.description}
       </p>
-      <button onclick="onboardingNextScreen()" style="
-        background: var(--blue);
-        color: #fff;
-        border: none;
-        padding: 12px 24px;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        transition: all .2s;
-      " onmouseover="this.style.opacity='0.85'" onmouseout="this.style.opacity='1'">
-        Commençons →
+      <button onclick="onboardingNextScreen()" style="width:100%;background:var(--blue);color:#fff;border:none;padding:14px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .2s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+        Commencer
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
       </button>
     </div>
   `;
@@ -276,30 +262,17 @@ function showWelcomeScreen(container) {
 
 function showQuestionScreen(container, qIndex) {
   const q = ONBOARDING_CONFIG.questions[qIndex];
-  const progressPct = ((qIndex + 1) / 3) * 100;
 
   container.innerHTML = `
     <div>
-      <div style="margin-bottom: 20px">
-        <div style="font-size: 12px; color: var(--text2); margin-bottom: 8px">
-          Question ${qIndex + 1} / 3
-        </div>
-        <div style="width: 100%; height: 4px; background: rgba(0,0,0,.1); border-radius: 2px; overflow: hidden">
-          <div style="width: ${progressPct}%; height: 100%; background: var(--blue); transition: width .3s"></div>
-        </div>
+      <div style="display:flex;gap:6px;margin-bottom:28px">
+        ${[0,1,2].map(i => `<div style="flex:1;height:3px;border-radius:2px;background:${i <= qIndex ? 'var(--blue)' : 'rgba(0,0,0,.1)'}"></div>`).join('')}
       </div>
-
-      <h2 style="font-size: 18px; font-weight: 700; margin: 0 0 20px; line-height: 1.3">
+      <h2 style="font-size:17px;font-weight:800;margin:0 0 18px;line-height:1.35;color:var(--text)">
         ${q.title}
       </h2>
-
-      <div style="display: flex; flex-direction: column; gap: 10px" id="question-options">
-        <!-- Options générées par JS -->
-      </div>
-
-      <div style="margin-top: 20px; display: flex; gap: 10px">
-        ${qIndex > 0 ? `<button onclick="onboardingPrevScreen()" style="flex: 1; padding: 10px; border: 1.5px solid var(--border); background: transparent; color: var(--text); border-radius: 8px; cursor: pointer; font-weight: 600">← Précédent</button>` : ''}
-      </div>
+      <div style="display:flex;flex-direction:column;gap:8px" id="question-options"></div>
+      ${qIndex > 0 ? `<div style="text-align:center;margin-top:16px"><button onclick="onboardingPrevScreen()" style="background:none;border:none;color:var(--text2);font-size:13px;cursor:pointer;padding:4px 8px">← Retour</button></div>` : ''}
     </div>
   `;
 
@@ -307,19 +280,23 @@ function showQuestionScreen(container, qIndex) {
   q.options.forEach(opt => {
     const btn = document.createElement('button');
     btn.style.cssText = `
-      padding: 14px;
-      border: 2px solid var(--border);
+      padding: 13px 16px;
+      border: 1.5px solid var(--border);
       border-radius: 10px;
-      background: rgba(0,0,0,.02);
+      background: var(--bg);
       color: var(--text);
       cursor: pointer;
       font-size: 14px;
       font-weight: 500;
-      transition: all .2s;
+      transition: all .15s;
       text-align: left;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
       -webkit-tap-highlight-color: transparent;
+      width: 100%;
     `;
-    btn.textContent = opt.label;
+    btn.innerHTML = `<span>${opt.label}</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:.3;flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>`;
     btn.onclick = () => {
       onboardingState.answers[q.id] = opt.value;
       onboardingState.scores[q.id] = opt.score;
@@ -327,11 +304,13 @@ function showQuestionScreen(container, qIndex) {
     };
     btn.onmouseover = () => {
       btn.style.borderColor = 'var(--blue)';
-      btn.style.background = 'rgba(15,76,92,.05)';
+      btn.style.background = 'rgba(15,76,92,.04)';
+      btn.querySelector('svg').style.opacity = '1';
     };
     btn.onmouseout = () => {
       btn.style.borderColor = 'var(--border)';
-      btn.style.background = 'rgba(0,0,0,.02)';
+      btn.style.background = 'var(--bg)';
+      btn.querySelector('svg').style.opacity = '.3';
     };
     optionsContainer.appendChild(btn);
   });
@@ -339,59 +318,44 @@ function showQuestionScreen(container, qIndex) {
 
 function showResultsScreen(container) {
   const presets = calculatePresets();
-  const subdivLabel = SUBDIV_LABEL(presets.clickSubdiv);
 
   container.innerHTML = `
-    <div style="text-align: center">
-      <div style="font-size: 48px; margin-bottom: 16px">✨</div>
-      <h1 style="font-size: 22px; font-weight: 700; margin: 0 0 8px">
-        Voilà votre profil !
-      </h1>
-      <p style="color: var(--text2); font-size: 13px; margin: 0 0 24px; line-height: 1.5">
-        ${presets.profile} — ${presets.label}
-      </p>
+    <div style="text-align:center">
+      <div style="width:64px;height:64px;border-radius:50%;background:rgba(76,160,100,.12);display:flex;align-items:center;justify-content:center;margin:0 auto 20px">
+        <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </div>
+      <h1 style="font-size:22px;font-weight:800;margin:0 0 6px;color:var(--text)">Votre profil</h1>
+      <p style="color:var(--blue);font-size:13px;font-weight:700;margin:0 0 24px;letter-spacing:.3px">${presets.label} · ${presets.profile}</p>
 
-      <div style="background: rgba(0,0,0,.05); border-radius: 12px; padding: 18px; margin-bottom: 24px">
-        <div style="font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 12px; font-weight: 600">
-          Presets de tempo recommandés
-        </div>
-        <div style="display: flex; gap: 8px; justify-content: center; margin-bottom: 16px">
-          <div style="padding: 8px 12px; background: #fff; border-radius: 6px; font-weight: 700">
-            🐢 ${presets.tempoPresets.lent} BPM
+      <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px">
+        <div style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;font-weight:600;margin-bottom:12px">Tempos recommandés</div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px">
+          <div style="background:var(--bg);border-radius:8px;padding:10px 6px;text-align:center">
+            <div style="font-size:10px;color:var(--text2);font-weight:600;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Lent</div>
+            <div style="font-size:18px;font-weight:800;color:var(--text)">${presets.tempoPresets.lent}</div>
+            <div style="font-size:10px;color:var(--text3)">BPM</div>
           </div>
-          <div style="padding: 8px 12px; background: #fff; border-radius: 6px; font-weight: 700">
-            🚶 ${presets.tempoPresets.cool} BPM
+          <div style="background:var(--bg);border-radius:8px;padding:10px 6px;text-align:center">
+            <div style="font-size:10px;color:var(--text2);font-weight:600;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Cool</div>
+            <div style="font-size:18px;font-weight:800;color:var(--text)">${presets.tempoPresets.cool}</div>
+            <div style="font-size:10px;color:var(--text3)">BPM</div>
           </div>
-          <div style="padding: 8px 12px; background: #fff; border-radius: 6px; font-weight: 700">
-            🔥 ${presets.tempoPresets.chaud} BPM
+          <div style="background:var(--bg);border-radius:8px;padding:10px 6px;text-align:center">
+            <div style="font-size:10px;color:var(--orange);font-weight:600;margin-bottom:4px;text-transform:uppercase;letter-spacing:.3px">Chaud</div>
+            <div style="font-size:18px;font-weight:800;color:var(--orange)">${presets.tempoPresets.chaud}</div>
+            <div style="font-size:10px;color:var(--text3)">BPM</div>
           </div>
-        </div>
-
-        <div style="font-size: 12px; color: var(--text2); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 8px; font-weight: 600">
-          Subdivision rythmique
-        </div>
-        <div style="padding: 10px; background: #fff; border-radius: 6px; font-weight: 700; font-size: 16px">
-          ${subdivLabel}
         </div>
       </div>
 
-      <p style="font-size: 12px; color: var(--text2); margin: 0 0 20px; line-height: 1.5">
-        💡 Vous pourrez modifier ces réglages à tout moment dans <strong>Réglages → Affichage</strong>
+      <p style="font-size:12px;color:var(--text2);margin:0 0 20px;line-height:1.6;display:flex;align-items:flex-start;gap:6px;text-align:left">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-top:1px"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Modifiables à tout moment dans <strong>Réglages → Tempo</strong>
       </p>
 
-      <button onclick="onboardingComplete('${presets.label}')" style="
-        background: var(--green);
-        color: #fff;
-        border: none;
-        padding: 12px 24px;
-        border-radius: 8px;
-        font-size: 14px;
-        font-weight: 600;
-        cursor: pointer;
-        width: 100%;
-        transition: all .2s;
-      " onmouseover="this.style.opacity='0.9'" onmouseout="this.style.opacity='1'">
-        ✅ Commencer !
+      <button onclick="onboardingComplete('${presets.label}')" style="width:100%;background:var(--blue);color:#fff;border:none;padding:14px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;transition:opacity .2s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+        C'est parti !
       </button>
     </div>
   `;
@@ -418,7 +382,7 @@ function onboardingComplete(levelLabel) {
   if (modal) modal.remove();
 
   // Toast de confirmation
-  showOnboardingToast(`✅ ${levelLabel} configuré ! App prête à l'emploi.`);
+  showOnboardingToast(`${levelLabel} configuré — App prête à l'emploi.`);
 }
 
 function showOnboardingToast(message) {

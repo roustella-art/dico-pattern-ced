@@ -819,20 +819,19 @@ function renderSessionCalendar() {
 
   const streakColor = current >= 7 ? 'var(--green)' : current >= 3 ? 'var(--orange)' : 'var(--blue)';
   const icoFlame    = `<svg width="22" height="26" viewBox="0 0 24 28"><path d="M12 2C12 2 6 8 6 14a6 6 0 0012 0c0-3-2-5-2-5s0 4-4 4c0-4 4-7 4-13z" fill="${streakColor}"/></svg>`;
-  const icoTrophy   = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4a2 2 0 01-2-2V5h4M18 9h2a2 2 0 002-2V5h-4M12 17v4M8 21h8M3 5h18"/><path d="M12 17a7 7 0 007-7V5H5v5a7 7 0 007 7z"/></svg>`;
+  const icoLightning= `<svg width="20" height="24" viewBox="0 0 20 24" fill="none"><polygon points="11,1 2,13 10,13 9,23 18,11 10,11" fill="var(--orange)" stroke="none"/></svg>`;
   const icoCalendar = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`;
-  const streakIco   = current >= 3 ? icoFlame : icoCalendar;
 
   return `
   <div style="background:var(--bg);border-radius:var(--radius);padding:4px 0 8px;">
     <div style="display:flex;gap:8px;margin-bottom:14px">
       <div style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 8px;text-align:center">
-        <div style="margin-bottom:6px">${streakIco}</div>
+        <div style="margin-bottom:6px">${icoFlame}</div>
         <div style="font-size:22px;font-weight:800;color:${streakColor};line-height:1">${current}</div>
         <div style="font-size:10px;color:var(--text2);margin-top:3px">Série</div>
       </div>
       <div style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 8px;text-align:center">
-        <div style="margin-bottom:6px">${icoTrophy}</div>
+        <div style="margin-bottom:6px">${icoLightning}</div>
         <div style="font-size:22px;font-weight:800;color:var(--text);line-height:1">${record}</div>
         <div style="font-size:10px;color:var(--text2);margin-top:3px">Record</div>
       </div>
@@ -896,16 +895,15 @@ function renderCalendarAccordion() {
   const month = now.getMonth();
   const monthNames = ["Janvier","Février","Mars","Avril","Mai","Juin","Juillet","Août","Septembre","Octobre","Novembre","Décembre"];
   return `
-  <details style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:2px">
-    <summary style="padding:10px 14px;cursor:pointer;user-select:none;font-size:13px;font-weight:700;
-      list-style:none;color:var(--text2);display:flex;align-items:center;gap:6px">
+  <div style="border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:2px;background:#fff">
+    <div style="padding:10px 14px;font-size:13px;font-weight:700;color:var(--text2);display:flex;align-items:center;gap:6px">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
-      Calendrier — ${monthNames[month]} ${now.getFullYear()}
-    </summary>
-    <div style="padding:10px 14px 12px;background:var(--bg)">
+      ${monthNames[month]} ${now.getFullYear()}
+    </div>
+    <div style="padding:0 14px 12px;background:#fff">
       <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px">${buildCalendarCells(sessions)}</div>
     </div>
-  </details>`;
+  </div>`;
 }
 // ── PROGRESSION TAB ──
 
@@ -967,32 +965,24 @@ function renderGlobalProgress() {
   const icoTrophyInline = `<svg style="display:inline;vertical-align:middle" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4a2 2 0 01-2-2V5h4M18 9h2a2 2 0 002-2V5h-4M12 17v4M8 21h8M3 5h18"/><path d="M12 17a7 7 0 007-7V5H5v5a7 7 0 007 7z"/></svg>`;
   const fireEmoji = streak >= 3 ? icoFlameInline : '';
 
-  // ── Chrono numérique ──
-  const chronoS = Math.floor((CHRONO.elapsed + (CHRONO.running ? Date.now() - CHRONO.startAt : 0)) / 1000);
-  const chronoMM = String(Math.floor(chronoS/60)).padStart(2,'0');
-  const chronoSS = String(chronoS%60).padStart(2,'0');
-
-  // ═══ 1 — MES SÉANCES (ouvert, calendrier rétractable) ═══════════════════════
-  let html = `<details class="prog-acc" open>
-    <summary>Mes séances<span class="prog-sum-stat">${fireEmoji} ${streak} j · ${icoTrophyInline} ${record} · ${totalDays} j</span></summary>
-    <div class="prog-acc-body">`;
+  // ═══ 1 — MES SÉANCES ═════════════════════════════════════════════════════════
+  let html = `<div style="margin-bottom:4px">`;
 
   // Stats (toujours visibles quand la section est ouverte) — réutilise sessions/streak/record déclarés plus haut
   const sColor  = streak >= 7 ? 'var(--green)' : streak >= 3 ? 'var(--orange)' : 'var(--blue)';
-  const icoFlame2  = `<svg width="22" height="26" viewBox="0 0 24 28"><path d="M12 2C12 2 6 8 6 14a6 6 0 0012 0c0-3-2-5-2-5s0 4-4 4c0-4 4-7 4-13z" fill="${sColor}"/></svg>`;
-  const icoTrophy2 = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--text)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9H4a2 2 0 01-2-2V5h4M18 9h2a2 2 0 002-2V5h-4M12 17v4M8 21h8M3 5h18"/><path d="M12 17a7 7 0 007-7V5H5v5a7 7 0 007 7z"/></svg>`;
-  const icoCalSm2  = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`;
-  const streakIco2 = streak >= 3 ? icoFlame2 : icoCalSm2;
+  const icoFlame2    = `<svg width="22" height="26" viewBox="0 0 24 28"><path d="M12 2C12 2 6 8 6 14a6 6 0 0012 0c0-3-2-5-2-5s0 4-4 4c0-4 4-7 4-13z" fill="${sColor}"/></svg>`;
+  const icoLightning2= `<svg width="20" height="24" viewBox="0 0 20 24" fill="none"><polygon points="11,1 2,13 10,13 9,23 18,11 10,11" fill="var(--orange)" stroke="none"/></svg>`;
+  const icoCalSm2    = `<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`;
 
   html += `
   <div style="display:flex;gap:8px;margin-bottom:12px">
     <div style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 8px;text-align:center">
-      <div style="margin-bottom:6px">${streakIco2}</div>
+      <div style="margin-bottom:6px">${icoFlame2}</div>
       <div style="font-size:22px;font-weight:800;color:${sColor};line-height:1">${streak}</div>
       <div style="font-size:10px;color:var(--text2);margin-top:3px">Série</div>
     </div>
     <div style="flex:1;background:var(--card);border:1px solid var(--border);border-radius:10px;padding:12px 8px;text-align:center">
-      <div style="margin-bottom:6px">${icoTrophy2}</div>
+      <div style="margin-bottom:6px">${icoLightning2}</div>
       <div style="font-size:22px;font-weight:800;color:var(--text);line-height:1">${record}</div>
       <div style="font-size:10px;color:var(--text2);margin-top:3px">Record</div>
     </div>
@@ -1003,9 +993,8 @@ function renderGlobalProgress() {
     </div>
   </div>`;
 
-  // Calendrier — sous-accordéon rétractable
   html += renderCalendarAccordion();
-  html += `</div></details>`;
+  html += `</div>`;
 
   // ═══ 2 — PROGRESSION GLOBALE ═════════════════════════════════════════════════
   html += `
@@ -1044,6 +1033,12 @@ function renderGlobalProgress() {
 
   html += `</div></div></details>`;
 
+  html += `
+  <div style="margin-top:32px;text-align:right;color:var(--text3);font-size:11px;line-height:1.7">
+    <div style="font-weight:600;font-size:12px;color:var(--text2)">Dico Pattern</div>
+    <div>© 2026 · Développé par Cédric RAOU</div>
+    <div>Dijon <span style="font-size:13px">🇫🇷</span></div>
+  </div>`;
 
   return html;
 }
@@ -1066,8 +1061,8 @@ function renderJournalPage() {
   const icoProgression = `<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="5" y1="20" x2="5" y2="12"/><line x1="10" y1="20" x2="10" y2="6"/><line x1="15" y1="20" x2="15" y2="10"/><line x1="20" y1="20" x2="20" y2="3"/><line x1="2" y1="20" x2="23" y2="20"/></svg>`;
   const seg = `
     <div class="filter-seg" style="margin-bottom:16px">
-      <button class="${journalSubTab==='journal'?'active':''}" onclick="setJournalSubTab('journal')" style="display:flex;align-items:center;justify-content:center;gap:5px">${icoJournal} Historique</button>
       <button class="${journalSubTab==='stats'?'active':''}" onclick="setJournalSubTab('stats')" style="display:flex;align-items:center;justify-content:center;gap:5px">${icoProgression} Progression</button>
+      <button class="${journalSubTab==='journal'?'active':''}" onclick="setJournalSubTab('journal')" style="display:flex;align-items:center;justify-content:center;gap:5px">${icoJournal} Historique</button>
     </div>`;
   return seg + (journalSubTab === 'stats' ? renderGlobalProgress() : renderJournal());
 }
@@ -1172,13 +1167,15 @@ function renderJournal() {
     const isToday = new Date().toLocaleDateString('fr-FR') === dayKey;
     const open = isToday ? 'open' : ''; // Ouvrir le jour actuel par défaut
 
-    // Grouper les entrées par patId
+    // Grouper les entrées par patId — les séquences Labo se groupent par nom de preset
+    // (sinon toutes les séquences Labo du jour se fondraient sous la même clé '__shaker__')
     const byPattern = {};
     entries.forEach(entry => {
-      if (!byPattern[entry.patId]) {
-        byPattern[entry.patId] = [];
+      const groupKey = entry.isLabo ? `__shaker__::${entry.patName}` : entry.patId;
+      if (!byPattern[groupKey]) {
+        byPattern[groupKey] = [];
       }
-      byPattern[entry.patId].push(entry);
+      byPattern[groupKey].push(entry);
     });
 
     // Résumé du jour
@@ -1206,10 +1203,11 @@ function renderJournal() {
         <div class="journal-entries">`;
 
     // Pour chaque pattern du jour, afficher UNE SEULE ligne condensée
-    Object.entries(byPattern).forEach(([patId, patEntries]) => {
+    Object.entries(byPattern).forEach(([groupKey, patEntries]) => {
       // Trier par timestamp pour que la première lecture soit en premier
       patEntries.sort((a, b) => a.timestamp - b.timestamp);
       const firstEntry = patEntries[0];
+      const isLabo = !!firstEntry.isLabo;
 
       // Tempo min/max
       const tempos = patEntries.map(e => e.bpm);
@@ -1234,12 +1232,15 @@ function renderJournal() {
       if (hasShuffleMode) modesText.push('🔀');
       const modesBadge = modesText.length > 0 ? `<span style="color:var(--text2);font-size:10px">${modesText.join(' ')}</span>` : '';
 
+      const clickHandler = isLabo ? `goToLaboFromJournal()` : `goToPatternFromJournal('${firstEntry.patId}')`;
+      const subLabel = isLabo ? 'Labo — séquence' : firstEntry.patId;
+
       html += `
       <div class="journal-entry">
         <div class="journal-time">${time}</div>
-        <div class="journal-pattern-info" onclick="goToPatternFromJournal('${patId}')">
-          <div class="journal-pattern-name">${firstEntry.patName}</div>
-          <div class="journal-pattern-id">${patId}</div>
+        <div class="journal-pattern-info" onclick="${clickHandler}">
+          <div class="journal-pattern-name">${isLabo ? '🎛 ' : ''}${firstEntry.patName}</div>
+          <div class="journal-pattern-id">${subLabel}</div>
         </div>
         <div class="journal-meta">
           <span style="font-weight:600;color:var(--orange)">${bpmText} BPM</span>
@@ -1263,11 +1264,7 @@ function renderJournal() {
     </button>
   </div>
 
-  <div style="margin-top:32px;text-align:right;color:var(--text3);font-size:11px;line-height:1.7">
-    <div style="font-weight:600;font-size:12px;color:var(--text2)">Dico Pattern</div>
-    <div>© 2026 · Développé par Cédric RAOU</div>
-    <div>Dijon <span style="font-size:13px">🇫🇷</span></div>
-  </div>`;
+  `;
 
   return html;
 }

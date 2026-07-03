@@ -252,10 +252,6 @@
   #metro-bpm-global::-webkit-inner-spin-button,#metro-bpm-global::-webkit-outer-spin-button{-webkit-appearance:none;margin:0}
   .spd-custom{-moz-appearance:textfield}
 
-  /* CHRONO */
-  .chrono-wrap{display:flex;align-items:center;gap:6px}
-  .chrono-btn{background:rgba(255,255,255,.22);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:7px;padding:4px 9px;font-size:13px;cursor:pointer;line-height:1.4;transition:background .1s}
-  .chrono-btn:active{background:rgba(255,255,255,.38)}
 
   /* NAV ICONS */
   nav button .ico{width:24px;height:24px;display:flex;align-items:center;justify-content:center}
@@ -355,9 +351,6 @@
   #landscape-block{display:none}
   body.nav-hidden nav{display:none !important}
 
-  /* CHRONO POPUP */
-  .chrono-popup{position:fixed;bottom:76px;left:50%;transform:translateX(-50%) translateY(12px);background:var(--header-bg);color:var(--header-text);border-radius:14px;padding:13px 18px;font-size:13px;font-weight:600;text-align:center;max-width:290px;width:90%;z-index:500;opacity:0;transition:opacity .35s,transform .35s;pointer-events:none;box-shadow:0 4px 24px rgba(0,0,0,.35);line-height:1.5}
-  .chrono-popup.visible{opacity:1;transform:translateX(-50%) translateY(0)}
 
 </style>
 </head>
@@ -404,7 +397,7 @@
       <button id="string-group-btn" class="h-icon-btn" onclick="cycleStringGroup()" title="Groupe de cordes — DGBE · ADGB · EADG" style="font-size:9px;font-weight:700;letter-spacing:.3px;min-width:34px">DGBE</button>
       <button id="neck-toggle-btn" class="h-icon-btn" onclick="toggleNeckPosition()" title="Basculer mid/high neck" style="font-size:10px;font-weight:700">mid</button>
       <button id="loop-ext-btn" class="h-icon-btn" onclick="cycleLoopExt()" title="Loop étendu — Base · −1 · +1 · +2 · +3 · +4" style="font-size:10px;font-weight:700;letter-spacing:.3px">L+0</button>
-      <button class="h-icon-btn" id="gear-btn"
+      <button class="h-icon-btn" id="gear-btn" style="color:#E53935"
         onclick="openSettings()"
         aria-label="Réglages" title="Réglages">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -1233,6 +1226,11 @@ function goToPatternFromJournal(patId) {
   }, 100);
 }
 
+// Navigue vers le Labo depuis une entrée de journal Labo
+function goToLaboFromJournal() {
+  showTab('shaker');
+}
+
 // Appelé au début du playback — enregistre le moment + BPM courant
 function recordPatPlay(patId) {
   if (!patId) return;
@@ -1701,99 +1699,6 @@ function bpmEditCommit() {
 // Tap sur la tab → lecture/stop
 function tabWrapClick(patId) { previewPlay(patId); }
 
-// ─── CHRONO ───────────────────────────────────────────────────────────────────
-const CHRONO = { running:false, elapsed:0, startAt:0, timer:null, lastBeep:-1 };
-
-// Messages popup chrono
-const CHRONO_MSGS_5 = [
-  "Déjà 5 min 🎯 C'est une bonne session !",
-  "5 minutes — le geste commence à s'ancrer 💪",
-  "Beau travail ! 5 min de patterns, ça compte 🎸",
-  "5 min dans la zone. Tu gères.",
-];
-const CHRONO_MSGS_10 = [
-  "10 min 🏁 Il est temps de passer à autre chose — arpèges, chansons…",
-  "Dico Pattern : à consommer avec modération 😉 10 min régulières > 1h par mois.",
-  "10 min c'est parfait ! Maintenant joue de la musique 🎵",
-  "Bravo ! 10 min de patterns, change d'activité — ton cerveau a besoin de digérer.",
-];
-
-function showChronoPopup(msg) {
-  let ex = document.getElementById('chrono-popup');
-  if (ex) ex.remove();
-  const el = document.createElement('div');
-  el.id = 'chrono-popup';
-  el.className = 'chrono-popup';
-  el.textContent = msg;
-  document.getElementById('app').appendChild(el);
-  setTimeout(() => el.classList.add('visible'), 50);
-  setTimeout(() => { el.classList.remove('visible'); setTimeout(() => el.remove(), 400); }, 5500);
-}
-
-function chronoBeep() {
-  try {
-    const ctx = metroCtx();
-    // Deux bips courts pour signaler 5 min
-    [0, 0.18].forEach(offset => {
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.connect(gain); gain.connect(ctx.destination);
-      osc.frequency.value = 660;
-      const t = ctx.currentTime + offset;
-      gain.gain.setValueAtTime(0.4, t);
-      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-      osc.start(t); osc.stop(t + 0.13);
-    });
-  } catch(e) { console.warn('chronoBeep:', e); }
-}
-
-function chronoTick() {
-  const total = CHRONO.elapsed + (Date.now() - CHRONO.startAt);
-  const s = Math.floor(total / 1000);
-  const mm = String(Math.floor(s / 60)).padStart(2,'0');
-  const ss = String(s % 60).padStart(2,'0');
-  const el = document.getElementById('chrono-time');
-  if (el) el.textContent = mm + ':' + ss;
-  // Flash rouge + popup à 5 et 10 minutes (sans bip sonore)
-  const beepAt = Math.floor(s / 300);
-  if (beepAt > 0 && beepAt !== CHRONO.lastBeep) {
-    CHRONO.lastBeep = beepAt;
-    if (el) { el.style.color = 'var(--red)'; setTimeout(() => { if (el) el.style.color = 'var(--blue)'; }, 5000); }
-    if (beepAt <= 2) {
-      const msgs = beepAt === 1 ? CHRONO_MSGS_5 : CHRONO_MSGS_10;
-      showChronoPopup(msgs[Math.floor(Math.random() * msgs.length)]);
-    }
-  }
-}
-
-function chronoToggle() {
-  if (CHRONO.running) {
-    clearInterval(CHRONO.timer);
-    CHRONO.elapsed += Date.now() - CHRONO.startAt;
-    CHRONO.running = false;
-    const btn = document.getElementById('chrono-play');
-    if (btn) btn.innerHTML = '<svg width="10" height="12" viewBox="0 0 10 12" fill="currentColor"><path d="M0 0l10 6-10 6z"/></svg>';
-  } else {
-    CHRONO.startAt = Date.now();
-    CHRONO.running = true;
-    CHRONO.timer = setInterval(chronoTick, 500);
-    const btn = document.getElementById('chrono-play');
-    if (btn) btn.innerHTML = '<svg width="11" height="13" viewBox="0 0 11 13" fill="currentColor"><rect x="0" y="0" width="3.5" height="13" rx="1"/><rect x="7.5" y="0" width="3.5" height="13" rx="1"/></svg>';
-  }
-}
-
-function chronoReset() {
-  clearInterval(CHRONO.timer);
-  CHRONO.running = false;
-  CHRONO.elapsed = 0;
-  CHRONO.lastBeep = -1;
-  const el  = document.getElementById('chrono-time');
-  if (el) { el.textContent = '00:00'; el.style.color = 'var(--blue)'; }
-  const btn = document.getElementById('chrono-play');
-  if (btn) btn.textContent = '▶';
-}
-
-
 // ─── TABS ─────────────────────────────────────────────────────────────────────
 function showTab(tab) {
   // Double-tap sur l'onglet actif : ferme les cartes, stop la preview, reset vers métronome
@@ -1808,8 +1713,8 @@ function showTab(tab) {
   if (METRO.running && tab !== state.tab) { metroStop(false); }
   if (tab !== 'shaker' && state.tab !== tab && typeof stopShaker === 'function') stopShaker();
   state.tab = tab;
-  // Retour sur Journal → toujours afficher Historique en premier
-  if (tab === 'journal') journalSubTab = 'journal';
+  // Retour sur Journal → toujours afficher Progression en premier
+  if (tab === 'journal') journalSubTab = 'stats';
   document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
   document.getElementById('nav-'+tab).classList.add('active');
   render();
@@ -1855,7 +1760,7 @@ function openSettings(tab) {
       <div class="modal-head">
         <div>
           <h2 style="display:flex;align-items:center;gap:7px">
-            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="#E53935" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
             Réglages
           </h2>
         </div>
@@ -2141,7 +2046,7 @@ function openSettings(tab) {
           <button class="sf-btn" onclick="doImportJSON()">↑ Importer JSON</button>
         </div>
         <button class="sf-reset" onclick="resetApp()">Réinitialiser l'app</button>
-        <div class="sf-version">v5.3</div>
+        <div class="sf-version">v5.4</div>
       </div>
     </div>
   </div>`;
@@ -2718,7 +2623,6 @@ if (clickBtn && PREVIEW.click) clickBtn.classList.add('on');
 syncTrainModeUI();   // couleur BPM cyan si mode entraînement actif
 syncTrainBtnUI();    // couleur bouton Train. selon état train/pyramide
 syncShuffleModeUI(); // indicateur SH sur bouton Clic si shuffle actif
-chronoToggle();       // démarre le chrono automatiquement
 checkOnboarding();    // affiche l'onboarding au premier lancement
 
 
