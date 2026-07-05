@@ -7,7 +7,7 @@
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let state = {
-  tab: 'patterns',
+  tab: 'journal',
   filter: 'all',
   diffFilter: 'all',
   patternSort: 'progressif',

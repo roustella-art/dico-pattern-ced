@@ -5128,13 +5128,13 @@ const MODE_LABELS = {U:"Ascendant",D:"Descendant",M:"Mix"};
 const INTERPS = ["Down","Up","Leg"];
 const INTERP_LABELS = {Up:"Pick ↑",Down:"Pick ↓",Leg:"Legato"};
 const TEMPOS = [
-  { key:'lent',  label:'Tempo', range:'20–80',   rangeMin:20, rangeMax:80,  color:'#4a9e6b',
+  { key:'lent',  label:'Tempo', range:'40–100',  rangeMin:40, rangeMax:100, color:'#4a9e6b',
     icon:`<svg width="22" height="10" viewBox="0 0 22 10" fill="none" xmlns="http://www.w3.org/2000/svg">
       <circle cx="4"  cy="5" r="2.8" fill="#4a9e6b"/>
       <circle cx="11" cy="5" r="2.8" fill="#4a9e6b"/>
       <circle cx="18" cy="5" r="2.8" fill="#4a9e6b"/>
     </svg>`},
-  { key:'cool',  label:'Tempo', range:'80–110',  rangeMin:80, rangeMax:110, color:'#c07830',
+  { key:'cool',  label:'Tempo', range:'75–145',  rangeMin:75, rangeMax:145, color:'#c07830',
     icon:`<svg width="22" height="12" viewBox="0 0 22 12" fill="none" xmlns="http://www.w3.org/2000/svg">
       <path d="M1 6 Q3.5 1.5 6 6 Q8.5 10.5 11 6 Q13.5 1.5 16 6 Q18.5 10.5 21 7" stroke="#c07830" stroke-width="2" stroke-linecap="round" fill="none"/>
     </svg>`},

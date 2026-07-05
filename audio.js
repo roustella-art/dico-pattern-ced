@@ -1329,6 +1329,7 @@ function applyNavHidden() {
 }
 
 function setClickSubdiv(n) {
+  if (PREVIEW.patId) previewStop();
   SETTINGS.clickSubdiv = n;
   PREVIEW.clickNotes = n;
   saveSettings();

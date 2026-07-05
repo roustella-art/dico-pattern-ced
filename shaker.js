@@ -11,7 +11,7 @@ const SK_STRING_OPTIONS = ['e','B','G','D','A','E'];
 const SK_OPEN_FREQS     = { E:82.41, A:110.0, D:146.83, G:196.0, B:246.94, e:329.63 };
 const SK_MAX_STEPS      = 60;
 const SK_DURATION_MULT  = { '1/4':1, '1/8':0.5, '1/16':0.25, '1/8t':1/3, '6:16':1/6 };
-const SK_DURATION_MINW  = { '1/4':9, '1/8':5, '1/16':3, '1/8t':4, '6:16':2 };
+const SK_DURATION_DW    = { '1/4':4, '1/8':3, '1/16':2, '1/8t':3, '6:16':1 };  // tirets avant chaque chiffre
 const SK_REST_TAB_WIDTH = 4;
 const SK_PRESETS_KEY    = 'shaker_presets';
 
@@ -146,13 +146,16 @@ function skRefreshStepSummary(i) {
   const nameEl = document.querySelector(`.sk-step-card:nth-child(${i+1}) .sk-step-name`);
   if (!nameEl) return;
   const st = skSteps[i];
-  const isRest = st.patKey === 'rest';
+  const isRest  = st.patKey === 'rest';
+  const isMuted = st.patKey === 'muted';
   const DUR_LABELS = { '1/4':'♩', '1/8':'♪', '1/16':'♬', '1/8t':'T3', '6:16':'⑥' };
   const dur = st.duration || '1/4';
   const patName = st.patKey || '—';
   const formeName = st.forme || '';
   nameEl.textContent = isRest
-    ? '— Silence'
+    ? `— Silence · ${DUR_LABELS[dur]||dur}`
+    : isMuted
+    ? `✕ Note muté · ${st.string || 'e'} · ${DUR_LABELS[dur]||dur}`
     : (patName !== '—'
         ? `${patName}${formeName ? ' / '+formeName : ''} · ${st.string} · ${st.dir==='U'?'↑':'↓'} · ${DUR_LABELS[dur]||dur}`
         : '— choisir un pattern —');
@@ -481,11 +484,11 @@ function skSplitBlocks(assignments) {
 
 function skRenderBlock({ steps, repeatCount, isStop }) {
   const stepWidths = steps.map(a => {
-    const dw = a.duration === '6:16' ? 1 : 2;
-    const contentW = a.isRest ? SK_REST_TAB_WIDTH :
+    const dw = SK_DURATION_DW[a.duration || '1/4'] ?? 2;
+    const contentW = a.isRest ? dw + 2 :
       a.isMuted ? dw + 1 :
       a.notes.reduce((sum, n) => sum + dw + String(n).length, 0);
-    return Math.max(contentW, SK_DURATION_MINW[a.duration || '1/4'] || 2);
+    return contentW;
   });
   let pos = 0;
   const stepStarts = stepWidths.map(w => { const s = pos; pos += w; return s; });
@@ -496,7 +499,7 @@ function skRenderBlock({ steps, repeatCount, isStop }) {
     const chars = Array(totalWidth).fill('-');
     steps.forEach((a, i) => {
       if (a.isRest) return;
-      const dw = a.duration === '6:16' ? 1 : 2;
+      const dw = SK_DURATION_DW[a.duration || '1/4'] ?? 2;
       const dash = '-'.repeat(dw);
       if (a.isMuted && a.string === s) {
         (dash + 'X').split('').forEach((c, j) => { chars[stepStarts[i] + j] = c; });
@@ -955,18 +958,18 @@ function skStartCursor(eventsIgnored, totalTimeIgnored, patStart, ctx) {
       const curId = `sk-cursor-${mIdx}-${bi}`;
       const reps  = block.repeatCount || 1;
       const stepWidths = block.steps.map(a => {
-        const dw = a.duration === '6:16' ? 1 : 2;
-        const contentW = a.isRest ? SK_REST_TAB_WIDTH :
+        const dw = SK_DURATION_DW[a.duration || '1/4'] ?? 2;
+        const contentW = a.isRest ? dw + 2 :
           a.isMuted ? dw + 1 :
           a.notes.reduce((sum, n) => sum + dw + String(n).length, 0);
-        return Math.max(contentW, SK_DURATION_MINW[a.duration || '1/4'] || 2);
+        return contentW;
       });
       let p = 0;
       const stepStarts = stepWidths.map(w => { const s = p; p += w; return s; });
       for (let r = 0; r < reps; r++) {
         block.steps.forEach((a, i) => {
           if (a.isRest) return;
-          const dw = a.duration === '6:16' ? 1 : 2;
+          const dw = SK_DURATION_DW[a.duration || '1/4'] ?? 2;
           if (a.isMuted) {
             cols.push({ col: 3 + stepStarts[i] + dw, preId, curId });
             return;
@@ -1103,14 +1106,14 @@ function skLoadPresetsV2() {
     const raw = localStorage.getItem(SK_PRESETS_V2_KEY);
     if (raw) {
       const db = JSON.parse(raw);
-      if (!db.groups) db.groups = { 'Gammes Majeur': ['Do Majeur', 'Sol Majeur'] };
+      if (!db.groups) db.groups = {};
       return db;
     }
   } catch(e) {}
   return {
     presets: {},
-    folders: ['Exemples', 'Patterns multi-cordes', 'Do Majeur', 'Sol Majeur', 'Mes créations'],
-    groups: { 'Gammes Majeur': ['Do Majeur', 'Sol Majeur'] },
+    folders: ['Mes créations'],
+    groups: {},
   };
 }
 
@@ -1140,29 +1143,194 @@ function skSavePresetsToStorage(flat) {
 }
 
 // ── FAVORIS ───────────────────────────────────────────────────────────────────
+const SK_MAX_PINNED = 20;
+
 function skTogglePin(name) {
   const db = skLoadPresetsV2();
-  if (db.presets[name]) db.presets[name].pinned = !db.presets[name].pinned;
+  if (!db.presets[name]) return;
+  const willPin = !db.presets[name].pinned;
+  if (willPin) {
+    const pinnedCount = Object.values(db.presets).filter(p => p.pinned).length;
+    if (pinnedCount >= SK_MAX_PINNED) {
+      alert(`Limite de ${SK_MAX_PINNED} presets épinglés atteinte — désépingle-en un pour en ajouter un autre.`);
+      return;
+    }
+  }
+  db.presets[name].pinned = willPin;
   skSavePresetsV2(db);
   skBuildFavBar();
   skRefreshLibrary();
+}
+
+// ── ORDRE PERSONNALISÉ DES PRESETS (drag & drop / réorganisation) ────────────
+// db.presetOrder : liste globale de noms donnant l'ordre d'affichage souhaité.
+// Les presets absents de cette liste gardent leur ordre naturel (insertion), en fin.
+function skSortByPresetOrder(names) {
+  const db = skLoadPresetsV2();
+  const order = db.presetOrder || [];
+  const idx = new Map(order.map((n, i) => [n, i]));
+  return names.slice().sort((a, b) => {
+    const ia = idx.has(a) ? idx.get(a) : Infinity;
+    const ib = idx.has(b) ? idx.get(b) : Infinity;
+    return ia - ib;
+  });
+}
+
+// Met à jour l'ordre global en remplaçant la position relative d'un sous-ensemble
+// (ex: les items d'un seul dossier, ou juste les favoris) par leur nouvel ordre du DOM
+function skUpdatePresetOrderForSubset(newSubsetOrder) {
+  const db = skLoadPresetsV2();
+  let order = (db.presetOrder && db.presetOrder.length) ? db.presetOrder.slice() : Object.keys(db.presets);
+  Object.keys(db.presets).forEach(n => { if (!order.includes(n)) order.push(n); });
+  const subsetSet = new Set(newSubsetOrder);
+  let firstIdx = order.findIndex(n => subsetSet.has(n));
+  if (firstIdx === -1) firstIdx = order.length;
+  let insertAt = 0;
+  for (let i = 0; i < firstIdx; i++) if (!subsetSet.has(order[i])) insertAt++;
+  const rest = order.filter(n => !subsetSet.has(n));
+  rest.splice(insertAt, 0, ...newSubsetOrder);
+  db.presetOrder = rest;
+  skSavePresetsV2(db);
+}
+
+// Réorganisation de la rangée 1 de la bibliothèque (dossiers + groupes mélangés) :
+// applique le nouvel ordre relatif séparément à db.folders (dossiers) et aux clés de
+// db.groups (groupes), sans toucher aux dossiers qui n'apparaissent pas en rangée 1
+// (ex: sous-dossiers déjà rattachés à un groupe).
+function skReorderRow1(newOrder) {
+  const db = skLoadPresetsV2();
+  const groupNamesSet = new Set(Object.keys(db.groups || {}));
+  const folderTokens = newOrder.filter(t => !groupNamesSet.has(t));
+  const groupTokens  = newOrder.filter(t => groupNamesSet.has(t));
+
+  let folders = db.folders.slice();
+  const folderSet = new Set(folderTokens);
+  let firstIdx = folders.findIndex(f => folderSet.has(f));
+  if (firstIdx === -1) firstIdx = folders.length;
+  let insertAt = 0;
+  for (let i = 0; i < firstIdx; i++) if (!folderSet.has(folders[i])) insertAt++;
+  const rest = folders.filter(f => !folderSet.has(f));
+  rest.splice(insertAt, 0, ...folderTokens);
+  db.folders = rest;
+
+  if (db.groups) {
+    const newGroups = {};
+    groupTokens.forEach(g => { newGroups[g] = db.groups[g]; });
+    Object.keys(db.groups).forEach(g => { if (!(g in newGroups)) newGroups[g] = db.groups[g]; });
+    db.groups = newGroups;
+  }
+  skSavePresetsV2(db);
+}
+
+// Réorganisation de la rangée 2 (sous-dossiers d'un groupe) — remplace directement
+// le tableau des enfants du groupe actuellement affiché
+function skReorderRow2(newOrder) {
+  const activeGroup = document.getElementById('sk-lib-subfolders')?.dataset.activeGroup;
+  if (!activeGroup) return;
+  const db = skLoadPresetsV2();
+  if (!db.groups || !db.groups[activeGroup]) return;
+  db.groups[activeGroup] = newOrder;
+  skSavePresetsV2(db);
+}
+
+// Réorganisation par appui long + glisser — fonctionne au doigt (tactile) et à la souris.
+// Bind une seule fois par conteneur (délégation), fonctionne même après un re-render du innerHTML.
+function skInitReorderable(containerId, itemSelector, groupSelector, opts = {}) {
+  const container = document.getElementById(containerId);
+  if (!container || container.dataset.reorderBound) return;
+  container.dataset.reorderBound = '1';
+
+  const keyAttr   = opts.keyAttr || 'presetName';
+  const onReorder = opts.onReorder || skUpdatePresetOrderForSubset;
+  const horizontal = opts.horizontal ?? (container.id === 'sk-fav-bar');
+
+  let dragEl = null, timer = null, armed = false, startX = 0, startY = 0;
+
+  const clearTimer = () => { if (timer) { clearTimeout(timer); timer = null; } };
+
+  const getSiblings = (scope) => scope
+    ? [...scope.querySelectorAll(itemSelector)]
+    : [...container.querySelectorAll(itemSelector)];
+
+  const getDragAfter = (scope, x, y) => {
+    const items = getSiblings(scope).filter(el => el !== dragEl);
+    let closest = { offset: -Infinity, element: null };
+    items.forEach(child => {
+      const box = child.getBoundingClientRect();
+      const offset = horizontal
+        ? x - box.left - box.width / 2
+        : y - box.top - box.height / 2;
+      if (offset < 0 && offset > closest.offset) closest = { offset, element: child };
+    });
+    return closest.element;
+  };
+
+  let pointerId = null;
+
+  container.addEventListener('pointerdown', (e) => {
+    const item = e.target.closest(itemSelector);
+    if (!item) return;
+    startX = e.clientX; startY = e.clientY;
+    armed = false;
+    pointerId = e.pointerId;
+    clearTimer();
+    timer = setTimeout(() => {
+      armed = true;
+      dragEl = item;
+      item.classList.add('sk-reorder-active');
+      // Capture sur le CONTENEUR (jamais reparenté) — pas sur l'item, qui lui est déplacé
+      // en direct via insertBefore pendant le drag : reparenter un élément capturé
+      // invalide la capture instantanément dans la plupart des navigateurs.
+      try { container.setPointerCapture(pointerId); } catch(e) {}
+      if (navigator.vibrate) navigator.vibrate(15);
+    }, 420);
+  });
+
+  container.addEventListener('pointermove', (e) => {
+    if (!armed || !dragEl) {
+      if (timer && (Math.abs(e.clientX - startX) > 8 || Math.abs(e.clientY - startY) > 8)) clearTimer();
+      return;
+    }
+    e.preventDefault();
+    const scope = groupSelector ? dragEl.closest(groupSelector) : null;
+    const after = getDragAfter(scope, e.clientX, e.clientY);
+    const parent = scope || container;
+    if (after == null) parent.appendChild(dragEl);
+    else parent.insertBefore(dragEl, after);
+  }, { passive: false });
+
+  const finish = () => {
+    clearTimer();
+    if (armed && dragEl) {
+      dragEl.classList.remove('sk-reorder-active');
+      if (pointerId != null) { try { container.releasePointerCapture(pointerId); } catch(e) {} }
+      const scope = groupSelector ? dragEl.closest(groupSelector) : null;
+      const newOrder = getSiblings(scope).map(el => el.dataset[keyAttr]).filter(Boolean);
+      onReorder(newOrder, scope);
+    }
+    armed = false; dragEl = null; pointerId = null;
+  };
+  container.addEventListener('pointerup', finish);
+  container.addEventListener('pointercancel', finish);
+  container.addEventListener('lostpointercapture', () => { if (armed) finish(); });
 }
 
 function skBuildFavBar() {
   const bar = document.getElementById('sk-fav-bar');
   if (!bar) return;
   const db = skLoadPresetsV2();
-  const pinned = Object.entries(db.presets).filter(([,p]) => p.pinned);
-  if (!pinned.length) {
+  const pinnedNames = skSortByPresetOrder(Object.keys(db.presets).filter(n => db.presets[n].pinned));
+  if (!pinnedNames.length) {
     bar.innerHTML = `<span class="sk-fav-empty">Épingle des presets depuis la bibliothèque ★</span>`;
     return;
   }
-  bar.innerHTML = pinned.map(([name]) => {
+  bar.innerHTML = pinnedNames.map(name => {
     const active = name === skCurrentPreset;
-    return `<button class="sk-fav-chip${active ? ' active' : ''}" onclick="skLoadPresetByName('${name.replace(/'/g,"\\'")}')">
+    return `<button class="sk-fav-chip${active ? ' active' : ''}" data-preset-name="${name.replace(/"/g,'&quot;')}" onclick="skLoadPresetByName('${name.replace(/'/g,"\\'")}')">
       ${name}
     </button>`;
   }).join('');
+  skInitReorderable('sk-fav-bar', '.sk-fav-chip', null);
 }
 
 // ── CHARGER UN PRESET ─────────────────────────────────────────────────────────
@@ -1179,6 +1347,14 @@ function skLoadPresetByName(name) {
   const _chevron = document.getElementById('sk-seq-chevron');
   if (_seqBody) _seqBody.style.display = 'none';
   if (_chevron) _chevron.textContent = '▶';
+  // Restaurer le mode de lecture et le BPM sauvegardés avec le modèle
+  if (p.playMode) skSetPlayMode(p.playMode);
+  if (p.bpm) {
+    HCTRL.bpm = p.bpm;
+    PREVIEW.bpm = p.bpm;
+    const hbpm = document.getElementById('header-bpm-val');
+    if (hbpm) hbpm.textContent = HCTRL.bpm;
+  }
   skBuildStepsUI();
   skGenerateAndShow();
   skBuildFavBar();
@@ -1215,10 +1391,41 @@ function skSetLibFolder(f) {
   skRenderLibrary();
 }
 
+// Supprime un dossier — bloqué s'il contient encore des presets, pour ne jamais perdre de créations
+function skDeleteFolder(name) {
+  const db = skLoadPresetsV2();
+  const hasPresets = Object.values(db.presets).some(p => p.folder === name);
+  if (hasPresets) {
+    alert(`Le dossier "${name}" contient encore des presets — déplace-les ou supprime-les d'abord.`);
+    return;
+  }
+  if (!confirm(`Supprimer le dossier vide "${name}" ?`)) return;
+  db.folders = db.folders.filter(f => f !== name);
+  if (db.groups) {
+    Object.keys(db.groups).forEach(g => {
+      db.groups[g] = db.groups[g].filter(f => f !== name);
+      if (!db.groups[g].length) delete db.groups[g];
+    });
+  }
+  if (skLibFolder === name) skLibFolder = '';
+  skSavePresetsV2(db);
+  skRenderLibrary();
+}
+
+// Dissout un groupe — les dossiers restent intacts, seul le regroupement disparaît
+function skDissolveGroup(groupName) {
+  if (!confirm(`Dissoudre le groupe "${groupName}" ? Les dossiers ne seront pas supprimés.`)) return;
+  const db = skLoadPresetsV2();
+  if (db.groups) delete db.groups[groupName];
+  skSavePresetsV2(db);
+  skRenderLibrary();
+}
+
 function skRefreshLibrary() {
   const body = document.getElementById('sk-lib-body');
   if (!body) return;
   body.innerHTML = skBuildLibraryBody();
+  skInitReorderable('sk-lib-body', '.sk-lib-item', '.sk-lib-folder-group');
 }
 
 function skBuildLibraryBody() {
@@ -1227,14 +1434,19 @@ function skBuildLibraryBody() {
   const folders = [...new Set(['Tous', ...db.folders,
     ...Object.values(db.presets).map(p => p.folder).filter(Boolean)])];
 
-  const filtered = Object.entries(db.presets).filter(([name, p]) => {
+  let filtered = Object.entries(db.presets).filter(([name, p]) => {
     const matchQ = !skLibQuery || name.toLowerCase().includes(skLibQuery);
-    const matchF = !skLibFolder || skLibFolder === 'Tous' || p.folder === skLibFolder
-      || (groups[skLibFolder] || []).includes(p.folder);
+    const matchF = skLibFolder === '__pinned__' ? p.pinned
+      : (!skLibFolder || skLibFolder === 'Tous' || p.folder === skLibFolder
+      || (groups[skLibFolder] || []).includes(p.folder));
     return matchQ && matchF;
   });
 
   if (!filtered.length) return `<div class="sk-lib-empty">Aucun preset trouvé</div>`;
+
+  // Tri selon l'ordre personnalisé (réorganisation par appui long)
+  const orderedNames = skSortByPresetOrder(filtered.map(([name]) => name));
+  filtered = orderedNames.map(name => filtered.find(([n]) => n === name));
 
   // Groupe par dossier si pas de filtre actif
   const grouped = {};
@@ -1246,6 +1458,7 @@ function skBuildLibraryBody() {
 
   return Object.entries(grouped).map(([folder, items]) => `
     <div class="sk-lib-folder-label">${folder}</div>
+    <div class="sk-lib-folder-group" data-folder="${folder.replace(/"/g,'&quot;')}">
     ${items.map(([name, p]) => {
       const active    = name === skCurrentPreset;
       const isBuiltIn = name in SK_DEFAULT_PRESETS;
@@ -1253,7 +1466,7 @@ function skBuildLibraryBody() {
       const steps     = p.steps || [];
       const noteCount = steps.filter(s => s.patKey && s.patKey !== 'rest').length;
       return `
-    <div class="sk-lib-item${active ? ' active' : ''}${isBuiltIn ? ' built-in' : ''}">
+    <div class="sk-lib-item${active ? ' active' : ''}${isBuiltIn ? ' built-in' : ''}" data-preset-name="${name.replace(/"/g,'&quot;')}">
       <div class="sk-lib-item-main" onclick="skLoadPresetByName('${name.replace(/'/g,"\\'")}')">
         <div class="sk-lib-item-name">${name}</div>
         <div class="sk-lib-item-meta">${noteCount} pas · ${folder}</div>
@@ -1264,6 +1477,7 @@ function skBuildLibraryBody() {
       ${isBuiltIn ? '' : `<button class="sk-lib-del" onclick="skDeletePresetByName('${name.replace(/'/g,"\\'")}')">✕</button>`}
     </div>`;
     }).join('')}
+    </div>
   `).join('');
 }
 
@@ -1278,43 +1492,70 @@ function skRenderLibrary() {
     ...db.folders,
     ...Object.values(db.presets).map(p => p.folder).filter(Boolean),
   ])];
+  const presetFolders = new Set(Object.values(db.presets).map(p => p.folder));
+  const isFolderEmpty = f => !presetFolders.has(f);
 
-  // Rangée principale : dossiers réels sans les sous-dossiers, + noms de groupes
-  // 'Mes créations' est toujours visible au premier niveau
+  // Rangée principale : dossiers qui n'appartiennent à aucun groupe, + les groupes eux-mêmes
+  // (un groupe est cliquable : il révèle ses dossiers enfants en rangée 2)
+  // 'Mes créations' reste toujours visible au premier niveau même si elle rejoint un groupe
   const topFolders = allFolders.filter(f => f === 'Mes créations' || !subFolderSet.has(f));
-  Object.keys(groups).forEach(g => {
-    if (!topFolders.includes(g)) topFolders.push(g);
-  });
+  const groupNames = Object.keys(groups);
 
-  // Groupe actif (si skLibFolder est le groupe ou un de ses enfants)
-  const activeGroup = Object.entries(groups).find(
-    ([g, children]) => skLibFolder === g || children.includes(skLibFolder)
-  )?.[0] || null;
+  // Groupe actif : soit le groupe lui-même est sélectionné, soit un de ses enfants
+  const activeGroup = groupNames.find(
+    g => skLibFolder === g || groups[g].includes(skLibFolder)
+  ) || null;
 
-  sheet.querySelector('.sk-lib-folders').innerHTML =
-    ['Tous', ...topFolders].map(f => {
-      const isGroup  = !!groups[f];
-      const isActive = skLibFolder === f
-        || (!skLibFolder && f === 'Tous')
-        || (isGroup && f === activeGroup);
+  const pinnedItem = (() => {
+    const isActive = skLibFolder === '__pinned__';
+    return `<div class="sk-lib-folder-item">
+      <button class="sk-lib-folder-btn${isActive ? ' active' : ''}"
+        onclick="skSetLibFolder('__pinned__')">★ Épinglés</button>
+    </div>`;
+  })();
+
+  sheet.querySelector('.sk-lib-folders').innerHTML = pinnedItem +
+    ['Tous', ...topFolders, ...groupNames].map(f => {
+      const isGroup = groupNames.includes(f);
+      const isActive = isGroup
+        ? f === activeGroup
+        : (skLibFolder === f || (!skLibFolder && f === 'Tous'));
       const esc = f.replace(/'/g, "\\'");
-      return `<button class="sk-lib-folder-btn${isActive ? ' active' : ''}${isGroup ? ' sk-lib-group-btn' : ''}"
-        onclick="skSetLibFolder('${esc}')">${f}${isGroup ? ' ›' : ''}</button>`;
+      const canDelete = !isGroup && f !== 'Tous' && isFolderEmpty(f);
+      const delBtn = isGroup
+        ? `<button class="sk-lib-folder-del" title="Dissoudre le groupe (les dossiers ne sont pas supprimés)" onclick="event.stopPropagation();skDissolveGroup('${esc}')">✕</button>`
+        : canDelete ? `<button class="sk-lib-folder-del" title="Supprimer le dossier vide" onclick="event.stopPropagation();skDeleteFolder('${esc}')">✕</button>` : '';
+      // 'Tous' n'a pas de data-order-key : il n'est jamais déplaçable (n'est pas un vrai dossier)
+      const orderAttr = f === 'Tous' ? '' : ` data-order-key="${f.replace(/"/g,'&quot;')}"`;
+      return `<div class="sk-lib-folder-item"${orderAttr}>
+        <button class="sk-lib-folder-btn${isActive ? ' active' : ''}${isGroup ? ' sk-lib-group-btn' : ''}"
+          onclick="skSetLibFolder('${esc}')">${f}${isGroup ? ' ›' : ''}</button>
+        ${delBtn}
+      </div>`;
     }).join('');
+  skInitReorderable('sk-lib-folders', '.sk-lib-folder-item[data-order-key]', null,
+    { keyAttr: 'orderKey', onReorder: skReorderRow1, horizontal: true });
 
   // Rangée sous-dossiers — visible uniquement si un groupe est actif
   const subRow = sheet.querySelector('.sk-lib-subfolders');
+  subRow.dataset.activeGroup = activeGroup || '';
   if (activeGroup) {
     subRow.style.display = 'flex';
     subRow.innerHTML = groups[activeGroup].map(f => {
       const esc = f.replace(/'/g, "\\'");
-      return `<button class="sk-lib-folder-btn sk-lib-subfolder-btn${skLibFolder === f ? ' active' : ''}"
-        onclick="skSetLibFolder('${esc}')">${f}</button>`;
+      const canDelete = isFolderEmpty(f);
+      return `<div class="sk-lib-folder-item" data-order-key="${f.replace(/"/g,'&quot;')}">
+        <button class="sk-lib-folder-btn sk-lib-subfolder-btn${skLibFolder === f ? ' active' : ''}"
+          onclick="skSetLibFolder('${esc}')">${f}</button>
+        ${canDelete ? `<button class="sk-lib-folder-del" title="Supprimer le dossier vide" onclick="event.stopPropagation();skDeleteFolder('${esc}')">✕</button>` : ''}
+      </div>`;
     }).join('');
   } else {
     subRow.style.display = 'none';
     subRow.innerHTML = '';
   }
+  skInitReorderable('sk-lib-subfolders', '.sk-lib-folder-item[data-order-key]', null,
+    { keyAttr: 'orderKey', onReorder: skReorderRow2, horizontal: true });
 
   skRefreshLibrary();
 }
@@ -1323,7 +1564,6 @@ function skRenderLibrary() {
 function skOpenSaveDialog() {
   if (!skSteps.length) return;
   const db = skLoadPresetsV2();
-  const groups = db.groups || {};
   const folders = [...new Set([...db.folders,
     ...Object.values(db.presets).map(p => p.folder).filter(Boolean)])];
 
@@ -1331,9 +1571,13 @@ function skOpenSaveDialog() {
   const currentPresetFolder = skCurrentPreset ? db.presets[skCurrentPreset]?.folder : null;
   const defaultFolder = currentPresetFolder || 'Mes créations';
 
-  const folderOpts = folders.map(f =>
-    `<option value="${f}"${f === defaultFolder ? ' selected' : ''}>${f}</option>`).join('');
+  const folderOpts = `<option value="">— aucun (direct dans le dossier) —</option>` +
+    folders.map(f =>
+      `<option value="${f}"${f === defaultFolder ? ' selected' : ''}>${f}</option>`).join('');
 
+  // Liste complète des dossiers (groupes) existants — la sélection du sous-dossier
+  // ne fait que pré-sélectionner celui déjà associé, sans restreindre la liste
+  const groups = db.groups || {};
   const groupOpts = `<option value="">— aucun —</option>` +
     Object.keys(groups).map(g => `<option value="${g}">${g}</option>`).join('');
 
@@ -1350,16 +1594,16 @@ function skOpenSaveDialog() {
       <div class="sk-dialog-field">
         <label class="sk-dialog-label">Dossier</label>
         <div style="display:flex;gap:6px">
-          <select id="sk-save-folder" class="sk-dialog-input" style="flex:1"
-            onchange="skSyncGroupFromFolder(this.value)">${folderOpts}</select>
-          <button class="sk-dialog-new-folder" onclick="skPromptNewFolder()">+ Nouveau</button>
+          <select id="sk-save-group" class="sk-dialog-input" style="flex:1">${groupOpts}</select>
+          <button class="sk-dialog-new-folder" onclick="skPromptNewGroup()">+ Nouveau</button>
         </div>
       </div>
       <div class="sk-dialog-field">
-        <label class="sk-dialog-label">Groupe <span style="font-weight:400;color:var(--text3)">(optionnel)</span></label>
+        <label class="sk-dialog-label">Sous-dossier</label>
         <div style="display:flex;gap:6px">
-          <select id="sk-save-group" class="sk-dialog-input" style="flex:1">${groupOpts}</select>
-          <button class="sk-dialog-new-folder" onclick="skPromptNewGroup()">+ Nouveau</button>
+          <select id="sk-save-folder" class="sk-dialog-input" style="flex:1"
+            onchange="skSyncGroupFromFolder(this.value)">${folderOpts}</select>
+          <button class="sk-dialog-new-folder" onclick="skPromptNewFolder()">+ Nouveau</button>
         </div>
       </div>
       <div class="sk-dialog-actions">
@@ -1377,17 +1621,20 @@ function skCloseSaveDialog() {
   if (d) { d.style.display = 'none'; d.innerHTML = ''; }
 }
 
+// Pré-sélectionne le dossier (groupe) auquel le sous-dossier choisi appartient déjà,
+// sans jamais restreindre la liste complète des dossiers existants
 function skSyncGroupFromFolder(folder) {
+  if (!folder) return; // "— aucun —" : ne touche pas au Dossier déjà choisi
   const db = skLoadPresetsV2();
   const groups = db.groups || {};
   const sel = document.getElementById('sk-save-group');
   if (!sel) return;
-  const match = Object.entries(groups).find(([, children]) => children.includes(folder));
-  sel.value = match ? match[0] : '';
+  const match = Object.keys(groups).find(g => groups[g].includes(folder));
+  if (match) sel.value = match;
 }
 
 function skPromptNewFolder() {
-  const name = prompt('Nom du nouveau dossier :');
+  const name = prompt('Nom du nouveau sous-dossier :');
   if (!name || !name.trim()) return;
   const sel = document.getElementById('sk-save-folder');
   if (!sel) return;
@@ -1398,7 +1645,7 @@ function skPromptNewFolder() {
 }
 
 function skPromptNewGroup() {
-  const name = prompt('Nom du nouveau groupe :');
+  const name = prompt('Nom du nouveau dossier :');
   if (!name || !name.trim()) return;
   const sel = document.getElementById('sk-save-group');
   if (!sel) return;
@@ -1406,13 +1653,28 @@ function skPromptNewGroup() {
   opt.value = opt.textContent = name.trim();
   sel.appendChild(opt);
   sel.value = name.trim();
+
+  // Un dossier a besoin d'au moins un sous-dossier — on enchaîne directement
+  // pour éviter qu'un nouveau dossier ne se retrouve avec "Mes créations" par défaut
+  const subName = prompt(`Nom du sous-dossier à créer dans "${name.trim()}" :`);
+  if (subName && subName.trim()) {
+    const folderSel = document.getElementById('sk-save-folder');
+    if (folderSel) {
+      const subOpt = document.createElement('option');
+      subOpt.value = subOpt.textContent = subName.trim();
+      folderSel.appendChild(subOpt);
+      folderSel.value = subName.trim();
+    }
+  }
 }
 
 function skConfirmSave() {
-  const name   = document.getElementById('sk-save-name')?.value.trim();
-  const folder = document.getElementById('sk-save-folder')?.value || 'Mes créations';
-  const group  = document.getElementById('sk-save-group')?.value || '';
+  const name      = document.getElementById('sk-save-name')?.value.trim();
+  const subfolder = document.getElementById('sk-save-folder')?.value || '';
+  const group     = document.getElementById('sk-save-group')?.value || '';
   if (!name) { document.getElementById('sk-save-name')?.focus(); return; }
+  // Sans sous-dossier : le preset vit directement dans le dossier choisi (ou "Mes créations" par défaut)
+  const folder = subfolder || group || 'Mes créations';
   const db = skLoadPresetsV2();
   const existing = db.presets[name];
   db.presets[name] = {
@@ -1420,16 +1682,20 @@ function skConfirmSave() {
     folder,
     pinned: existing ? existing.pinned : false,
     createdAt: existing ? existing.createdAt : Date.now(),
+    playMode: skPlayMode,
+    bpm: HCTRL.bpm,
   };
   if (!db.folders.includes(folder)) db.folders.push(folder);
-  // Gestion groupe : ajouter le dossier au groupe sélectionné, le retirer des autres
+  // Gestion groupe : ajouter le sous-dossier au groupe sélectionné, le retirer des autres.
+  // Si le preset vit directement dans le dossier (folder === group), inutile de l'ajouter
+  // comme sous-dossier de lui-même.
   if (!db.groups) db.groups = {};
   Object.keys(db.groups).forEach(g => {
-    db.groups[g] = db.groups[g].filter(f => f !== folder);
+    db.groups[g] = db.groups[g].filter(f => f !== subfolder);
   });
-  if (group) {
+  if (group && subfolder && subfolder !== group) {
     if (!db.groups[group]) db.groups[group] = [];
-    if (!db.groups[group].includes(folder)) db.groups[group].push(folder);
+    if (!db.groups[group].includes(subfolder)) db.groups[group].push(subfolder);
   }
   skSavePresetsV2(db);
   skCurrentPreset = name;
@@ -1440,7 +1706,8 @@ function skConfirmSave() {
 }
 
 function skDeletePresetByName(name) {
-  if (name in SK_DEFAULT_PRESETS) return; // presets intégrés non supprimables
+  // Les modèles intégrés à l'app ne sont jamais supprimables par l'utilisateur
+  if (name in SK_DEFAULT_PRESETS) return;
   if (!confirm(`Supprimer "${name}" ?`)) return;
   const db = skLoadPresetsV2();
   delete db.presets[name];
@@ -1551,7 +1818,7 @@ function skExportPresets() {
   if (!skSteps.length) { alert('Aucun pas à exporter — compose d\'abord une séquence.'); return; }
   const name = skCurrentPreset || 'sequence';
   const noteText = skLoadNotes()[name] || '';
-  const payload = { name, steps: skSteps, ...(noteText ? { notes: noteText } : {}) };
+  const payload = { name, steps: skSteps, playMode: skPlayMode, bpm: HCTRL.bpm, ...(noteText ? { notes: noteText } : {}) };
   const json = JSON.stringify(payload, null, 2);
   const blob = new Blob([json], { type: 'application/json' });
   const url  = URL.createObjectURL(blob);
@@ -1583,6 +1850,114 @@ function skImportPresets() {
   document.getElementById('sk-import-file')?.click();
 }
 
+function skValidateImport(imported) {
+  const errors = [];
+  if (typeof imported !== 'object' || imported === null)
+    return ['Format invalide — fichier JSON mal formé.'];
+
+  // Nom
+  if (typeof imported.name !== 'string' || !imported.name.trim())
+    errors.push('Champ "name" manquant ou invalide.');
+  else if (imported.name.length > 200)
+    errors.push('Nom trop long (max 200 caractères).');
+
+  // Steps
+  if (!Array.isArray(imported.steps))
+    return ['Champ "steps" manquant ou invalide.'];
+  if (imported.steps.length === 0)
+    errors.push('Le modèle ne contient aucun pas.');
+  if (imported.steps.length > SK_MAX_STEPS)
+    errors.push(`Trop de pas (${imported.steps.length} — max ${SK_MAX_STEPS}).`);
+
+  // Notes personnelles
+  if (imported.notes !== undefined && typeof imported.notes !== 'string')
+    errors.push('Champ "notes" invalide (doit être du texte).');
+  if (typeof imported.notes === 'string' && imported.notes.length > 2000)
+    errors.push('Notes personnelles trop longues (max 2000 caractères).');
+
+  // Valeurs autorisées pour chaque pas
+  const VALID_PAT_KEYS = new Set([
+    'rest', 'muted', 'measure', 'repeat-start', 'repeat-end', 'stop',
+    ...SK_PAT_KEYS
+  ]);
+  const VALID_STRINGS   = new Set(['e','B','G','D','A','E']);
+  const VALID_DIRS      = new Set(['U','D']);
+  const VALID_DURATIONS = new Set(['1/4','1/8','1/16','1/8t','6:16']);
+
+  imported.steps.forEach((st, i) => {
+    const idx = `Pas ${i + 1}`;
+    if (typeof st !== 'object' || st === null) { errors.push(`${idx} : format invalide.`); return; }
+    if (!VALID_PAT_KEYS.has(st.patKey))
+      errors.push(`${idx} : patKey inconnu "${st.patKey}".`);
+    if (st.string != null && !VALID_STRINGS.has(st.string))
+      errors.push(`${idx} : corde invalide "${st.string}".`);
+    if (st.dir !== undefined && !VALID_DIRS.has(st.dir))
+      errors.push(`${idx} : direction invalide "${st.dir}".`);
+    if (st.startFret !== undefined) {
+      const f = Number(st.startFret);
+      if (!Number.isInteger(f) || f < 0 || f > 24)
+        errors.push(`${idx} : frette invalide (${st.startFret}) — doit être entre 0 et 24.`);
+    }
+    if (st.duration !== undefined && !VALID_DURATIONS.has(st.duration))
+      errors.push(`${idx} : durée invalide "${st.duration}".`);
+    if (st.active !== undefined && typeof st.active !== 'boolean')
+      errors.push(`${idx} : champ "active" invalide.`);
+    if (st.patKey === 'repeat-end' && st.repeatCount !== undefined) {
+      const rc = Number(st.repeatCount);
+      if (!Number.isInteger(rc) || rc < 2 || rc > 16)
+        errors.push(`${idx} : repeatCount invalide (${st.repeatCount}) — doit être entre 2 et 16.`);
+    }
+  });
+
+  return errors;
+}
+
+// Applique un preset importé (validé au préalable) à la bibliothèque et à l'état courant
+function skApplyImportedPreset(imported, fallbackName) {
+  let name = imported.name || fallbackName || 'preset';
+  const db = skLoadPresetsV2();
+
+  // Les presets intégrés à l'app ne doivent jamais être écrasés silencieusement —
+  // on renomme automatiquement en variante plutôt que de perdre l'original.
+  if (name in SK_DEFAULT_PRESETS) {
+    let suggestion = `${name} (importé)`;
+    let i = 2;
+    while (db.presets[suggestion]) { suggestion = `${name} (importé ${i})`; i++; }
+    name = suggestion;
+    alert(`"${imported.name || fallbackName}" est un preset intégré à l'app — le preset importé sera enregistré sous "${name}" pour préserver l'original.`);
+  } else if (db.presets[name]) {
+    if (!confirm(`Un preset "${name}" existe déjà. Le remplacer ?`)) return false;
+  }
+  db.presets[name] = {
+    steps: imported.steps, folder: 'Mes créations', pinned: false, createdAt: Date.now(),
+    ...(imported.playMode ? { playMode: imported.playMode } : {}),
+    ...(imported.bpm ? { bpm: imported.bpm } : {}),
+  };
+  skSavePresetsV2(db);
+  if (imported.notes) skSaveNote(name, imported.notes);
+  skCurrentPreset = name;
+  skSteps = imported.steps.map(s => ({ ...s }));
+  skSeqCollapsed = true;
+  const _sb = document.getElementById('sk-seq-body');
+  const _sc = document.getElementById('sk-seq-chevron');
+  if (_sb) _sb.style.display = 'none';
+  if (_sc) _sc.textContent = '▶';
+  if (imported.playMode) skSetPlayMode(imported.playMode);
+  if (imported.bpm) {
+    HCTRL.bpm = imported.bpm;
+    PREVIEW.bpm = imported.bpm;
+    const hbpm = document.getElementById('header-bpm-val');
+    if (hbpm) hbpm.textContent = HCTRL.bpm;
+  }
+  skBuildStepsUI();
+  skGenerateAndShow();
+  skBuildPresetSelect();
+  skBuildFavBar();
+  const sel = document.getElementById('sk-preset-sel');
+  if (sel) sel.value = name;
+  return true;
+}
+
 function skHandleImportFile(e) {
   const file = e.target.files[0];
   if (!file) return;
@@ -1590,38 +1965,78 @@ function skHandleImportFile(e) {
   reader.onload = evt => {
     try {
       const imported = JSON.parse(evt.target.result);
-      if (!Array.isArray(imported.steps) || !imported.steps.length) {
-        alert('Format invalide — le fichier doit contenir un tableau "steps".');
+      const importErrors = skValidateImport(imported);
+      if (importErrors.length) {
+        alert('Fichier invalide :\n\n' + importErrors.slice(0, 5).join('\n') + (importErrors.length > 5 ? `\n\n… et ${importErrors.length - 5} autre(s) erreur(s).` : ''));
+        e.target.value = '';
         return;
       }
-      const name = imported.name || file.name.replace(/\.json$/, '');
-      const db = skLoadPresetsV2();
-      if (db.presets[name]) {
-        if (!confirm(`Un preset "${name}" existe déjà. Le remplacer ?`)) { e.target.value = ''; return; }
-      }
-      db.presets[name] = { steps: imported.steps, folder: 'Mes créations', pinned: false, createdAt: Date.now() };
-      skSavePresetsV2(db);
-      if (imported.notes) skSaveNote(name, imported.notes);
-      skCurrentPreset = name;
-      skSteps = imported.steps.map(s => ({ ...s }));
-      skSeqCollapsed = true;
-      const _sb = document.getElementById('sk-seq-body');
-      const _sc = document.getElementById('sk-seq-chevron');
-      if (_sb) _sb.style.display = 'none';
-      if (_sc) _sc.textContent = '▶';
-      skBuildStepsUI();
-      skGenerateAndShow();
-      skBuildPresetSelect();
-      skBuildFavBar();
-      // Sélectionner le preset importé dans le select
-      const sel = document.getElementById('sk-preset-sel');
-      if (sel) sel.value = name;
+      skApplyImportedPreset(imported, file.name.replace(/\.json$/, ''));
     } catch(err) {
       alert('Erreur de lecture JSON : ' + err.message);
     }
     e.target.value = '';
   };
   reader.readAsText(file);
+}
+
+// ── PARTAGE PAR CODE COMPACT (forum, message...) ─────────────────────────────
+const SK_CODE_PREFIX = 'DPLABO1:';
+
+function skEncodePresetPayload(payload) {
+  const json = JSON.stringify(payload);
+  const b64  = btoa(unescape(encodeURIComponent(json)));
+  return SK_CODE_PREFIX + b64;
+}
+
+function skDecodePresetCode(code) {
+  const trimmed = code.trim();
+  if (!trimmed.startsWith(SK_CODE_PREFIX)) throw new Error('Ce code ne provient pas du Labo Dico Pattern.');
+  const b64  = trimmed.slice(SK_CODE_PREFIX.length);
+  const json = decodeURIComponent(escape(atob(b64)));
+  return JSON.parse(json);
+}
+
+function skExportPresetCode() {
+  if (!skSteps.length) { alert('Aucun pas à exporter — compose d\'abord une séquence.'); return; }
+  const db = skLoadPresetsV2();
+  const baseName = skCurrentPreset || 'sequence';
+  // Si la séquence courante correspond à un preset déjà enregistré (perso ou intégré),
+  // on suggère un nom de variante distinct pour éviter d'écraser l'original à l'import.
+  const suggestion = db.presets[baseName] ? `${baseName} (variante)` : baseName;
+  const name = prompt('Nom du preset à partager :', suggestion);
+  if (!name || !name.trim()) return;
+  const finalName = name.trim();
+
+  const noteText = skLoadNotes()[baseName] || '';
+  const payload = { name: finalName, steps: skSteps, playMode: skPlayMode, bpm: HCTRL.bpm, ...(noteText ? { notes: noteText } : {}) };
+  const code = skEncodePresetPayload(payload);
+
+  if (navigator.clipboard && navigator.clipboard.writeText) {
+    navigator.clipboard.writeText(code).then(() => {
+      alert('Code copié dans le presse-papier — colle-le sur un forum ou dans un message pour le partager.');
+    }).catch(() => {
+      prompt('Copie ce code pour le partager :', code);
+    });
+  } else {
+    prompt('Copie ce code pour le partager :', code);
+  }
+}
+
+function skImportPresetCode() {
+  const code = prompt('Colle ici le code du preset partagé :');
+  if (!code || !code.trim()) return;
+  try {
+    const imported = skDecodePresetCode(code);
+    const importErrors = skValidateImport(imported);
+    if (importErrors.length) {
+      alert('Code invalide :\n\n' + importErrors.slice(0, 5).join('\n') + (importErrors.length > 5 ? `\n\n… et ${importErrors.length - 5} autre(s) erreur(s).` : ''));
+      return;
+    }
+    skApplyImportedPreset(imported, 'preset-importe');
+  } catch(err) {
+    alert('Erreur de lecture du code : ' + err.message);
+  }
 }
 
 // ── RENDU HTML ────────────────────────────────────────────────────────────────
@@ -1656,6 +2071,7 @@ function renderShaker() {
   flex-shrink: 0; border: 1.5px solid var(--border); background: var(--card);
   border-radius: 20px; padding: 6px 14px; font-size: 12px; font-weight: 600;
   color: var(--text); cursor: pointer; white-space: nowrap; transition: all .15s;
+  touch-action: pan-x;
 }
 .sk-fav-chip.active { border-color: var(--blue); color: var(--blue); background: var(--blue-light); }
 .sk-fav-chip:active  { opacity: .7; }
@@ -1711,6 +2127,23 @@ function renderShaker() {
 .sk-lib-subfolders::-webkit-scrollbar { display: none; }
 .sk-lib-subfolder-btn { font-size: 11px !important; padding: 4px 11px !important; }
 .sk-lib-group-btn { border-style: dashed; }
+.sk-lib-folder-item { display: flex; align-items: center; gap: 2px; flex-shrink: 0; touch-action: pan-x; }
+.sk-lib-folder-del {
+  flex-shrink: 0; border: none; background: transparent; color: var(--text3);
+  font-size: 11px; width: 18px; height: 18px; border-radius: 50%; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; opacity: .6; transition: all .15s;
+}
+.sk-lib-folder-del:hover { opacity: 1; color: var(--red); background: rgba(200,60,60,.1); }
+.sk-lib-group-label {
+  flex-shrink: 0; display: flex; align-items: center; gap: 6px;
+  font-size: 11px; font-weight: 700; color: var(--blue); white-space: nowrap; padding-right: 4px;
+}
+.sk-lib-group-del {
+  border: none; background: transparent; color: var(--text3); font-size: 11px;
+  width: 16px; height: 16px; border-radius: 50%; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; opacity: .6; transition: all .15s;
+}
+.sk-lib-group-del:hover { opacity: 1; color: var(--red); background: rgba(200,60,60,.1); }
 .sk-lib-folder-btn {
   flex-shrink: 0; border: 1.5px solid var(--border); background: transparent;
   border-radius: 16px; padding: 5px 13px; font-size: 12px; font-weight: 600;
@@ -1727,9 +2160,20 @@ function renderShaker() {
 .sk-lib-item {
   display: flex; align-items: center; gap: 6px; padding: 10px 12px;
   border: 1.5px solid var(--border); border-radius: 10px; margin-bottom: 6px;
-  background: var(--card); transition: border-color .15s;
+  background: var(--card); transition: border-color .15s, transform .15s, box-shadow .15s;
+  touch-action: pan-y;
 }
 .sk-lib-item.active { border-color: var(--blue); background: var(--blue-light); }
+.sk-lib-item.sk-reorder-active, .sk-fav-chip.sk-reorder-active, .sk-lib-folder-item.sk-reorder-active {
+  transform: scale(1.05); box-shadow: 0 6px 18px rgba(0,0,0,.18); z-index: 5; position: relative;
+  touch-action: none;
+  border-color: var(--orange) !important; background: var(--orange-light, rgba(255,152,0,.12)) !important;
+  color: var(--orange) !important;
+}
+.sk-lib-folder-item.sk-reorder-active .sk-lib-folder-btn {
+  border-color: var(--orange) !important; background: var(--orange-light, rgba(255,152,0,.12)) !important;
+  color: var(--orange) !important;
+}
 .sk-lib-item-main { flex: 1; cursor: pointer; min-width: 0; }
 .sk-lib-item-name { font-size: 14px; font-weight: 600; color: var(--text); }
 .sk-lib-item-meta { font-size: 11px; color: var(--text2); margin-top: 2px; }
@@ -2116,9 +2560,8 @@ function renderShaker() {
   <div class="sk-section-label" style="margin-top:6px">
     Presets
     <span style="float:right;display:flex;gap:10px;align-items:center">
-      <button class="sk-fav-io-btn" onclick="skImportPresets()" title="Importer depuis un fichier JSON"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Importer</button>
-      <button class="sk-fav-io-btn" onclick="skExportPresets()" title="Exporter la séquence courante en JSON"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 16 12 21 17 16"/><line x1="12" y1="21" x2="12" y2="9"/></svg>Exporter</button>
-      <button class="sk-fav-io-btn" onclick="skExportAllPresets()" title="Exporter toute la bibliothèque (tous les presets) en un seul JSON"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>Tout exporter</button>
+      <button class="sk-fav-io-btn" onclick="skImportPresetCode()" title="Importer un preset depuis un code partagé"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Coller un code</button>
+      <button class="sk-fav-io-btn" onclick="skExportPresetCode()" title="Générer un code à partager (forum, message...)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 16 12 21 17 16"/><line x1="12" y1="21" x2="12" y2="9"/></svg>Copier un code</button>
       <button class="sk-fav-save-btn" onclick="skOpenSaveDialog()">＋ Sauvegarder</button>
     </span>
   </div>
@@ -2143,8 +2586,8 @@ function renderShaker() {
   <div class="sk-lib-search-row">
     <input id="sk-lib-search" class="sk-lib-search" type="search" placeholder="Rechercher un preset…" oninput="skFilterLibrary(this.value)">
   </div>
-  <div class="sk-lib-folders"></div>
-  <div class="sk-lib-subfolders" style="display:none"></div>
+  <div class="sk-lib-folders" id="sk-lib-folders"></div>
+  <div class="sk-lib-subfolders" id="sk-lib-subfolders" style="display:none"></div>
   <div class="sk-lib-body" id="sk-lib-body"></div>
 </div>
 
@@ -2156,507 +2599,504 @@ function renderShaker() {
 // ── INIT (appelé après le premier rendu) ──────────────────────────────────────
 // ── PRESETS PAR DÉFAUT ────────────────────────────────────────────────────────
 const SK_DEFAULT_PRESETS = {
-  'Am Penta pos.5': [
-    { string:'E', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'A', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-  ],
-  'Am Harm. pos.5': [
-    { string:'E', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'A', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'D', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:6, active:true, duration:'1/16' },
-    { string:'G', patKey:'A3P1', forme:'1-3-5', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-4',   dir:'U', startFret:6, active:true, duration:'1/16' },
-    { string:'e', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-  ],
-  'Arpège Em (sweep)': [
-    { string:'E', patKey:'A1P0', forme:'standard', dir:'U', startFret:7,  active:true, duration:'1/16' },
-    { string:'A', patKey:'A2P1', forme:'1-4',      dir:'U', startFret:7,  active:true, duration:'1/16' },
-    { string:'D', patKey:'A1P0', forme:'standard', dir:'U', startFret:9,  active:true, duration:'1/16' },
-    { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:9,  active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:8,  active:true, duration:'1/16' },
-    { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:12, active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P0', forme:'standard', dir:'D', startFret:8,  active:true, duration:'1/16' },
-    { string:'G', patKey:'A1P0', forme:'standard', dir:'D', startFret:9,  active:true, duration:'1/16' },
-    { string:'D', patKey:'A1P0', forme:'standard', dir:'D', startFret:9,  active:true, duration:'1/16' },
-    { string:'A', patKey:'A2P1', forme:'1-4',      dir:'D', startFret:7,  active:true, duration:'1/16' },
-    { string:'E', patKey:'A2P1', forme:'1-5',      dir:'D', startFret:3,  active:true, duration:'1/16' },
-  ],
-  'Triades Dim (GBe)': [
-    { string:'G', patKey:'A2P1', forme:'1-4', dir:'U', startFret:4, active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:6, active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-4', dir:'U', startFret:4, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-4', dir:'U', startFret:7, active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:9, active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-4', dir:'U', startFret:7, active:true, duration:'1/16' },
-  ],
-
-  // ── GAMMES ────────────────────────────────────────────────────────────────────
-  'Am Naturelle pos.5': [
-    { string:'E', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'A', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'D', patKey:'A3P1', forme:'1-3-5', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A3P1', forme:'1-3-5', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'B', patKey:'A3P1', forme:'1-3-5', dir:'U', startFret:6, active:true, duration:'1/16' },
-    { string:'e', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-  ],
-  'Blues Am pos.5': [
-    { string:'E', patKey:'A2P1', forme:'1-4',   dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'A', patKey:'A3P1', forme:'1-2-3', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-3',   dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-3',   dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-4',   dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-4',   dir:'U', startFret:5, active:true, duration:'1/16' },
-  ],
-  'Dorien Am pos.5': [
-    { string:'E', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'A', patKey:'A3P1', forme:'1-3-5', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'D', patKey:'A3P1', forme:'1-3-5', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A3P1', forme:'1-3-5', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'B', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:7, active:true, duration:'1/16' },
-    { string:'e', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-  ],
-
-  // ── ARPÈGES ───────────────────────────────────────────────────────────────────
-  'Arpège Am (sweep)': [
-    { string:'E', patKey:'A1P0', forme:'standard', dir:'U', startFret:5,  active:true, duration:'1/16' },
-    { string:'A', patKey:'A1P0', forme:'standard', dir:'U', startFret:7,  active:true, duration:'1/16' },
-    { string:'D', patKey:'A1P0', forme:'standard', dir:'U', startFret:7,  active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-5',      dir:'U', startFret:5,  active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:5,  active:true, duration:'1/16' },
-    { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:5,  active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P0', forme:'standard', dir:'D', startFret:5,  active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-5',      dir:'D', startFret:5,  active:true, duration:'1/16' },
-    { string:'D', patKey:'A1P0', forme:'standard', dir:'D', startFret:7,  active:true, duration:'1/16' },
-    { string:'A', patKey:'A1P0', forme:'standard', dir:'D', startFret:7,  active:true, duration:'1/16' },
-    { string:'E', patKey:'A2P1', forme:'1-4',      dir:'D', startFret:5,  active:true, duration:'1/16' },
-  ],
-
-  // ── PLANS EXCLUSIFS LABO ──────────────────────────────────────────────────────
-  'Plan Contrarié (Am Penta)': [
-    { string:'E', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'A', patKey:'A2P1', forme:'1-3', dir:'D', startFret:5, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-3', dir:'D', startFret:5, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-4', dir:'D', startFret:5, active:true, duration:'1/16' },
-  ],
-  'Plan Mixte Rythmique': [
-    { string:'E', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/8'  },
-    { string:'A', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/8'  },
-    { string:'D', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/8'  },
-    { string:'G', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-  ],
-  'Plan Respiré (Am Penta)': [
-    { string:'E', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'A', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'e', patKey:'rest', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/4' },
-    { string:'D', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'e', patKey:'rest', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/4' },
-    { string:'B', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-  ],
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // B6P1 — PAUL GILBERT LIKE
-  // Séquence : 3↑ sur N, rebond sur N+1, 2↓ sur N, puis shift vers N+1
-  // ═══════════════════════════════════════════════════════════════════════════
-  'B6P1 (1-2-3)': [
-    { string:'D', patKey:'A3P1', forme:'1-2-3', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-2',   dir:'D', startFret:6, active:true, duration:'1/16' },
-    { string:'G', patKey:'A3P1', forme:'1-2-3', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-2',   dir:'D', startFret:6, active:true, duration:'1/16' },
-    { string:'B', patKey:'A3P1', forme:'1-2-3', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-2',   dir:'D', startFret:6, active:true, duration:'1/16' },
-  ],
-  'B6P1 (1-2-4)': [
-    { string:'D', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-3',   dir:'D', startFret:6, active:true, duration:'1/16' },
-    { string:'G', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-3',   dir:'D', startFret:6, active:true, duration:'1/16' },
-    { string:'B', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-3',   dir:'D', startFret:6, active:true, duration:'1/16' },
-  ],
-  'B6P1 (1-3-4)': [
-    { string:'D', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-2',   dir:'D', startFret:7, active:true, duration:'1/16' },
-    { string:'G', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-2',   dir:'D', startFret:7, active:true, duration:'1/16' },
-    { string:'B', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-2',   dir:'D', startFret:7, active:true, duration:'1/16' },
-  ],
-  'B6P1 (1-3-5)': [
-    { string:'D', patKey:'A3P1', forme:'1-3-5', dir:'U', startFret:4, active:true, duration:'1/16' },
-    { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:4, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-3',   dir:'D', startFret:6, active:true, duration:'1/16' },
-    { string:'G', patKey:'A3P1', forme:'1-3-5', dir:'U', startFret:4, active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:4, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-3',   dir:'D', startFret:6, active:true, duration:'1/16' },
-    { string:'B', patKey:'A3P1', forme:'1-3-5', dir:'U', startFret:4, active:true, duration:'1/16' },
-    { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:4, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-3',   dir:'D', startFret:6, active:true, duration:'1/16' },
-  ],
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // B8P1 — BUMBLEBEE
-  // A2P1↑ sur N, A5P2 (1-2-3-2-1) sur N+1, A1P1 rebond sur N — shift D→G→B
-  // ═══════════════════════════════════════════════════════════════════════════
-  'B8P1 Bumblebee': [
-    { string:'e', patKey:'repeat-start', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-2', dir:'U', startFret:7, active:true, duration:'1/16' },
-    { string:'G', patKey:'A5P2', forme:'1-2-3-2-1', dir:'U', startFret:4, active:true, duration:'1/16' },
-    { string:'D', patKey:'A1P0', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
-    { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16', repeatCount:4 },
-    { string:'e', patKey:'repeat-start', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-2', dir:'U', startFret:7, active:true, duration:'1/16' },
-    { string:'B', patKey:'A5P2', forme:'1-2-3-2-1', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
-    { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16', repeatCount:4 },
-    { string:'e', patKey:'repeat-start', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-2', dir:'U', startFret:7, active:true, duration:'1/16' },
-    { string:'e', patKey:'A5P2', forme:'1-2-3-2-1', dir:'U', startFret:4, active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
-    { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16', repeatCount:4 },
-  ],
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // C MAJEURE — GAMMES (montées uniquement, descente via mode Inversé)
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  // ── Pos. ouverte ─────────────────────────────────────────────────────────
-  'Do Majeur Forme C': [
-    { string:'A', patKey:'A1P0', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'D', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-2',      dir:'U', startFret:0, active:true, duration:'1/16' },
-  ],
-  'Do Majeur Forme C étendue': [
-    { string:'A', patKey:'A1P0', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'D', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'B', patKey:'A3P1', forme:'1-2-4',    dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'e', patKey:'A3P1', forme:'1-2-4',    dir:'U', startFret:0, active:true, duration:'1/16' },
-  ],
-  'Do Penta Forme C': [
-    { string:'A', patKey:'A1P0', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:1, active:true, duration:'1/16' },
-  ],
-  'Do Penta Forme C étendue': [
-    { string:'A', patKey:'A1P0', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:1, active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-4',      dir:'U', startFret:0, active:true, duration:'1/16' },
-  ],
-
-  // ── Forme A (pos. 3) ─────────────────────────────────────────────────────
-  'Do Majeur Forme A': [
-    { string:'A', patKey:'A2P1', forme:'1-3',   dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'D', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:2, active:true, duration:'1/16' },
-    { string:'G', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:2, active:true, duration:'1/16' },
-  ],
-  'Do Majeur Forme A étendue': [
-    { string:'A', patKey:'A2P1', forme:'1-3',   dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'D', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:2, active:true, duration:'1/16' },
-    { string:'G', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:2, active:true, duration:'1/16' },
-    { string:'B', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-3',   dir:'U', startFret:3, active:true, duration:'1/16' },
-  ],
-  'Do Penta Forme A': [
-    { string:'A', patKey:'A2P1', forme:'1-3', dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-4', dir:'U', startFret:2, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-4', dir:'U', startFret:2, active:true, duration:'1/16' },
-  ],
-  'Do Penta Forme A étendue': [
-    { string:'A', patKey:'A2P1', forme:'1-3', dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-4', dir:'U', startFret:2, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-4', dir:'U', startFret:2, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-3', dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-3', dir:'U', startFret:3, active:true, duration:'1/16' },
-  ],
-
-  // ── Forme G (pos. 8) ─────────────────────────────────────────────────────
-  'Do Majeur Forme G': [
-    { string:'E', patKey:'A1P0', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
-    { string:'A', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-2',      dir:'U', startFret:4, active:true, duration:'1/16' },
-  ],
-  'Do Majeur Forme G (8va)': [
-    { string:'G', patKey:'A2P1', forme:'1-3',   dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'B', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'e', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-  ],
-  'Do Majeur Forme G étendue': [
-    { string:'E', patKey:'A1P0', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
-    { string:'A', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A3P1', forme:'1-2-4',    dir:'U', startFret:4, active:true, duration:'1/16' },
-    { string:'B', patKey:'A3P1', forme:'1-2-4',    dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'e', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:5, active:true, duration:'1/16' },
-  ],
-  'Do Penta Forme G': [
-    { string:'E', patKey:'A1P0', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
-    { string:'A', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
-  ],
-  'Do Penta Forme G (8va)': [
-    { string:'G', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-  ],
-  'Do Penta Forme G étendue': [
-    { string:'E', patKey:'A1P0', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
-    { string:'A', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-4',      dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-4',      dir:'U', startFret:5, active:true, duration:'1/16' },
-  ],
-
-  // ── Forme E (pos. 8–10) ───────────────────────────────────────────────────
-  'Do Majeur Forme E': [
-    { string:'E', patKey:'A2P1', forme:'1-3',   dir:'U', startFret:8, active:true, duration:'1/16' },
-    { string:'A', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:7, active:true, duration:'1/16' },
-    { string:'D', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:7, active:true, duration:'1/16' },
-  ],
-  'Do Majeur Forme E (8va)': [
-    { string:'D', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
-    { string:'G', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:7,  active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:8,  active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-2',      dir:'U', startFret:7,  active:true, duration:'1/16' },
-  ],
-  'Do Majeur Forme E étendue': [
-    { string:'E', patKey:'A2P1', forme:'1-3',   dir:'U', startFret:8, active:true, duration:'1/16' },
-    { string:'A', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:7, active:true, duration:'1/16' },
-    { string:'D', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:7, active:true, duration:'1/16' },
-    { string:'G', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:7, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-3',   dir:'U', startFret:8, active:true, duration:'1/16' },
-    { string:'e', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:7, active:true, duration:'1/16' },
-  ],
-  'Do Penta Forme E': [
-    { string:'E', patKey:'A2P1', forme:'1-3', dir:'U', startFret:8, active:true, duration:'1/16' },
-    { string:'A', patKey:'A2P1', forme:'1-4', dir:'U', startFret:7, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-4', dir:'U', startFret:7, active:true, duration:'1/16' },
-  ],
-  'Do Penta Forme E (8va)': [
-    { string:'D', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:7,  active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:8,  active:true, duration:'1/16' },
-    { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:8,  active:true, duration:'1/16' },
-  ],
-  'Do Penta Forme E étendue': [
-    { string:'E', patKey:'A2P1', forme:'1-3', dir:'U', startFret:8, active:true, duration:'1/16' },
-    { string:'A', patKey:'A2P1', forme:'1-4', dir:'U', startFret:7, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-4', dir:'U', startFret:7, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-3', dir:'U', startFret:7, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-3', dir:'U', startFret:8, active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-3', dir:'U', startFret:8, active:true, duration:'1/16' },
-  ],
-
-  // ── Forme D (pos. 10–13) ──────────────────────────────────────────────────
-  'Do Majeur Forme D': [
-    { string:'D', patKey:'A2P1', forme:'1-3',   dir:'U', startFret:10, active:true, duration:'1/16' },
-    { string:'G', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:9,  active:true, duration:'1/16' },
-    { string:'B', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:10, active:true, duration:'1/16' },
-  ],
-  'Do Majeur Forme D étendue': [
-    { string:'D', patKey:'A2P1', forme:'1-3',   dir:'U', startFret:10, active:true, duration:'1/16' },
-    { string:'G', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:9,  active:true, duration:'1/16' },
-    { string:'B', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:10, active:true, duration:'1/16' },
-    { string:'e', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:10, active:true, duration:'1/16' },
-  ],
-  'Do Penta Forme D': [
-    { string:'D', patKey:'A2P1', forme:'1-3', dir:'U', startFret:10, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-4', dir:'U', startFret:9,  active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-4', dir:'U', startFret:10, active:true, duration:'1/16' },
-  ],
-  'Do Penta Forme D étendue': [
-    { string:'D', patKey:'A2P1', forme:'1-3', dir:'U', startFret:10, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-4', dir:'U', startFret:9,  active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-4', dir:'U', startFret:10, active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-3', dir:'U', startFret:10, active:true, duration:'1/16' },
-  ],
-
-  // ═══════════════════════════════════════════════════════════════════════════
-  // SOL MAJEURE — GAMMES (montées uniquement)
-  // ═══════════════════════════════════════════════════════════════════════════
-
-  // ── Forme G (pos. ouverte) ────────────────────────────────────────────────
-  'Sol Majeur Forme G': [
-    { string:'E', patKey:'A1P0', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'A', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'D', patKey:'A3P1', forme:'1-3-5',    dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:0, active:true, duration:'1/16' },
-  ],
-  'Sol Majeur Forme G (8va)': [
-    { string:'G', patKey:'A2P1', forme:'1-3',   dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'B', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'e', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:0, active:true, duration:'1/16' },
-  ],
-  'Sol Majeur Forme G étendue': [
-    { string:'E', patKey:'A1P0', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'A', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'D', patKey:'A3P1', forme:'1-3-5',    dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'B', patKey:'A3P1', forme:'1-2-4',    dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'e', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:0, active:true, duration:'1/16' },
-  ],
-  'Sol Penta Forme G': [
-    { string:'E', patKey:'A1P0', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'A', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:0, active:true, duration:'1/16' },
-  ],
-  'Sol Penta Forme G (8va)': [
-    { string:'G', patKey:'A2P1', forme:'1-3', dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-4', dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-4', dir:'U', startFret:0, active:true, duration:'1/16' },
-  ],
-  'Sol Penta Forme G étendue': [
-    { string:'E', patKey:'A1P0', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'A', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-4',      dir:'U', startFret:0, active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-4',      dir:'U', startFret:0, active:true, duration:'1/16' },
-  ],
-
-  // ── Forme E (pos. 3–5) ───────────────────────────────────────────────────
-  'Sol Majeur Forme E': [
-    { string:'E', patKey:'A2P1', forme:'1-3',   dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'A', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:2, active:true, duration:'1/16' },
-    { string:'D', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:2, active:true, duration:'1/16' },
-  ],
-  'Sol Majeur Forme E (8va)': [
-    { string:'D', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:2, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-2',      dir:'U', startFret:2, active:true, duration:'1/16' },
-  ],
-  'Sol Majeur Forme E étendue': [
-    { string:'E', patKey:'A2P1', forme:'1-3',   dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'A', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:2, active:true, duration:'1/16' },
-    { string:'D', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:2, active:true, duration:'1/16' },
-    { string:'G', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:2, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-3',   dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'e', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:2, active:true, duration:'1/16' },
-  ],
-  'Sol Penta Forme E': [
-    { string:'E', patKey:'A2P1', forme:'1-3', dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'A', patKey:'A2P1', forme:'1-4', dir:'U', startFret:2, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-4', dir:'U', startFret:2, active:true, duration:'1/16' },
-  ],
-  'Sol Penta Forme E (8va)': [
-    { string:'D', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:2, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
-  ],
-  'Sol Penta Forme E étendue': [
-    { string:'E', patKey:'A2P1', forme:'1-3', dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'A', patKey:'A2P1', forme:'1-4', dir:'U', startFret:2, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-4', dir:'U', startFret:2, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-3', dir:'U', startFret:2, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-3', dir:'U', startFret:3, active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-3', dir:'U', startFret:3, active:true, duration:'1/16' },
-  ],
-
-  // ── Forme D (pos. 5–8) ───────────────────────────────────────────────────
-  'Sol Majeur Forme D': [
-    { string:'D', patKey:'A2P1', forme:'1-3',   dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:4, active:true, duration:'1/16' },
-    { string:'B', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-  ],
-  'Sol Majeur Forme D étendue': [
-    { string:'D', patKey:'A2P1', forme:'1-3',   dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:4, active:true, duration:'1/16' },
-    { string:'B', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'e', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-  ],
-  'Sol Penta Forme D': [
-    { string:'D', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-4', dir:'U', startFret:4, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-  ],
-  'Sol Penta Forme D étendue': [
-    { string:'D', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-4', dir:'U', startFret:4, active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
-  ],
-
-  // ── Forme C (pos. 7–10) ──────────────────────────────────────────────────
-  'Sol Majeur Forme C': [
-    { string:'A', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
-    { string:'D', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:7,  active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:7,  active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-2',      dir:'U', startFret:7,  active:true, duration:'1/16' },
-  ],
-  'Sol Majeur Forme C étendue': [
-    { string:'A', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
-    { string:'D', patKey:'A3P1', forme:'1-3-4',    dir:'U', startFret:7,  active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:7,  active:true, duration:'1/16' },
-    { string:'B', patKey:'A3P1', forme:'1-2-4',    dir:'U', startFret:7,  active:true, duration:'1/16' },
-    { string:'e', patKey:'A3P1', forme:'1-2-4',    dir:'U', startFret:7,  active:true, duration:'1/16' },
-  ],
-  'Sol Penta Forme C': [
-    { string:'A', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:7,  active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:7,  active:true, duration:'1/16' },
-    { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:8,  active:true, duration:'1/16' },
-  ],
-  'Sol Penta Forme C étendue': [
-    { string:'A', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:7,  active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:7,  active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-3',      dir:'U', startFret:8,  active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-4',      dir:'U', startFret:7,  active:true, duration:'1/16' },
-  ],
-
-  // ── Forme A (pos. 10–12) ─────────────────────────────────────────────────
-  'Sol Majeur Forme A': [
-    { string:'A', patKey:'A2P1', forme:'1-3',   dir:'U', startFret:10, active:true, duration:'1/16' },
-    { string:'D', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:9,  active:true, duration:'1/16' },
-    { string:'G', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:9,  active:true, duration:'1/16' },
-  ],
-  'Sol Majeur Forme A étendue': [
-    { string:'A', patKey:'A2P1', forme:'1-3',   dir:'U', startFret:10, active:true, duration:'1/16' },
-    { string:'D', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:9,  active:true, duration:'1/16' },
-    { string:'G', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:9,  active:true, duration:'1/16' },
-    { string:'B', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:10, active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-3',   dir:'U', startFret:10, active:true, duration:'1/16' },
-  ],
-  'Sol Penta Forme A': [
-    { string:'A', patKey:'A2P1', forme:'1-3', dir:'U', startFret:10, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-4', dir:'U', startFret:9,  active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-4', dir:'U', startFret:9,  active:true, duration:'1/16' },
-  ],
-  'Sol Penta Forme A étendue': [
-    { string:'A', patKey:'A2P1', forme:'1-3', dir:'U', startFret:10, active:true, duration:'1/16' },
-    { string:'D', patKey:'A2P1', forme:'1-4', dir:'U', startFret:9,  active:true, duration:'1/16' },
-    { string:'G', patKey:'A2P1', forme:'1-4', dir:'U', startFret:9,  active:true, duration:'1/16' },
-    { string:'B', patKey:'A2P1', forme:'1-3', dir:'U', startFret:10, active:true, duration:'1/16' },
-    { string:'e', patKey:'A2P1', forme:'1-3', dir:'U', startFret:10, active:true, duration:'1/16' },
-  ],
+  'Am Penta pos.5': {
+    folder: 'Variations de Am',
+    pinned: false,
+    playMode: 'inverse',
+    bpm: 80,
+    steps: [
+      { string:'E', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'A', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'D', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'G', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'B', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'e', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+    ],
+  },
+  'Am Harm. pos.5': {
+    folder: 'Variations de Am',
+    pinned: false,
+    playMode: 'inverse',
+    bpm: 80,
+    steps: [
+      { string:'E', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'A', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'D', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:6, active:true, duration:'1/16' },
+      { string:'G', patKey:'A3P1', forme:'1-3-5', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'B', patKey:'A2P1', forme:'1-4', dir:'U', startFret:6, active:true, duration:'1/16' },
+      { string:'e', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+    ],
+  },
+  'Am Naturelle pos.5': {
+    folder: 'Variations de Am',
+    pinned: false,
+    playMode: 'inverse',
+    bpm: 80,
+    steps: [
+      { string:'E', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'A', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'D', patKey:'A3P1', forme:'1-3-5', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'G', patKey:'A3P1', forme:'1-3-5', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'B', patKey:'A3P1', forme:'1-3-5', dir:'U', startFret:6, active:true, duration:'1/16' },
+      { string:'e', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+    ],
+  },
+  'Blues Am pos.5': {
+    folder: 'Variations de Am',
+    pinned: true,
+    playMode: 'inverse',
+    bpm: 80,
+    steps: [
+      { string:'E', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'A', patKey:'A3P1', forme:'1-2-3', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'D', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'G', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'B', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'e', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+    ],
+  },
+  'Plan Contrarié (Am Penta)': {
+    folder: 'Variations de Am',
+    pinned: false,
+    playMode: 'inverse',
+    bpm: 80,
+    steps: [
+      { string:'E', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'A', patKey:'A2P1', forme:'1-3', dir:'D', startFret:5, active:true, duration:'1/16' },
+      { string:'D', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'G', patKey:'A2P1', forme:'1-3', dir:'D', startFret:5, active:true, duration:'1/16' },
+      { string:'B', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'e', patKey:'A2P1', forme:'1-4', dir:'D', startFret:5, active:true, duration:'1/16' },
+    ],
+  },
+  'Plan Mixte Rythmique': {
+    folder: 'Variations de Am',
+    pinned: false,
+    playMode: 'inverse',
+    bpm: 80,
+    steps: [
+      { string:'E', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/8' },
+      { string:'A', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/8' },
+      { string:'D', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/8' },
+      { string:'G', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'B', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'e', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+    ],
+  },
+  'Plan Respiré (Am Penta)': {
+    folder: 'Variations de Am',
+    pinned: false,
+    playMode: 'inverse',
+    bpm: 80,
+    steps: [
+      { string:'E', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'A', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'e', patKey:'rest', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/4' },
+      { string:'D', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'G', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'e', patKey:'rest', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/4' },
+      { string:'B', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'e', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+    ],
+  },
+  'B6P1 (1-2-3)': {
+    folder: 'Patterns multi-cordes',
+    pinned: false,
+    playMode: 'strict',
+    bpm: 80,
+    steps: [
+      { string:'D', patKey:'A3P1', forme:'1-2-3', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'D', patKey:'A2P1', forme:'1-2', dir:'D', startFret:6, active:true, duration:'1/16' },
+      { string:'G', patKey:'A3P1', forme:'1-2-3', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'G', patKey:'A2P1', forme:'1-2', dir:'D', startFret:6, active:true, duration:'1/16' },
+      { string:'B', patKey:'A3P1', forme:'1-2-3', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'B', patKey:'A2P1', forme:'1-2', dir:'D', startFret:6, active:true, duration:'1/16' },
+    ],
+  },
+  'B6P1 (1-2-4)': {
+    folder: 'Patterns multi-cordes',
+    pinned: false,
+    playMode: 'strict',
+    bpm: 80,
+    steps: [
+      { string:'D', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'D', patKey:'A2P1', forme:'1-3', dir:'D', startFret:6, active:true, duration:'1/16' },
+      { string:'G', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'G', patKey:'A2P1', forme:'1-3', dir:'D', startFret:6, active:true, duration:'1/16' },
+      { string:'B', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'B', patKey:'A2P1', forme:'1-3', dir:'D', startFret:6, active:true, duration:'1/16' },
+    ],
+  },
+  'B6P1 (1-3-4)': {
+    folder: 'Patterns multi-cordes',
+    pinned: false,
+    playMode: 'strict',
+    bpm: 80,
+    steps: [
+      { string:'D', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'D', patKey:'A2P1', forme:'1-2', dir:'D', startFret:7, active:true, duration:'1/16' },
+      { string:'G', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'G', patKey:'A2P1', forme:'1-2', dir:'D', startFret:7, active:true, duration:'1/16' },
+      { string:'B', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'B', patKey:'A2P1', forme:'1-2', dir:'D', startFret:7, active:true, duration:'1/16' },
+    ],
+  },
+  'B6P1 (1-3-5)': {
+    folder: 'Patterns multi-cordes',
+    pinned: false,
+    playMode: 'strict',
+    bpm: 80,
+    steps: [
+      { string:'D', patKey:'A3P1', forme:'1-3-5', dir:'U', startFret:4, active:true, duration:'1/16' },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:4, active:true, duration:'1/16' },
+      { string:'D', patKey:'A2P1', forme:'1-3', dir:'D', startFret:6, active:true, duration:'1/16' },
+      { string:'G', patKey:'A3P1', forme:'1-3-5', dir:'U', startFret:4, active:true, duration:'1/16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:4, active:true, duration:'1/16' },
+      { string:'G', patKey:'A2P1', forme:'1-3', dir:'D', startFret:6, active:true, duration:'1/16' },
+      { string:'B', patKey:'A3P1', forme:'1-3-5', dir:'U', startFret:4, active:true, duration:'1/16' },
+      { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:4, active:true, duration:'1/16' },
+      { string:'B', patKey:'A2P1', forme:'1-3', dir:'D', startFret:6, active:true, duration:'1/16' },
+    ],
+  },
+  'B8P1 Bumblebee': {
+    folder: 'Patterns multi-cordes',
+    pinned: true,
+    playMode: 'strict',
+    bpm: 80,
+    steps: [
+      { string:'e', patKey:'repeat-start', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'D', patKey:'A2P1', forme:'1-2', dir:'U', startFret:7, active:true, duration:'1/16' },
+      { string:'G', patKey:'A5P2', forme:'1-2-3-2-1', dir:'U', startFret:4, active:true, duration:'1/16' },
+      { string:'D', patKey:'A1P0', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
+      { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16', repeatCount:4 },
+      { string:'e', patKey:'repeat-start', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'G', patKey:'A2P1', forme:'1-2', dir:'U', startFret:7, active:true, duration:'1/16' },
+      { string:'B', patKey:'A5P2', forme:'1-2-3-2-1', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
+      { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16', repeatCount:4 },
+      { string:'e', patKey:'repeat-start', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'B', patKey:'A2P1', forme:'1-2', dir:'U', startFret:7, active:true, duration:'1/16' },
+      { string:'e', patKey:'A5P2', forme:'1-2-3-2-1', dir:'U', startFret:4, active:true, duration:'1/16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
+      { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16', repeatCount:4 },
+    ],
+  },
+  'Do Majeur Forme C': {
+    folder: 'Do Majeur',
+    pinned: false,
+    playMode: 'inverse',
+    bpm: 80,
+    steps: [
+      { string:'A', patKey:'A1P0', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
+      { string:'D', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:0, active:true, duration:'1/16' },
+      { string:'G', patKey:'A2P1', forme:'1-3', dir:'U', startFret:0, active:true, duration:'1/16' },
+      { string:'B', patKey:'A2P1', forme:'1-2', dir:'U', startFret:0, active:true, duration:'1/16' },
+    ],
+  },
+  'Do Majeur Forme A': {
+    folder: 'Do Majeur',
+    pinned: false,
+    playMode: 'inverse',
+    bpm: 80,
+    steps: [
+      { string:'A', patKey:'A2P1', forme:'1-3', dir:'U', startFret:3, active:true, duration:'1/16' },
+      { string:'D', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:2, active:true, duration:'1/16' },
+      { string:'G', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:2, active:true, duration:'1/16' },
+    ],
+  },
+  'Do Majeur Forme G': {
+    folder: 'Do Majeur',
+    pinned: false,
+    playMode: 'inverse',
+    bpm: 80,
+    steps: [
+      { string:'E', patKey:'A1P0', forme:'standard', dir:'U', startFret:8, active:true, duration:'1/16' },
+      { string:'A', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'D', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'G', patKey:'A2P1', forme:'1-2', dir:'U', startFret:4, active:true, duration:'1/16' },
+    ],
+  },
+  'Do Majeur Forme E': {
+    folder: 'Do Majeur',
+    pinned: false,
+    playMode: 'inverse',
+    bpm: 80,
+    steps: [
+      { string:'E', patKey:'A2P1', forme:'1-3', dir:'U', startFret:8, active:true, duration:'1/16' },
+      { string:'A', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:7, active:true, duration:'1/16' },
+      { string:'D', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:7, active:true, duration:'1/16' },
+    ],
+  },
+  'Do Majeur Forme D': {
+    folder: 'Do Majeur',
+    pinned: false,
+    playMode: 'inverse',
+    bpm: 80,
+    steps: [
+      { string:'D', patKey:'A2P1', forme:'1-3', dir:'U', startFret:10, active:true, duration:'1/16' },
+      { string:'G', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:9, active:true, duration:'1/16' },
+      { string:'B', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:10, active:true, duration:'1/16' },
+    ],
+  },
+  'Sol Majeur Forme G': {
+    folder: 'Sol Majeur',
+    pinned: false,
+    playMode: 'inverse',
+    bpm: 80,
+    steps: [
+      { string:'E', patKey:'A1P0', forme:'standard', dir:'U', startFret:3, active:true, duration:'1/16' },
+      { string:'A', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:0, active:true, duration:'1/16' },
+      { string:'D', patKey:'A3P1', forme:'1-3-5', dir:'U', startFret:0, active:true, duration:'1/16' },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:0, active:true, duration:'1/16' },
+    ],
+  },
+  'Sol Majeur Forme E': {
+    folder: 'Sol Majeur',
+    pinned: false,
+    playMode: 'inverse',
+    bpm: 80,
+    steps: [
+      { string:'E', patKey:'A2P1', forme:'1-3', dir:'U', startFret:3, active:true, duration:'1/16' },
+      { string:'A', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:2, active:true, duration:'1/16' },
+      { string:'D', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:2, active:true, duration:'1/16' },
+    ],
+  },
+  'Sol Majeur Forme D': {
+    folder: 'Sol Majeur',
+    pinned: false,
+    playMode: 'inverse',
+    bpm: 80,
+    steps: [
+      { string:'D', patKey:'A2P1', forme:'1-3', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'G', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:4, active:true, duration:'1/16' },
+      { string:'B', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+    ],
+  },
+  'Sol Majeur Forme C': {
+    folder: 'Sol Majeur',
+    pinned: false,
+    playMode: 'inverse',
+    bpm: 80,
+    steps: [
+      { string:'A', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
+      { string:'D', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:7, active:true, duration:'1/16' },
+      { string:'G', patKey:'A2P1', forme:'1-3', dir:'U', startFret:7, active:true, duration:'1/16' },
+      { string:'B', patKey:'A2P1', forme:'1-2', dir:'U', startFret:7, active:true, duration:'1/16' },
+    ],
+  },
+  'Sol Majeur Forme A': {
+    folder: 'Sol Majeur',
+    pinned: false,
+    playMode: 'inverse',
+    bpm: 80,
+    steps: [
+      { string:'A', patKey:'A2P1', forme:'1-3', dir:'U', startFret:10, active:true, duration:'1/16' },
+      { string:'D', patKey:'A3P1', forme:'1-2-4', dir:'U', startFret:9, active:true, duration:'1/16' },
+      { string:'G', patKey:'A3P1', forme:'1-3-4', dir:'U', startFret:9, active:true, duration:'1/16' },
+    ],
+  },
+  'Les Astres': {
+    folder: 'Plans',
+    pinned: false,
+    playMode: 'strict',
+    bpm: 70,
+    steps: [
+      { string:'e', patKey:'rest', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'e', patKey:'A2P1', forme:'1-3', dir:'U', startFret:10, active:true, duration:'1/16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:12, active:true, duration:'1/16' },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:12, active:true, duration:'1/4' },
+      { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:12, active:true, duration:'1/16' },
+      { string:'e', patKey:'rest', forme:'standard', dir:'U', startFret:12, active:true, duration:'1/8' },
+      { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
+      { string:'e', patKey:'rest', forme:'standard', dir:'U', startFret:12, active:true, duration:'1/8' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:12, active:true, duration:'1/8' },
+      { string:'e', patKey:'rest', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/8' },
+      { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:12, active:true, duration:'1/4' },
+      { string:'e', patKey:'rest', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/4' },
+      { string:'e', patKey:'rest', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/4' },
+      { string:'e', patKey:'rest', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/8' },
+      { string:'e', patKey:'measure', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/4' },
+      { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
+      { string:'e', patKey:'muted', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:12, active:true, duration:'1/16' },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:12, active:true, duration:'1/4' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:15, active:true, duration:'1/16' },
+      { string:'e', patKey:'rest', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/8' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:13, active:true, duration:'1/8' },
+      { string:'B', patKey:'rest', forme:'standard', dir:'U', startFret:13, active:true, duration:'1/16' },
+      { string:'B', patKey:'A3P9', forme:'1-2', dir:'U', startFret:12, active:true, duration:'6:16' },
+      { string:'e', patKey:'rest', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/4' },
+      { string:'e', patKey:'rest', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/4' },
+      { string:'e', patKey:'rest', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/4' },
+      { string:'e', patKey:'rest', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/4' },
+    ],
+  },
+  'Marc Knopfer Triades': {
+    folder: 'Plans',
+    pinned: true,
+    playMode: 'strict',
+    bpm: 152,
+    steps: [
+      { string:'e', patKey:'repeat-start', forme:'1-4', dir:'D', startFret:10, active:true, duration:'1/16' },
+      { string:'e', patKey:'A2P1', forme:'1-4', dir:'D', startFret:10, active:true, duration:'1/16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
+      { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
+      { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16', repeatCount:8 },
+      { string:'e', patKey:'repeat-start', forme:'1-4', dir:'D', startFret:10, active:true, duration:'1/16' },
+      { string:'e', patKey:'A2P1', forme:'1-4', dir:'D', startFret:10, active:true, duration:'1/16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:11, active:true, duration:'1/16' },
+      { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
+      { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16', repeatCount:8 },
+      { string:'e', patKey:'repeat-start', forme:'1-4', dir:'D', startFret:10, active:true, duration:'1/16' },
+      { string:'e', patKey:'A2P1', forme:'1-4', dir:'D', startFret:12, active:true, duration:'1/16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:13, active:true, duration:'1/16' },
+      { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:12, active:true, duration:'1/16' },
+      { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/16', repeatCount:8 },
+    ],
+  },
+  'Nuno #1': {
+    folder: 'Plans',
+    pinned: true,
+    playMode: 'strict',
+    bpm: 100,
+    steps: [
+      { string:'G', patKey:'repeat-start', forme:'1-3', dir:'D', startFret:7, active:true, duration:'1/4' },
+      { string:'G', patKey:'A3P9', forme:'1-3', dir:'D', startFret:7, active:true, duration:'6:16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:6, active:true, duration:'6:16' },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:9, active:true, duration:'6:16' },
+      { string:'B', patKey:'A3P9', forme:'1-4', dir:'U', startFret:6, active:true, duration:'6:16' },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:9, active:true, duration:'6:16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:6, active:true, duration:'6:16' },
+      { string:'G', patKey:'A2P1', forme:'1-3', dir:'D', startFret:7, active:true, duration:'6:16' },
+      { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'6:16', repeatCount:2 },
+      { string:'e', patKey:'measure', forme:'standard', dir:'U', startFret:5, active:true, duration:'6:16' },
+      { string:'e', patKey:'repeat-start', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/4' },
+      { string:'G', patKey:'A3P9', forme:'1-4', dir:'D', startFret:6, active:true, duration:'6:16' },
+      { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'6:16' },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:9, active:true, duration:'6:16' },
+      { string:'e', patKey:'A3P9', forme:'1-5', dir:'U', startFret:5, active:true, duration:'6:16' },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:9, active:true, duration:'6:16' },
+      { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:5, active:true, duration:'6:16' },
+      { string:'G', patKey:'A2P1', forme:'1-4', dir:'D', startFret:6, active:true, duration:'6:16' },
+      { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'6:16', repeatCount:2 },
+      { string:'e', patKey:'measure', forme:'standard', dir:'U', startFret:5, active:true, duration:'6:16' },
+      { string:'e', patKey:'repeat-start', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/4' },
+      { string:'G', patKey:'A3P9', forme:'1-5', dir:'D', startFret:9, active:true, duration:'6:16' },
+      { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:9, active:true, duration:'6:16' },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:13, active:true, duration:'6:16' },
+      { string:'e', patKey:'A3P9', forme:'1-4', dir:'U', startFret:9, active:true, duration:'6:16' },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:13, active:true, duration:'6:16' },
+      { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:9, active:true, duration:'6:16' },
+      { string:'G', patKey:'A2P1', forme:'1-5', dir:'D', startFret:9, active:true, duration:'6:16' },
+      { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'6:16', repeatCount:2 },
+      { string:'e', patKey:'measure', forme:'standard', dir:'U', startFret:5, active:true, duration:'6:16' },
+      { string:'e', patKey:'repeat-start', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/4' },
+      { string:'G', patKey:'A3P9', forme:'1-5', dir:'D', startFret:7, active:true, duration:'6:16' },
+      { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:7, active:true, duration:'6:16' },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:11, active:true, duration:'6:16' },
+      { string:'e', patKey:'A3P9', forme:'1-4', dir:'U', startFret:7, active:true, duration:'6:16' },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:11, active:true, duration:'6:16' },
+      { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:7, active:true, duration:'6:16' },
+      { string:'G', patKey:'A2P1', forme:'1-5', dir:'D', startFret:7, active:true, duration:'6:16' },
+      { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'1/4', repeatCount:4 },
+    ],
+  },
+  'Nuno #2': {
+    folder: 'Plans',
+    pinned: true,
+    playMode: 'strict',
+    bpm: 115,
+    steps: [
+      { string:'e', patKey:'repeat-start', forme:'standard', dir:'U', startFret:5, active:true, duration:'6:16' },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:9, active:true, duration:'6:16' },
+      { string:'B', patKey:'A2P1', forme:'1-3', dir:'U', startFret:10, active:true, duration:'6:16' },
+      { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:9, active:true, duration:'6:16' },
+      { string:'B', patKey:'A2P1', forme:'1-3', dir:'D', startFret:10, active:true, duration:'6:16' },
+      { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'6:16', repeatCount:2 },
+      { string:'e', patKey:'repeat-start', forme:'standard', dir:'U', startFret:5, active:true, duration:'6:16', repeatCount:2 },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'6:16' },
+      { string:'B', patKey:'A2P1', forme:'1-3', dir:'U', startFret:12, active:true, duration:'6:16' },
+      { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'6:16' },
+      { string:'B', patKey:'A2P1', forme:'1-3', dir:'D', startFret:12, active:true, duration:'6:16' },
+      { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'6:16', repeatCount:2 },
+      { string:'e', patKey:'repeat-start', forme:'standard', dir:'U', startFret:5, active:true, duration:'6:16', repeatCount:2 },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:8, active:true, duration:'6:16' },
+      { string:'B', patKey:'A2P1', forme:'1-3', dir:'U', startFret:10, active:true, duration:'6:16' },
+      { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:8, active:true, duration:'6:16' },
+      { string:'B', patKey:'A2P1', forme:'1-3', dir:'D', startFret:10, active:true, duration:'6:16' },
+      { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'6:16', repeatCount:2 },
+      { string:'e', patKey:'repeat-start', forme:'standard', dir:'U', startFret:5, active:true, duration:'6:16' },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:9, active:true, duration:'6:16' },
+      { string:'B', patKey:'A2P1', forme:'1-3', dir:'U', startFret:10, active:true, duration:'6:16' },
+      { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:9, active:true, duration:'6:16' },
+      { string:'B', patKey:'A2P1', forme:'1-3', dir:'D', startFret:10, active:true, duration:'6:16' },
+      { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'6:16', repeatCount:2 },
+      { string:'e', patKey:'repeat-start', forme:'standard', dir:'U', startFret:5, active:true, duration:'6:16', repeatCount:2 },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:7, active:true, duration:'6:16' },
+      { string:'B', patKey:'A2P1', forme:'1-3', dir:'U', startFret:8, active:true, duration:'6:16' },
+      { string:'e', patKey:'A1P0', forme:'standard', dir:'U', startFret:7, active:true, duration:'6:16' },
+      { string:'B', patKey:'A2P1', forme:'1-3', dir:'D', startFret:8, active:true, duration:'6:16' },
+      { string:'e', patKey:'repeat-end', forme:'standard', dir:'U', startFret:5, active:true, duration:'6:16', repeatCount:2 },
+    ],
+  },
+  'Arpège Am pos.5': {
+    folder: 'Variations de Am',
+    pinned: true,
+    playMode: 'strict',
+    bpm: 130,
+    steps: [
+      { string:'E', patKey:'A2P1', forme:'1-4', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'A', patKey:'A1P0', forme:'standard', dir:'U', startFret:7, active:true, duration:'1/16' },
+      { string:'D', patKey:'A1P0', forme:'standard', dir:'U', startFret:7, active:true, duration:'1/16' },
+      { string:'G', patKey:'A2P1', forme:'1-5', dir:'U', startFret:5, active:true, duration:'1/16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
+      { string:'e', patKey:'A3P9', forme:'1-5', dir:'U', startFret:8, active:true, duration:'1/16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'D', startFret:10, active:true, duration:'1/16' },
+      { string:'G', patKey:'A2P1', forme:'1-5', dir:'D', startFret:5, active:true, duration:'1/16' },
+      { string:'D', patKey:'A1P0', forme:'standard', dir:'D', startFret:7, active:true, duration:'1/16' },
+      { string:'A', patKey:'A1P0', forme:'standard', dir:'D', startFret:7, active:true, duration:'1/16' },
+      { string:'E', patKey:'A1P0', forme:'standard', dir:'D', startFret:8, active:true, duration:'1/16' },
+    ],
+  },
+  'Triades Dim (GBe) Suite': {
+    folder: 'Plans',
+    pinned: true,
+    playMode: 'strict',
+    bpm: 140,
+    steps: [
+      { string:'G', patKey:'A2P1', forme:'1-4', dir:'U', startFret:4, active:true, duration:'1/16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:6, active:true, duration:'1/16' },
+      { string:'e', patKey:'A3P9', forme:'1-4', dir:'U', startFret:4, active:true, duration:'1/16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:6, active:true, duration:'1/16' },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:7, active:true, duration:'1/16' },
+      { string:'G', patKey:'A2P1', forme:'1-4', dir:'U', startFret:7, active:true, duration:'1/16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:9, active:true, duration:'1/16' },
+      { string:'e', patKey:'A3P9', forme:'1-4', dir:'U', startFret:7, active:true, duration:'1/16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:9, active:true, duration:'1/16' },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
+      { string:'e', patKey:'measure', forme:'1-4', dir:'U', startFret:7, active:true, duration:'1/4' },
+      { string:'G', patKey:'A2P1', forme:'1-4', dir:'U', startFret:10, active:true, duration:'1/16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:12, active:true, duration:'1/16' },
+      { string:'e', patKey:'A3P9', forme:'1-4', dir:'U', startFret:10, active:true, duration:'1/16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:12, active:true, duration:'1/16' },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:13, active:true, duration:'1/16' },
+      { string:'G', patKey:'A2P1', forme:'1-4', dir:'U', startFret:7, active:true, duration:'1/16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:9, active:true, duration:'1/16' },
+      { string:'e', patKey:'A3P9', forme:'1-4', dir:'U', startFret:7, active:true, duration:'1/16' },
+      { string:'B', patKey:'A1P0', forme:'standard', dir:'U', startFret:9, active:true, duration:'1/16' },
+      { string:'G', patKey:'A1P0', forme:'standard', dir:'U', startFret:10, active:true, duration:'1/16' },
+    ],
+  },
 };
 
 const SK_OBSOLETE_PRESETS = [
@@ -2668,31 +3108,138 @@ const SK_OBSOLETE_PRESETS = [
   'C Penta Forme E','C Penta Forme E (8va)','C Penta Forme E ét.',
   'C Maj Forme D','C Maj Forme D ét.','C Penta Forme D','C Penta Forme D ét.',
   'B8P3 Bumblebee',
+  // Nettoyage — anciens presets retirés lors de la réorganisation de la bibliothèque
+  'Arpège Em (sweep)', 'Triades Dim (GBe)', 'Dorien Am pos.5', 'Arpège Am (sweep)',
+  'Do Majeur Forme C étendue', 'Do Penta Forme C', 'Do Penta Forme C étendue',
+  'Do Majeur Forme A étendue', 'Do Penta Forme A', 'Do Penta Forme A étendue',
+  'Do Majeur Forme G (8va)', 'Do Majeur Forme G étendue', 'Do Penta Forme G',
+  'Do Penta Forme G (8va)', 'Do Penta Forme G étendue',
+  'Do Majeur Forme E (8va)', 'Do Majeur Forme E étendue', 'Do Penta Forme E',
+  'Do Penta Forme E (8va)', 'Do Penta Forme E étendue',
+  'Do Majeur Forme D étendue', 'Do Penta Forme D', 'Do Penta Forme D étendue',
+  'Sol Majeur Forme G (8va)', 'Sol Majeur Forme G étendue', 'Sol Penta Forme G',
+  'Sol Penta Forme G (8va)', 'Sol Penta Forme G étendue',
+  'Sol Majeur Forme E (8va)', 'Sol Majeur Forme E étendue', 'Sol Penta Forme E',
+  'Sol Penta Forme E (8va)', 'Sol Penta Forme E étendue',
+  'Sol Majeur Forme D étendue', 'Sol Penta Forme D', 'Sol Penta Forme D étendue',
+  'Sol Majeur Forme C étendue', 'Sol Penta Forme C', 'Sol Penta Forme C étendue',
+  'Sol Majeur Forme A étendue', 'Sol Penta Forme A', 'Sol Penta Forme A étendue',
+];
+
+// Organisation par défaut (dossiers + groupes + ordre) livrée avec l'app pour une installation neuve
+const SK_DEFAULT_FOLDERS = ['Variations de Am', 'Patterns multi-cordes', 'Do Majeur', 'Sol Majeur', 'Plans'];
+const SK_DEFAULT_GROUPS = {
+  'Démo':  ['Patterns multi-cordes', 'Variations de Am', 'Plans'],
+  'CAGED': ['Do Majeur', 'Sol Majeur'],
+};
+const SK_DEFAULT_PRESET_ORDER = [
+  'Am Penta pos.5', 'Blues Am pos.5', 'Am Naturelle pos.5', 'Am Harm. pos.5',
+  'Plan Contrarié (Am Penta)', 'Plan Mixte Rythmique', 'Plan Respiré (Am Penta)', 'Arpège Am pos.5',
+  'B6P1 (1-2-3)', 'B6P1 (1-2-4)', 'B6P1 (1-3-4)', 'B6P1 (1-3-5)', 'B8P1 Bumblebee',
+  'Do Majeur Forme C', 'Do Majeur Forme A', 'Do Majeur Forme G', 'Do Majeur Forme E', 'Do Majeur Forme D',
+  'Sol Majeur Forme G', 'Sol Majeur Forme E', 'Sol Majeur Forme D', 'Sol Majeur Forme C', 'Sol Majeur Forme A',
+  'Nuno #1', 'Nuno #2', 'Marc Knopfer Triades', 'Triades Dim (GBe) Suite', 'Les Astres',
 ];
 
 function skSeedDefaultPresets() {
   const db = skLoadPresetsV2();
+
+  // Migration ponctuelle (une seule fois) : réorganisation complète de la bibliothèque.
+  // Tous les presets existants (natifs ou perso) passent dans "Mes créations",
+  // tous les autres dossiers/sous-dossiers/groupes sont supprimés.
+  if (!db.libraryResetV1) {
+    Object.values(db.presets).forEach(p => { p.folder = 'Mes créations'; });
+    db.folders = ['Mes créations'];
+    db.groups = {};
+    db.libraryResetV1 = true;
+  }
+
+  // Seed ponctuel (une seule fois) des dossiers/groupes/ordre par défaut — fusion non destructive,
+  // ne touche jamais à une organisation déjà personnalisée par l'utilisateur.
+  if (!db.defaultFoldersSeededV1) {
+    SK_DEFAULT_FOLDERS.forEach(f => { if (!db.folders.includes(f)) db.folders.push(f); });
+    if (!db.groups) db.groups = {};
+    Object.entries(SK_DEFAULT_GROUPS).forEach(([g, children]) => {
+      if (!db.groups[g]) db.groups[g] = [];
+      children.forEach(c => { if (!db.groups[g].includes(c)) db.groups[g].push(c); });
+    });
+    if (!db.presetOrder || !db.presetOrder.length) db.presetOrder = SK_DEFAULT_PRESET_ORDER.slice();
+    db.defaultFoldersSeededV1 = true;
+  }
+
   SK_OBSOLETE_PRESETS.forEach(n => { delete db.presets[n]; });
   // Migration A1P1 → A1P0 : corriger tous les presets stockés
   Object.values(db.presets).forEach(p => {
     if (p.steps) p.steps.forEach(s => { if (s.patKey === 'A1P1') s.patKey = 'A1P0'; });
   });
-  // Migration : supprimer l'ancien dossier plat, ajouter les sous-dossiers
-  db.folders = db.folders.filter(f => f !== 'Gammes Majeur');
-  if (!db.folders.includes('Exemples'))              db.folders.unshift('Exemples');
-  if (!db.folders.includes('Patterns multi-cordes')) db.folders.splice(1, 0, 'Patterns multi-cordes');
-  if (!db.folders.includes('Do Majeur'))             db.folders.splice(2, 0, 'Do Majeur');
-  if (!db.folders.includes('Sol Majeur'))            db.folders.splice(3, 0, 'Sol Majeur');
-  Object.entries(SK_DEFAULT_PRESETS).forEach(([name, steps]) => {
-    let folder = 'Exemples';
-    if (name.startsWith('B6P1') || name.startsWith('B8P1'))              folder = 'Patterns multi-cordes';
-    else if (name.startsWith('Do Majeur') || name.startsWith('Do Penta'))   folder = 'Do Majeur';
-    else if (name.startsWith('Sol Majeur') || name.startsWith('Sol Penta')) folder = 'Sol Majeur';
-    if (!db.presets[name]) db.presets[name] = { folder, pinned:false, createdAt:0 };
-    db.presets[name].steps = steps;
-    db.presets[name].folder = folder;
+  const deletedBuiltins = db.deletedBuiltins || [];
+  Object.entries(SK_DEFAULT_PRESETS).forEach(([name, def]) => {
+    if (deletedBuiltins.includes(name)) return; // supprimé par l'utilisateur — ne pas ré-intégrer
+    const isNew = !db.presets[name];
+    // Le dossier n'est fixé qu'à la toute première création — jamais réécrasé ensuite,
+    // pour ne pas annuler le rangement de l'utilisateur à chaque rechargement de page.
+    if (isNew) db.presets[name] = { folder: def.folder || 'Mes créations', pinned: !!def.pinned, createdAt:0 };
+    db.presets[name].steps    = def.steps;
+    db.presets[name].playMode = def.playMode;
+    db.presets[name].bpm      = def.bpm;
   });
   skSavePresetsV2(db);
+}
+
+function skShowWelcomeForce() {
+  const existing = document.getElementById('sk-welcome-overlay');
+  if (existing) existing.remove();
+  _skBuildWelcomeOverlay();
+}
+
+function skShowWelcome() {
+  if (localStorage.getItem('dico-labo-welcome-done') === 'true') return;
+  localStorage.setItem('dico-labo-welcome-done', 'true');
+  _skBuildWelcomeOverlay();
+}
+
+function _skBuildWelcomeOverlay() {
+  const SVG_LABO = `<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(8,13) rotate(-20)"><path d="M-3,-9 L-3,5 Q-3,9 0,9 Q3,9 3,5 L3,-9"/><line x1="-4" y1="-10.5" x2="4" y2="-10.5" stroke-width="2"/><path d="M-2.5,2 L-2.5,5 Q-2.5,8.5 0,8.5 Q2.5,8.5 2.5,5 L2.5,2 Z" fill="currentColor" stroke="none" opacity="0.9"/></g><circle cx="16" cy="9" r="2.5" fill="currentColor" stroke="none"/><line x1="18.5" y1="9" x2="18.5" y2="2"/><line x1="18.5" y1="2" x2="22" y2="3.5"/></svg>`;
+
+  const SVG_COMPOSE = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="13" y2="18"/><circle cx="18" cy="18" r="2.5" fill="currentColor" stroke="none"/><line x1="18" y1="15.5" x2="18" y2="10" stroke-width="1.5"/><line x1="18" y1="10" x2="21" y2="11" stroke-width="1.5"/></svg>`;
+
+  const SVG_PIN = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l2.5 6.5H21l-5.5 4 2 6.5L12 15l-5.5 4 2-6.5L3 8.5h6.5Z" fill="currentColor" stroke="none" opacity="0.15"/><path d="M12 2l2.5 6.5H21l-5.5 4 2 6.5L12 15l-5.5 4 2-6.5L3 8.5h6.5Z"/><line x1="12" y1="15" x2="12" y2="22"/></svg>`;
+
+  const SVG_EYE = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>`;
+
+  const SVG_SHARE = `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 17 4 20 20 20 20 17"/><line x1="12" y1="3" x2="12" y2="15"/><polyline points="8 7 12 3 16 7"/></svg>`;
+
+  const overlay = document.createElement('div');
+  overlay.id = 'sk-welcome-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px)';
+
+  const rows = [
+    { svg: SVG_COMPOSE, title: 'Compose tes exercices',    body: 'Construis ta séquence pas à pas — pattern, corde, frette et valeur rythmique.' },
+    { svg: SVG_PIN,     title: 'Pour commencer',           body: 'Sélectionne un preset épinglé, ou pars de zéro en ajoutant tes premiers pas.' },
+    { svg: SVG_EYE,     title: 'Visualise en temps réel',  body: 'La tablature se génère automatiquement et le curseur suit la lecture.' },
+    { svg: SVG_SHARE,   title: 'Sauvegarde & partage',     body: 'Exporte tes créations via un code — archive ou partage tes exercices avec d\'autres guitaristes.' },
+  ];
+
+  overlay.innerHTML = `
+    <div style="background:var(--card);border-radius:18px;max-width:380px;width:100%;padding:28px 24px 24px;box-shadow:0 8px 40px rgba(0,0,0,.4)">
+      <div style="text-align:center;margin-bottom:20px">
+        <div style="display:flex;justify-content:center;margin-bottom:10px;color:var(--text2)">${SVG_LABO}</div>
+        <div style="font-size:20px;font-weight:800;color:var(--text)">Voici le Labo</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:13px;margin-bottom:22px">
+        ${rows.map(r => `
+        <div style="display:flex;gap:12px;align-items:flex-start">
+          <div style="flex-shrink:0;width:32px;height:32px;border-radius:8px;background:var(--bg);display:flex;align-items:center;justify-content:center;color:var(--text2)">${r.svg}</div>
+          <div><div style="font-weight:700;font-size:13px;color:var(--text);margin-bottom:2px">${r.title}</div><div style="color:var(--text2);font-size:12px;line-height:1.5">${r.body}</div></div>
+        </div>`).join('')}
+      </div>
+      <button onclick="document.getElementById('sk-welcome-overlay').remove()" style="width:100%;background:var(--blue);color:#fff;border:none;padding:13px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;transition:opacity .15s" onmouseover="this.style.opacity='.85'" onmouseout="this.style.opacity='1'">
+        C'est parti !
+      </button>
+    </div>`;
+
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
 }
 
 function skInit() {

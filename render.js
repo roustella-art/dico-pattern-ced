@@ -1232,14 +1232,14 @@ function renderJournal() {
       if (hasShuffleMode) modesText.push('🔀');
       const modesBadge = modesText.length > 0 ? `<span style="color:var(--text2);font-size:10px">${modesText.join(' ')}</span>` : '';
 
-      const clickHandler = isLabo ? `goToLaboFromJournal()` : `goToPatternFromJournal('${firstEntry.patId}')`;
+      const clickHandler = isLabo ? `goToLaboFromJournal('${firstEntry.patName.replace(/'/g,"\\'")}')` : `goToPatternFromJournal('${firstEntry.patId}')`;
       const subLabel = isLabo ? 'Labo — séquence' : firstEntry.patId;
 
       html += `
       <div class="journal-entry">
         <div class="journal-time">${time}</div>
         <div class="journal-pattern-info" onclick="${clickHandler}">
-          <div class="journal-pattern-name">${isLabo ? '🎛 ' : ''}${firstEntry.patName}</div>
+          <div class="journal-pattern-name">${isLabo ? '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:3px;opacity:.75"><g transform="translate(8,13) rotate(-20)"><path d="M-3,-9 L-3,5 Q-3,9 0,9 Q3,9 3,5 L3,-9" stroke-width="1.7"/><line x1="-4" y1="-10.5" x2="4" y2="-10.5" stroke-width="2" stroke-linecap="round"/><path d="M-2.5,2 L-2.5,5 Q-2.5,8.5 0,8.5 Q2.5,8.5 2.5,5 L2.5,2 Z" fill="currentColor" stroke="none" opacity="0.9"/></g><circle cx="16" cy="9" r="2.5" fill="currentColor" stroke="none"/><line x1="18.5" y1="9" x2="18.5" y2="2" stroke="currentColor" stroke-width="1.5"/><line x1="18.5" y1="2" x2="22" y2="3.5" stroke="currentColor" stroke-width="1.5"/></svg>' : ''}${firstEntry.patName}</div>
           <div class="journal-pattern-id">${subLabel}</div>
         </div>
         <div class="journal-meta">

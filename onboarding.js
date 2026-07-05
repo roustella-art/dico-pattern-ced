@@ -56,35 +56,30 @@ const ONBOARDING_CONFIG = {
       label: "Kurt Cobain",
       description: "Grunge/Alt-rock — Puissance et simplicité",
       styleScore: 1,
-      tempoMultiplier: 0.9, // Tempos un peu plus lents
       subdivMultiplier: 0.8, // Préfère les croches
     },
     page: {
       label: "Jimmy Page",
       description: "Blues-rock classique — Dynamique et feelé",
       styleScore: 2,
-      tempoMultiplier: 1.0,
-      subdivMultiplier: 1.0, // Équilibré
+      subdivMultiplier: 1.0,
     },
     django: {
       label: "Django Reinhardt",
       description: "Jazz/Swing — Sophistication et nuance",
       styleScore: 2,
-      tempoMultiplier: 1.2, // Tempos plus rapides
       subdivMultiplier: 1.2, // Préfère les triolets
     },
     malmsteen: {
       label: "Yngwie Malmsteen",
       description: "Neoclassical metal — Virtuosité extrême",
       styleScore: 4,
-      tempoMultiplier: 1.3, // Tempos rapides
       subdivMultiplier: 1.5, // Préfère les sextolets
     },
     none: {
       label: "Pas d'inspiration particulière",
       description: "On va trouver votre style ensemble !",
       styleScore: 1,
-      tempoMultiplier: 0.8,
       subdivMultiplier: 1.0,
     },
   },
@@ -92,12 +87,12 @@ const ONBOARDING_CONFIG = {
   // Presets de base (avant ajustements)
   // subdivCap : plafond de subdivision — empêche le multiplicateur de style de dépasser cette valeur
   basePresets: {
-    0: { tempoPresets: { lent: 40, cool: 60, chaud: 80 },  clickSubdiv: 2, subdivCap: 4, label: 'Débutant' },
-    1: { tempoPresets: { lent: 50, cool: 70, chaud: 90 },  clickSubdiv: 2, subdivCap: 4, label: 'Débutant+' },
-    2: { tempoPresets: { lent: 60, cool: 80, chaud: 100 }, clickSubdiv: 4, subdivCap: 6, label: 'Intermédiaire' },
-    3: { tempoPresets: { lent: 70, cool: 90, chaud: 110 }, clickSubdiv: 4, subdivCap: 6, label: 'Intermédiaire+' },
-    4: { tempoPresets: { lent: 80, cool: 100, chaud: 120 },clickSubdiv: 4, subdivCap: 4, label: 'Avancé' },
-    5: { tempoPresets: { lent: 100, cool: 120, chaud: 150 },clickSubdiv: 4, subdivCap: 4, label: 'Virtuose' },
+    0: { tempoPresets: { lent: 50,  cool: 80,  chaud: 115 }, clickSubdiv: 2, subdivCap: 2, label: 'Débutant' },
+    1: { tempoPresets: { lent: 58,  cool: 90,  chaud: 128 }, clickSubdiv: 2, subdivCap: 2, label: 'Débutant+' },
+    2: { tempoPresets: { lent: 66,  cool: 100, chaud: 141 }, clickSubdiv: 2, subdivCap: 4, label: 'Intermédiaire' },
+    3: { tempoPresets: { lent: 55,  cool: 82,  chaud: 118 }, clickSubdiv: 4, subdivCap: 4, label: 'Intermédiaire+' },
+    4: { tempoPresets: { lent: 70,  cool: 105, chaud: 135 }, clickSubdiv: 4, subdivCap: 4, label: 'Avancé' },
+    5: { tempoPresets: { lent: 85,  cool: 125, chaud: 155 }, clickSubdiv: 4, subdivCap: 4, label: 'Virtuose' },
   },
 };
 
@@ -143,16 +138,10 @@ function calculatePresets() {
   // Déterminer le preset de base
   const basePreset = ONBOARDING_CONFIG.basePresets[Math.floor(totalScore / 2)];
 
-  // Appliquer les ajustements du profil, puis clamp sur la plage propre à chaque tempo (TEMPOS)
-  const clampToRange = (val, key) => {
-    const t = TEMPOS.find(x => x.key === key);
-    if (!t) return val;
-    return Math.min(t.rangeMax, Math.max(t.rangeMin, val));
-  };
   const adjustedTempos = {
-    lent:  clampToRange(Math.round(basePreset.tempoPresets.lent  * profileData.tempoMultiplier), 'lent'),
-    cool:  clampToRange(Math.round(basePreset.tempoPresets.cool  * profileData.tempoMultiplier), 'cool'),
-    chaud: clampToRange(Math.round(basePreset.tempoPresets.chaud * profileData.tempoMultiplier), 'chaud'),
+    lent:  basePreset.tempoPresets.lent,
+    cool:  basePreset.tempoPresets.cool,
+    chaud: basePreset.tempoPresets.chaud,
   };
 
   // Pour la subdivision, c'est plus discret (rester dans les valeurs valides: 2, 3, 4, 6)
@@ -177,7 +166,13 @@ function calculatePresets() {
 function applyOnboardingSettings(presets) {
   SETTINGS.tempoPresets = presets.tempoPresets;
   SETTINGS.clickSubdiv = presets.clickSubdiv;
+  PREVIEW.clickNotes = presets.clickSubdiv;
+  HCTRL.bpm = presets.tempoPresets.lent;
+  PREVIEW.bpm = presets.tempoPresets.lent;
+  const hbpm = document.getElementById('header-bpm-val');
+  if (hbpm) hbpm.textContent = HCTRL.bpm;
   saveSettings();
+  if (typeof syncSubdivUI === 'function') syncSubdivUI();
 }
 
 function SUBDIV_LABEL(val) {
@@ -243,8 +238,14 @@ function showOnboardingScreen() {
 function showWelcomeScreen(container) {
   container.innerHTML = `
     <div style="text-align:center">
-      <div style="width:80px;height:80px;border-radius:50%;background:rgba(15,76,92,.1);display:flex;align-items:center;justify-content:center;margin:0 auto 24px">
-        <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--blue)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18V5l12-2v13"/><circle cx="6" cy="18" r="3"/><circle cx="18" cy="16" r="3"/></svg>
+      <div style="margin:0 auto 24px;display:inline-block">
+        <svg width="72" height="72" viewBox="0 0 32 32" aria-label="Dico Pattern">
+          <rect width="32" height="32" rx="8" fill="#0F4C5C"/>
+          <circle cx="8"  cy="23" r="2"   fill="#F4EEE2" opacity=".45"/>
+          <circle cx="14" cy="19" r="2"   fill="#F4EEE2" opacity=".65"/>
+          <circle cx="20" cy="13" r="2"   fill="#F4EEE2" opacity=".85"/>
+          <circle cx="25" cy="9"  r="2.5" fill="#D4622E"/>
+        </svg>
       </div>
       <h1 style="font-size:24px;font-weight:800;margin:0 0 10px;line-height:1.2;color:var(--text)">
         ${ONBOARDING_CONFIG.welcome.title}
@@ -381,8 +382,11 @@ function onboardingComplete(levelLabel) {
   const modal = document.getElementById('onboarding-modal');
   if (modal) modal.remove();
 
+  if (typeof syncTempoPresetsUI === 'function') syncTempoPresetsUI();
+
   // Toast de confirmation
   showOnboardingToast(`${levelLabel} configuré — App prête à l'emploi.`);
+
 }
 
 function showOnboardingToast(message) {
