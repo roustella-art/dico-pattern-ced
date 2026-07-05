@@ -1278,9 +1278,8 @@ function skInitReorderable(containerId, itemSelector, groupSelector, opts = {}) 
       armed = true;
       dragEl = item;
       item.classList.add('sk-reorder-active');
-      // Capture sur le CONTENEUR (jamais reparenté) — pas sur l'item, qui lui est déplacé
-      // en direct via insertBefore pendant le drag : reparenter un élément capturé
-      // invalide la capture instantanément dans la plupart des navigateurs.
+      container._savedOverflow = container.style.overflow;
+      container.style.overflow = 'visible';
       try { container.setPointerCapture(pointerId); } catch(e) {}
       if (navigator.vibrate) navigator.vibrate(15);
     }, 420);
@@ -1303,6 +1302,7 @@ function skInitReorderable(containerId, itemSelector, groupSelector, opts = {}) 
     clearTimer();
     if (armed && dragEl) {
       dragEl.classList.remove('sk-reorder-active');
+      container.style.overflow = container._savedOverflow || '';
       if (pointerId != null) { try { container.releasePointerCapture(pointerId); } catch(e) {} }
       const scope = groupSelector ? dragEl.closest(groupSelector) : null;
       const newOrder = getSiblings(scope).map(el => el.dataset[keyAttr]).filter(Boolean);
@@ -2062,6 +2062,14 @@ function renderShaker() {
   font-size: 11px; font-weight: 600; cursor: pointer; padding: 0; letter-spacing: .3px;
 }
 .sk-fav-io-btn:hover { color: var(--orange); }
+.sk-io-action-btn {
+  flex: 1; display: flex; align-items: center; justify-content: center; gap: 5px;
+  border: 1.5px solid var(--border); border-radius: 8px; background: var(--card);
+  color: var(--text2); font-size: 12px; font-weight: 600; cursor: pointer;
+  padding: 9px 8px; transition: all .15s; white-space: nowrap; overflow: hidden;
+  -webkit-tap-highlight-color: transparent;
+}
+.sk-io-action-btn:active { background: var(--bg); opacity: .8; }
 .sk-fav-bar {
   display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px;
   scrollbar-width: none; -webkit-overflow-scrolling: touch;
@@ -2071,7 +2079,7 @@ function renderShaker() {
   flex-shrink: 0; border: 1.5px solid var(--border); background: var(--card);
   border-radius: 20px; padding: 6px 14px; font-size: 12px; font-weight: 600;
   color: var(--text); cursor: pointer; white-space: nowrap; transition: all .15s;
-  touch-action: pan-x;
+  touch-action: pan-x; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
 .sk-fav-chip.active { border-color: var(--blue); color: var(--blue); background: var(--blue-light); }
 .sk-fav-chip:active  { opacity: .7; }
@@ -2127,7 +2135,7 @@ function renderShaker() {
 .sk-lib-subfolders::-webkit-scrollbar { display: none; }
 .sk-lib-subfolder-btn { font-size: 11px !important; padding: 4px 11px !important; }
 .sk-lib-group-btn { border-style: dashed; }
-.sk-lib-folder-item { display: flex; align-items: center; gap: 2px; flex-shrink: 0; touch-action: pan-x; }
+.sk-lib-folder-item { display: flex; align-items: center; gap: 2px; flex-shrink: 0; touch-action: pan-x; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .sk-lib-folder-del {
   flex-shrink: 0; border: none; background: transparent; color: var(--text3);
   font-size: 11px; width: 18px; height: 18px; border-radius: 50%; cursor: pointer;
@@ -2161,7 +2169,7 @@ function renderShaker() {
   display: flex; align-items: center; gap: 6px; padding: 10px 12px;
   border: 1.5px solid var(--border); border-radius: 10px; margin-bottom: 6px;
   background: var(--card); transition: border-color .15s, transform .15s, box-shadow .15s;
-  touch-action: pan-y;
+  touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
 .sk-lib-item.active { border-color: var(--blue); background: var(--blue-light); }
 .sk-lib-item.sk-reorder-active, .sk-fav-chip.sk-reorder-active, .sk-lib-folder-item.sk-reorder-active {
@@ -2509,11 +2517,12 @@ function renderShaker() {
 
 <div class="sk-wrap">
 
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;user-select:none" onclick="skToggleSeqCollapse()">
-    <div class="sk-section-label" style="margin-bottom:0;flex-shrink:0">
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
+    <div class="sk-section-label" style="margin-bottom:0;flex-shrink:0;cursor:pointer;user-select:none" onclick="skToggleSeqCollapse()">
       <span id="sk-seq-chevron">${skSeqCollapsed ? '▶' : '▼'}</span> Séquence — <span id="sk-step-count">${skSteps.length}</span> / ${SK_MAX_STEPS} pas
     </div>
-    <div class="sk-info-bar" id="sk-info-bar" style="margin-bottom:0;flex:1;justify-content:flex-end"></div>
+    <div style="flex:1"></div>
+    <button class="sk-fav-save-btn" onclick="skOpenSaveDialog()">＋ Save</button>
   </div>
   <div id="sk-seq-body" style="display:${skSeqCollapsed ? 'none' : 'block'}">
   <div class="sk-steps-list" id="sk-steps-list"></div>
@@ -2557,13 +2566,8 @@ function renderShaker() {
 
   <div id="sk-prog-wrap"></div>
 
-  <div class="sk-section-label" style="margin-top:6px">
-    Presets
-    <span style="float:right;display:flex;gap:10px;align-items:center">
-      <button class="sk-fav-io-btn" onclick="skImportPresetCode()" title="Importer un preset depuis un code partagé"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>Coller un code</button>
-      <button class="sk-fav-io-btn" onclick="skExportPresetCode()" title="Générer un code à partager (forum, message...)"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle;margin-right:4px"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 16 12 21 17 16"/><line x1="12" y1="21" x2="12" y2="9"/></svg>Copier un code</button>
-      <button class="sk-fav-save-btn" onclick="skOpenSaveDialog()">＋ Sauvegarder</button>
-    </span>
+  <div style="margin-top:6px;margin-bottom:4px">
+    <span class="sk-section-label" style="margin:0">Presets</span>
   </div>
   <input type="file" id="sk-import-file" accept=".json" style="display:none" onchange="skHandleImportFile(event)">
   <div class="sk-fav-bar" id="sk-fav-bar">
@@ -2573,6 +2577,16 @@ function renderShaker() {
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
     Bibliothèque
   </button>
+  <div style="display:flex;gap:8px;margin-top:8px">
+    <button class="sk-io-action-btn" onclick="skImportPresetCode()" title="Importer un preset depuis un code partagé">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Importer
+    </button>
+    <button class="sk-io-action-btn" onclick="skExportPresetCode()" title="Générer un code à partager (forum, message...)">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 16 12 21 17 16"/><line x1="12" y1="21" x2="12" y2="9"/></svg>
+      Copier le preset
+    </button>
+  </div>
 
 </div>
 
