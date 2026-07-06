@@ -1329,11 +1329,16 @@ function skBuildFavBar() {
   }
   bar.innerHTML = pinnedNames.map(name => {
     const active = name === skCurrentPreset;
-    return `<button class="sk-fav-chip${active ? ' active' : ''}" data-preset-name="${name.replace(/"/g,'&quot;')}" onclick="skLoadPresetByName('${name.replace(/'/g,"\\'")}')">
-      ${name}
-    </button>`;
+    // Le drag cible le <div> wrapper, pas le <button> natif : sur iOS Safari, un long-press
+    // + suivi tactile prolongé sur un bouton natif interfère avec setPointerCapture
+    // (fonctionne en desktop, échoue silencieusement sur iPhone).
+    return `<div class="sk-fav-chip-item" data-preset-name="${name.replace(/"/g,'&quot;')}">
+      <button class="sk-fav-chip${active ? ' active' : ''}" onclick="skLoadPresetByName('${name.replace(/'/g,"\\'")}')">
+        ${name}
+      </button>
+    </div>`;
   }).join('');
-  skInitReorderable('sk-fav-bar', '.sk-fav-chip', null);
+  skInitReorderable('sk-fav-bar', '.sk-fav-chip-item', null);
 }
 
 // ── CHARGER UN PRESET ─────────────────────────────────────────────────────────
@@ -2078,8 +2083,11 @@ function renderShaker() {
   scrollbar-width: none; -webkit-overflow-scrolling: touch;
 }
 .sk-fav-bar::-webkit-scrollbar { display: none; }
+.sk-fav-chip-item {
+  flex-shrink: 0; touch-action: pan-x; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
 .sk-fav-chip {
-  flex-shrink: 0; border: 1.5px solid var(--border); background: var(--card);
+  border: 1.5px solid var(--border); background: var(--card);
   border-radius: 20px; padding: 6px 14px; font-size: 12px; font-weight: 600;
   color: var(--text); cursor: pointer; white-space: nowrap; transition: all .15s;
   touch-action: pan-x; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
@@ -2175,13 +2183,14 @@ function renderShaker() {
   touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
 .sk-lib-item.active { border-color: var(--blue); background: var(--blue-light); }
-.sk-lib-item.sk-reorder-active, .sk-fav-chip.sk-reorder-active, .sk-lib-folder-item.sk-reorder-active {
+.sk-lib-item.sk-reorder-active, .sk-lib-folder-item.sk-reorder-active, .sk-fav-chip-item.sk-reorder-active {
   transform: scale(1.05); box-shadow: 0 6px 18px rgba(0,0,0,.18); z-index: 5; position: relative;
   touch-action: none;
   border-color: var(--orange) !important; background: var(--orange-light, rgba(255,152,0,.12)) !important;
   color: var(--orange) !important;
 }
-.sk-lib-folder-item.sk-reorder-active .sk-lib-folder-btn {
+.sk-lib-folder-item.sk-reorder-active .sk-lib-folder-btn,
+.sk-fav-chip-item.sk-reorder-active .sk-fav-chip {
   border-color: var(--orange) !important; background: var(--orange-light, rgba(255,152,0,.12)) !important;
   color: var(--orange) !important;
 }
