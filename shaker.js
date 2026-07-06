@@ -1193,6 +1193,23 @@ function skUpdatePresetOrderForSubset(newSubsetOrder) {
   skSavePresetsV2(db);
 }
 
+// Flèches ▲▼ à côté d'une carte preset — alternative fiable au glisser (surtout sur mobile).
+// Échange l'item avec son voisin immédiat dans son groupe visuel courant (dossier ou
+// liste plate des épinglés), puis persiste via la même logique que le drag.
+function skMovePresetArrow(btn, direction) {
+  const item = btn.closest('.sk-lib-item');
+  const group = item?.closest('.sk-lib-folder-group');
+  if (!item || !group) return;
+  const names = [...group.querySelectorAll('.sk-lib-item[data-preset-name]')].map(el => el.dataset.presetName);
+  const idx = names.indexOf(item.dataset.presetName);
+  const swapIdx = idx + direction;
+  if (swapIdx < 0 || swapIdx >= names.length) return;
+  [names[idx], names[swapIdx]] = [names[swapIdx], names[idx]];
+  skUpdatePresetOrderForSubset(names);
+  skRefreshLibrary();
+  if (group.dataset.folder === '__pinned__') skBuildFavBar();
+}
+
 // Réorganisation de la rangée 1 de la bibliothèque (dossiers + groupes mélangés) :
 // applique le nouvel ordre relatif séparément à db.folders (dossiers) et aux clés de
 // db.groups (groupes), sans toucher aux dossiers qui n'apparaissent pas en rangée 1
@@ -1327,18 +1344,14 @@ function skBuildFavBar() {
     bar.innerHTML = `<span class="sk-fav-empty">Épingle des presets depuis la bibliothèque ★</span>`;
     return;
   }
+  // L'ordre affiché ici suit skSortByPresetOrder — réorganisable depuis l'onglet
+  // "★ Épinglés" de la bibliothèque (glisser vertical), pas directement ici.
   bar.innerHTML = pinnedNames.map(name => {
     const active = name === skCurrentPreset;
-    // Le drag cible le <div> wrapper, pas le <button> natif : sur iOS Safari, un long-press
-    // + suivi tactile prolongé sur un bouton natif interfère avec setPointerCapture
-    // (fonctionne en desktop, échoue silencieusement sur iPhone).
-    return `<div class="sk-fav-chip-item" data-preset-name="${name.replace(/"/g,'&quot;')}">
-      <button class="sk-fav-chip${active ? ' active' : ''}" onclick="skLoadPresetByName('${name.replace(/'/g,"\\'")}')">
-        ${name}
-      </button>
-    </div>`;
+    return `<button class="sk-fav-chip${active ? ' active' : ''}" onclick="skLoadPresetByName('${name.replace(/'/g,"\\'")}')">
+      ${name}
+    </button>`;
   }).join('');
-  skInitReorderable('sk-fav-bar', '.sk-fav-chip-item', null);
 }
 
 // ── CHARGER UN PRESET ─────────────────────────────────────────────────────────
@@ -1452,11 +1465,67 @@ function skBuildLibraryBody() {
 
   if (!filtered.length) return `<div class="sk-lib-empty">Aucun preset trouvé</div>`;
 
-  // Tri selon l'ordre personnalisé (réorganisation par appui long)
+  const isPinnedTab = skLibFolder === '__pinned__';
+  const isAllTab = !skLibFolder || skLibFolder === 'Tous';
+
+  const itemHtml = ([name, p], folder, arrows) => {
+    const active    = name === skCurrentPreset;
+    const isBuiltIn = name in SK_DEFAULT_PRESETS;
+    const pinIcon   = p.pinned ? '★' : '☆';
+    const steps     = p.steps || [];
+    const noteCount = steps.filter(s => s.patKey && s.patKey !== 'rest').length;
+    const arrowsHtml = arrows ? `
+      <div class="sk-lib-arrows">
+        <button class="sk-lib-arrow" ${arrows.isFirst ? 'disabled' : ''} onclick="skMovePresetArrow(this,-1)" title="Monter">▲</button>
+        <button class="sk-lib-arrow" ${arrows.isLast ? 'disabled' : ''} onclick="skMovePresetArrow(this,1)" title="Descendre">▼</button>
+      </div>` : '';
+    return `
+    <div class="sk-lib-item${active ? ' active' : ''}${isBuiltIn ? ' built-in' : ''}" data-preset-name="${name.replace(/"/g,'&quot;')}">
+      ${arrowsHtml}
+      <div class="sk-lib-item-main" onclick="skLoadPresetByName('${name.replace(/'/g,"\\'")}')">
+        <div class="sk-lib-item-name">${name}</div>
+        <div class="sk-lib-item-meta">${noteCount} pas · ${folder}</div>
+      </div>
+      <button class="sk-lib-pin${p.pinned ? ' pinned' : ''}" onclick="skTogglePin('${name.replace(/'/g,"\\'")}')">
+        ${pinIcon}
+      </button>
+      ${isBuiltIn ? '' : `<button class="sk-lib-del" onclick="skDeletePresetByName('${name.replace(/'/g,"\\'")}')">✕</button>`}
+    </div>`;
+  };
+
+  if (isAllTab) {
+    // Onglet "Tous" : tri alphabétique simple, groupé par dossier pour la lisibilité
+    // (pas de flèches ni de drag ici — l'ordre est toujours recalculé alphabétiquement)
+    filtered.sort((a, b) => a[0].localeCompare(b[0]));
+    const grouped = {};
+    filtered.forEach(([name, p]) => {
+      const f = p.folder || 'Mes créations';
+      if (!grouped[f]) grouped[f] = [];
+      grouped[f].push([name, p]);
+    });
+    return Object.entries(grouped).map(([folder, items]) => `
+      <div class="sk-lib-folder-label">${folder}</div>
+      <div class="sk-lib-folder-group" data-folder="${folder.replace(/"/g,'&quot;')}">
+      ${items.map(it => itemHtml(it, folder, null)).join('')}
+      </div>
+    `).join('');
+  }
+
+  if (isPinnedTab) {
+    // Onglet "★ Épinglés" : liste unique et plate (pas de sous-groupes par dossier),
+    // triée par ordre personnalisé — flèches + glisser vertical pilotent directement
+    // l'ordre des bulles épinglées affichées dans le Labo.
+    const orderedNames = skSortByPresetOrder(filtered.map(([name]) => name));
+    filtered = orderedNames.map(name => filtered.find(([n]) => n === name));
+    return `<div class="sk-lib-folder-group" data-folder="__pinned__">
+      ${filtered.map(([name, p], i) => itemHtml([name, p], p.folder || 'Mes créations',
+        { isFirst: i === 0, isLast: i === filtered.length - 1 })).join('')}
+    </div>`;
+  }
+
+  // Dossier / sous-dossier / groupe spécifique : tri personnalisé, groupé par dossier
   const orderedNames = skSortByPresetOrder(filtered.map(([name]) => name));
   filtered = orderedNames.map(name => filtered.find(([n]) => n === name));
-
-  // Groupe par dossier si pas de filtre actif
   const grouped = {};
   filtered.forEach(([name, p]) => {
     const f = p.folder || 'Mes créations';
@@ -1467,24 +1536,7 @@ function skBuildLibraryBody() {
   return Object.entries(grouped).map(([folder, items]) => `
     <div class="sk-lib-folder-label">${folder}</div>
     <div class="sk-lib-folder-group" data-folder="${folder.replace(/"/g,'&quot;')}">
-    ${items.map(([name, p]) => {
-      const active    = name === skCurrentPreset;
-      const isBuiltIn = name in SK_DEFAULT_PRESETS;
-      const pinIcon   = p.pinned ? '★' : '☆';
-      const steps     = p.steps || [];
-      const noteCount = steps.filter(s => s.patKey && s.patKey !== 'rest').length;
-      return `
-    <div class="sk-lib-item${active ? ' active' : ''}${isBuiltIn ? ' built-in' : ''}" data-preset-name="${name.replace(/"/g,'&quot;')}">
-      <div class="sk-lib-item-main" onclick="skLoadPresetByName('${name.replace(/'/g,"\\'")}')">
-        <div class="sk-lib-item-name">${name}</div>
-        <div class="sk-lib-item-meta">${noteCount} pas · ${folder}</div>
-      </div>
-      <button class="sk-lib-pin${p.pinned ? ' pinned' : ''}" onclick="skTogglePin('${name.replace(/'/g,"\\'")}')">
-        ${pinIcon}
-      </button>
-      ${isBuiltIn ? '' : `<button class="sk-lib-del" onclick="skDeletePresetByName('${name.replace(/'/g,"\\'")}')">✕</button>`}
-    </div>`;
-    }).join('')}
+    ${items.map((it, i) => itemHtml(it, folder, { isFirst: i === 0, isLast: i === items.length - 1 })).join('')}
     </div>
   `).join('');
 }
@@ -2083,14 +2135,10 @@ function renderShaker() {
   scrollbar-width: none; -webkit-overflow-scrolling: touch;
 }
 .sk-fav-bar::-webkit-scrollbar { display: none; }
-.sk-fav-chip-item {
-  flex-shrink: 0; touch-action: pan-x; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
-}
 .sk-fav-chip {
-  border: 1.5px solid var(--border); background: var(--card);
+  flex-shrink: 0; border: 1.5px solid var(--border); background: var(--card);
   border-radius: 20px; padding: 6px 14px; font-size: 12px; font-weight: 600;
   color: var(--text); cursor: pointer; white-space: nowrap; transition: all .15s;
-  touch-action: pan-x; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
 .sk-fav-chip.active { border-color: var(--blue); color: var(--blue); background: var(--blue-light); }
 .sk-fav-chip:active  { opacity: .7; }
@@ -2124,7 +2172,7 @@ function renderShaker() {
 .sk-lib-title { font-size: 16px; font-weight: 700; }
 .sk-lib-close {
   border: none; background: var(--border); border-radius: 50%;
-  width: 28px; height: 28px; font-size: 14px; cursor: pointer; color: var(--text2);
+  width: 36px; height: 36px; font-size: 14px; cursor: pointer; color: var(--text2);
   display: flex; align-items: center; justify-content: center;
 }
 .sk-lib-search-row { padding: 0 16px 10px; flex-shrink: 0; }
@@ -2149,7 +2197,7 @@ function renderShaker() {
 .sk-lib-folder-item { display: flex; align-items: center; gap: 2px; flex-shrink: 0; touch-action: pan-x; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
 .sk-lib-folder-del {
   flex-shrink: 0; border: none; background: transparent; color: var(--text3);
-  font-size: 11px; width: 18px; height: 18px; border-radius: 50%; cursor: pointer;
+  font-size: 12px; width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
   display: flex; align-items: center; justify-content: center; opacity: .6; transition: all .15s;
 }
 .sk-lib-folder-del:hover { opacity: 1; color: var(--red); background: rgba(200,60,60,.1); }
@@ -2159,7 +2207,7 @@ function renderShaker() {
 }
 .sk-lib-group-del {
   border: none; background: transparent; color: var(--text3); font-size: 11px;
-  width: 16px; height: 16px; border-radius: 50%; cursor: pointer;
+  width: 26px; height: 26px; border-radius: 50%; cursor: pointer;
   display: flex; align-items: center; justify-content: center; opacity: .6; transition: all .15s;
 }
 .sk-lib-group-del:hover { opacity: 1; color: var(--red); background: rgba(200,60,60,.1); }
@@ -2183,28 +2231,37 @@ function renderShaker() {
   touch-action: pan-y; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
 }
 .sk-lib-item.active { border-color: var(--blue); background: var(--blue-light); }
-.sk-lib-item.sk-reorder-active, .sk-lib-folder-item.sk-reorder-active, .sk-fav-chip-item.sk-reorder-active {
+.sk-lib-item.sk-reorder-active, .sk-lib-folder-item.sk-reorder-active {
   transform: scale(1.05); box-shadow: 0 6px 18px rgba(0,0,0,.18); z-index: 5; position: relative;
   touch-action: none;
   border-color: var(--orange) !important; background: var(--orange-light, rgba(255,152,0,.12)) !important;
   color: var(--orange) !important;
 }
-.sk-lib-folder-item.sk-reorder-active .sk-lib-folder-btn,
-.sk-fav-chip-item.sk-reorder-active .sk-fav-chip {
+.sk-lib-folder-item.sk-reorder-active .sk-lib-folder-btn {
   border-color: var(--orange) !important; background: var(--orange-light, rgba(255,152,0,.12)) !important;
   color: var(--orange) !important;
 }
+.sk-lib-arrows { display: flex; flex-direction: column; gap: 2px; flex-shrink: 0; }
+.sk-lib-arrow {
+  border: none; background: transparent; color: var(--text2); font-size: 10px;
+  width: 34px; height: 24px; line-height: 1; cursor: pointer; padding: 0;
+  display: flex; align-items: center; justify-content: center; border-radius: 4px;
+}
+.sk-lib-arrow:hover:not(:disabled) { background: var(--border); color: var(--text); }
+.sk-lib-arrow:disabled { opacity: .2; cursor: default; }
 .sk-lib-item-main { flex: 1; cursor: pointer; min-width: 0; }
 .sk-lib-item-name { font-size: 14px; font-weight: 600; color: var(--text); }
 .sk-lib-item-meta { font-size: 11px; color: var(--text2); margin-top: 2px; }
 .sk-lib-pin {
   border: none; background: transparent; font-size: 18px; cursor: pointer;
-  color: var(--border); padding: 4px; line-height: 1; flex-shrink: 0;
+  color: var(--border); line-height: 1; flex-shrink: 0;
+  width: 40px; height: 40px; display: flex; align-items: center; justify-content: center;
 }
 .sk-lib-pin.pinned { color: #f0a500; }
 .sk-lib-del {
-  border: none; background: transparent; font-size: 13px; cursor: pointer;
-  color: var(--red); opacity: .5; padding: 4px; flex-shrink: 0;
+  border: none; background: transparent; font-size: 14px; cursor: pointer;
+  color: var(--red); opacity: .5; flex-shrink: 0;
+  width: 36px; height: 36px; display: flex; align-items: center; justify-content: center;
 }
 .sk-lib-del:active { opacity: 1; }
 .sk-lib-empty { text-align: center; color: var(--text2); padding: 32px 0; font-size: 13px; }
@@ -2325,7 +2382,7 @@ function renderShaker() {
   display: flex; align-items: center; gap: 2px; flex-shrink: 0;
 }
 .sk-hact-btn {
-  border: none; background: transparent; padding: 6px 7px;
+  border: none; background: transparent; padding: 9px 10px;
   font-size: 13px; color: var(--text2); cursor: pointer; border-radius: 6px; line-height: 1;
 }
 .sk-hact-btn:active { background: var(--border); }
