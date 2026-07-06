@@ -1279,7 +1279,9 @@ function skInitReorderable(containerId, itemSelector, groupSelector, opts = {}) 
       dragEl = item;
       item.classList.add('sk-reorder-active');
       container._savedOverflow = container.style.overflow;
+      container._savedTouchAction = container.style.touchAction;
       container.style.overflow = 'visible';
+      container.style.touchAction = 'none';
       try { container.setPointerCapture(pointerId); } catch(e) {}
       if (navigator.vibrate) navigator.vibrate(15);
     }, 420);
@@ -1303,6 +1305,7 @@ function skInitReorderable(containerId, itemSelector, groupSelector, opts = {}) 
     if (armed && dragEl) {
       dragEl.classList.remove('sk-reorder-active');
       container.style.overflow = container._savedOverflow || '';
+      container.style.touchAction = container._savedTouchAction || '';
       if (pointerId != null) { try { container.releasePointerCapture(pointerId); } catch(e) {} }
       const scope = groupSelector ? dragEl.closest(groupSelector) : null;
       const newOrder = getSiblings(scope).map(el => el.dataset[keyAttr]).filter(Boolean);
@@ -2567,7 +2570,7 @@ function renderShaker() {
   <div id="sk-prog-wrap"></div>
 
   <div style="margin-top:6px;margin-bottom:4px">
-    <span class="sk-section-label" style="margin:0">Presets</span>
+    <span class="sk-section-label" style="margin:0">Presets <span style="color:#f0a500">★</span></span>
   </div>
   <input type="file" id="sk-import-file" accept=".json" style="display:none" onchange="skHandleImportFile(event)">
   <div class="sk-fav-bar" id="sk-fav-bar">
@@ -3187,16 +3190,25 @@ function skSeedDefaultPresets() {
     if (p.steps) p.steps.forEach(s => { if (s.patKey === 'A1P1') s.patKey = 'A1P0'; });
   });
   const deletedBuiltins = db.deletedBuiltins || [];
+
+  // Rattrapage ponctuel (une seule fois) : des modèles intégrés créés par l'utilisateur
+  // avant que l'organisation ne soit figée en dur pouvaient rester coincés dans leur
+  // ancien dossier. On force leur dossier officiel une dernière fois, puis plus jamais.
+  const forceFolderFix = !db.builtinFolderSyncV1;
+
   Object.entries(SK_DEFAULT_PRESETS).forEach(([name, def]) => {
     if (deletedBuiltins.includes(name)) return; // supprimé par l'utilisateur — ne pas ré-intégrer
     const isNew = !db.presets[name];
     // Le dossier n'est fixé qu'à la toute première création — jamais réécrasé ensuite,
     // pour ne pas annuler le rangement de l'utilisateur à chaque rechargement de page.
     if (isNew) db.presets[name] = { folder: def.folder || 'Mes créations', pinned: !!def.pinned, createdAt:0 };
+    else if (forceFolderFix) db.presets[name].folder = def.folder || 'Mes créations';
     db.presets[name].steps    = def.steps;
     db.presets[name].playMode = def.playMode;
     db.presets[name].bpm      = def.bpm;
   });
+  if (forceFolderFix) db.builtinFolderSyncV1 = true;
+
   skSavePresetsV2(db);
 }
 
