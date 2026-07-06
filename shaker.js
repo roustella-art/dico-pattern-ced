@@ -1282,40 +1282,24 @@ function skInitReorderable(containerId, itemSelector, groupSelector, opts = {}) 
     return closest.element;
   };
 
-  let pointerId = null;
+  const arm = (item) => {
+    armed = true;
+    dragEl = item;
+    item.classList.add('sk-reorder-active');
+    container._savedOverflow = container.style.overflow;
+    container._savedTouchAction = container.style.touchAction;
+    container.style.overflow = 'visible';
+    container.style.touchAction = 'none';
+    if (navigator.vibrate) navigator.vibrate(15);
+  };
 
-  container.addEventListener('pointerdown', (e) => {
-    const item = e.target.closest(itemSelector);
-    if (!item) return;
-    startX = e.clientX; startY = e.clientY;
-    armed = false;
-    pointerId = e.pointerId;
-    clearTimer();
-    timer = setTimeout(() => {
-      armed = true;
-      dragEl = item;
-      item.classList.add('sk-reorder-active');
-      container._savedOverflow = container.style.overflow;
-      container._savedTouchAction = container.style.touchAction;
-      container.style.overflow = 'visible';
-      container.style.touchAction = 'none';
-      try { container.setPointerCapture(pointerId); } catch(e) {}
-      if (navigator.vibrate) navigator.vibrate(15);
-    }, 420);
-  });
-
-  container.addEventListener('pointermove', (e) => {
-    if (!armed || !dragEl) {
-      if (timer && (Math.abs(e.clientX - startX) > 8 || Math.abs(e.clientY - startY) > 8)) clearTimer();
-      return;
-    }
-    e.preventDefault();
+  const moveTo = (x, y) => {
     const scope = groupSelector ? dragEl.closest(groupSelector) : null;
-    const after = getDragAfter(scope, e.clientX, e.clientY);
+    const after = getDragAfter(scope, x, y);
     const parent = scope || container;
     if (after == null) parent.appendChild(dragEl);
     else parent.insertBefore(dragEl, after);
-  }, { passive: false });
+  };
 
   const finish = () => {
     clearTimer();
@@ -1323,16 +1307,81 @@ function skInitReorderable(containerId, itemSelector, groupSelector, opts = {}) 
       dragEl.classList.remove('sk-reorder-active');
       container.style.overflow = container._savedOverflow || '';
       container.style.touchAction = container._savedTouchAction || '';
-      if (pointerId != null) { try { container.releasePointerCapture(pointerId); } catch(e) {} }
       const scope = groupSelector ? dragEl.closest(groupSelector) : null;
       const newOrder = getSiblings(scope).map(el => el.dataset[keyAttr]).filter(Boolean);
       onReorder(newOrder, scope);
     }
-    armed = false; dragEl = null; pointerId = null;
+    armed = false; dragEl = null;
   };
-  container.addEventListener('pointerup', finish);
-  container.addEventListener('pointercancel', finish);
-  container.addEventListener('lostpointercapture', () => { if (armed) finish(); });
+
+  // ── Tactile (iOS/Android) — passe par les Touch Events natifs, pas par les Pointer
+  // Events : setPointerCapture est nettement moins fiable sur Safari iOS que sur
+  // desktop, et les Touch Events sont matures/stables sur iOS depuis toujours.
+  let touchId = null;
+
+  container.addEventListener('touchstart', (e) => {
+    const item = e.target.closest(itemSelector);
+    if (!item) return;
+    const t = e.changedTouches[0];
+    touchId = t.identifier;
+    startX = t.clientX; startY = t.clientY;
+    armed = false;
+    clearTimer();
+    timer = setTimeout(() => { timer = null; arm(item); }, 420);
+  }, { passive: true });
+
+  container.addEventListener('touchmove', (e) => {
+    const t = [...e.changedTouches].find(t => t.identifier === touchId);
+    if (!t) return;
+    if (!armed || !dragEl) {
+      if (timer && (Math.abs(t.clientX - startX) > 8 || Math.abs(t.clientY - startY) > 8)) clearTimer();
+      return;
+    }
+    e.preventDefault();
+    moveTo(t.clientX, t.clientY);
+  }, { passive: false });
+
+  const finishTouch = () => { touchId = null; finish(); };
+  container.addEventListener('touchend', finishTouch);
+  container.addEventListener('touchcancel', finishTouch);
+
+  // ── Souris (desktop) — Pointer Events, déjà fiables sur Mac Safari/Chrome ────
+  let pointerId = null;
+
+  container.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'touch') return; // le tactile est géré ci-dessus
+    const item = e.target.closest(itemSelector);
+    if (!item) return;
+    startX = e.clientX; startY = e.clientY;
+    armed = false;
+    pointerId = e.pointerId;
+    clearTimer();
+    timer = setTimeout(() => {
+      timer = null;
+      arm(item);
+      try { container.setPointerCapture(pointerId); } catch(e) {}
+    }, 420);
+  });
+
+  container.addEventListener('pointermove', (e) => {
+    if (e.pointerType === 'touch') return;
+    if (!armed || !dragEl) {
+      if (timer && (Math.abs(e.clientX - startX) > 8 || Math.abs(e.clientY - startY) > 8)) clearTimer();
+      return;
+    }
+    e.preventDefault();
+    moveTo(e.clientX, e.clientY);
+  }, { passive: false });
+
+  const finishPointer = (e) => {
+    if (e.pointerType === 'touch') return;
+    if (pointerId != null) { try { container.releasePointerCapture(pointerId); } catch(e) {} }
+    finish();
+    pointerId = null;
+  };
+  container.addEventListener('pointerup', finishPointer);
+  container.addEventListener('pointercancel', finishPointer);
+  container.addEventListener('lostpointercapture', (e) => { if (e.pointerType !== 'touch' && armed) finish(); });
 }
 
 function skBuildFavBar() {
@@ -1368,13 +1417,18 @@ function skLoadPresetByName(name) {
   const _chevron = document.getElementById('sk-seq-chevron');
   if (_seqBody) _seqBody.style.display = 'none';
   if (_chevron) _chevron.textContent = '▶';
-  // Restaurer le mode de lecture et le BPM sauvegardés avec le modèle
+  // Restaurer le mode de lecture, le BPM et le shuffle sauvegardés avec le modèle
   if (p.playMode) skSetPlayMode(p.playMode);
   if (p.bpm) {
     HCTRL.bpm = p.bpm;
     PREVIEW.bpm = p.bpm;
     const hbpm = document.getElementById('header-bpm-val');
     if (hbpm) hbpm.textContent = HCTRL.bpm;
+  }
+  if (SETTINGS.shuffleMode !== !!p.shuffle) {
+    SETTINGS.shuffleMode = !!p.shuffle;
+    saveSettings();
+    if (typeof syncShuffleModeUI === 'function') syncShuffleModeUI();
   }
   skBuildStepsUI();
   skGenerateAndShow();
@@ -1744,6 +1798,7 @@ function skConfirmSave() {
     createdAt: existing ? existing.createdAt : Date.now(),
     playMode: skPlayMode,
     bpm: HCTRL.bpm,
+    ...(SETTINGS.shuffleMode ? { shuffle: true } : {}),
   };
   if (!db.folders.includes(folder)) db.folders.push(folder);
   // Gestion groupe : ajouter le sous-dossier au groupe sélectionné, le retirer des autres.
@@ -3306,9 +3361,9 @@ function _skBuildWelcomeOverlay() {
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px)';
 
   const rows = [
-    { svg: SVG_COMPOSE, title: 'Compose tes exercices',    body: 'Construis ta séquence pas à pas — pattern, corde, frette et valeur rythmique.' },
     { svg: SVG_PIN,     title: 'Pour commencer',           body: 'Sélectionne un preset épinglé, ou pars de zéro en ajoutant tes premiers pas.' },
     { svg: SVG_EYE,     title: 'Visualise en temps réel',  body: 'La tablature se génère automatiquement et le curseur suit la lecture.' },
+    { svg: SVG_COMPOSE, title: 'Compose tes exercices',    body: 'Construis ta séquence pas à pas — pattern, corde, frette et valeur rythmique.' },
     { svg: SVG_SHARE,   title: 'Sauvegarde & partage',     body: 'Exporte tes créations via un code — archive ou partage tes exercices avec d\'autres guitaristes.' },
   ];
 

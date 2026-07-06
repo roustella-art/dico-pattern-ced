@@ -145,9 +145,9 @@
 
   /* BOTTOM NAV */
   nav{flex-shrink:0;width:100%;height:calc(var(--nav-h) + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--border);display:flex;padding-bottom:env(safe-area-inset-bottom)}
-  nav button{flex:1;border:none;background:none;font-size:10px;color:var(--text2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;transition:all .15s;border-bottom:3px solid transparent}
+  nav button{flex:1;border:none;background:none;font-size:10px;color:var(--text2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;transition:all .15s}
   nav button .ico{font-size:22px;line-height:1}
-  nav button.active{color:var(--blue);font-weight:600;background:var(--blue-light);border-bottom-color:var(--blue);border-radius:8px 8px 0 0}
+  nav button.active{color:var(--blue);font-weight:600;background:var(--blue-light);border-radius:8px 8px 0 0}
 
   /* CARDS */
   .card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);margin-bottom:10px;overflow:hidden}
@@ -2068,7 +2068,7 @@ function openSettings(tab) {
           <button class="sf-btn" onclick="doImportJSON()">↑ Importer JSON</button>
         </div>
         <button class="sf-reset" onclick="resetApp()">Réinitialiser l'app</button>
-        <div class="sf-version">v6.3</div>
+        <div class="sf-version">v6.4</div>
       </div>
     </div>
   </div>`;
@@ -2468,8 +2468,8 @@ function _buildPatternsWelcomeOverlay() {
   const rows = [
     { svg: SVG_MECA,     title: 'De la mécanique pure',      body: 'Les patterns sont des mouvements systématiques au service de ta guitare. Chaque pattern entraîne ta coordination main gauche / main droite, ton indépendance digitale et ta fluidité de jeu.' },
     { svg: SVG_METRO,    title: 'Comment progresser',         body: 'Travaille à tempo lent, vraiment lent. L\'objectif n\'est pas la vitesse, c\'est la régularité : un pattern bien ancré à 60 BPM vaut mieux qu\'un pattern bâclé à 120.' },
-    { svg: SVG_CALENDAR, title: 'La clé, c\'est la constance', body: '10 minutes par jour sur 2 ou 3 patterns vaut mieux qu\'une heure par semaine. Ta mémoire musculaire se construit dans la durée, pas dans l\'intensité.' },
     { svg: SVG_CHART,    title: 'Repère ta progression',      body: 'Utilise les tableaux de progression pour baliser ton niveau sur chaque pattern.' },
+    { svg: SVG_CALENDAR, title: 'La clé, c\'est la constance', body: '10 minutes par jour c\'est suffisant ! Ta mémoire musculaire se construit dans la durée, pas dans l\'intensité.' },
   ];
 
   const overlay = document.createElement('div');
