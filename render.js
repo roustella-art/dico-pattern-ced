@@ -285,6 +285,7 @@ function buildGammeProgGrid(p) {
 
   // Créer un progressId distinct pour chaque direction/groupe
   let progressId = p.id;
+  const DIR_LABEL_MAP = { U:'Asc.', D:'Des.', M:'Mix' };
   let badgeText = '';
   if (p.hasDirectionTabs && selectedDir) {
     if (p.formeTabs) {
@@ -292,11 +293,10 @@ function buildGammeProgGrid(p) {
       const isPenta  = getGammePenta(p.id);
       const pentaPfx = isPenta ? 'Penta_' : '';
       progressId = p.id + '__' + pentaPfx + selectedDir + '_' + (forme || p.formeTabs[0]);
-      const formeLabel = (forme || p.formeTabs[0]).replace(' 8va', '');
-      badgeText = (isPenta ? 'P·' : '') + (p.versionTabs ? '' : selectedDir + ' · ') + formeLabel;
+      badgeText = DIR_LABEL_MAP[selectedDir] || selectedDir;
     } else {
       progressId = p.id + '__' + selectedDir.replace(/[→↔]/g, '-');
-      badgeText = selectedDir;
+      badgeText = DIR_LABEL_MAP[selectedDir] || selectedDir;
     }
   }
 
@@ -316,7 +316,7 @@ function buildGammeProgGrid(p) {
   // Badge de direction OU badge de groupe
   let badgeLabel = '';
   if (badgeText) {
-    badgeLabel = `<span style="font-size:10px;font-weight:700;color:var(--blue);background:var(--blue-light);border-radius:6px;padding:1px 7px">${badgeText}</span>`;
+    badgeLabel = `<span style="font-size:11px;font-weight:700;color:#fff">${badgeText}</span>`;
   }
 
   const html = `<div class="prog-grid" style="margin-bottom:10px">
@@ -594,8 +594,8 @@ function renderPatternGroupBody(pats, key) {
   const thStyle = i => PREVIEW.interp===i
     ? 'background:var(--orange);color:#fff;'
     : 'background:var(--blue);color:rgba(255,255,255,.75);';
-  const DIR_BADGE_LABELS = {U:'↑ Asc.', D:'↓ Desc.', M:'↑↓ Mix'};
-  const dirBadge = `<span style="font-size:9px;font-weight:700;color:#fff;background:${dirColor};border-radius:6px;padding:1px 6px;opacity:.9">${DIR_BADGE_LABELS[activeDir] || activeDir}</span>`;
+  const DIR_BADGE_LABELS = {U:'Asc.', D:'Des.', M:'Mix'};
+  const dirBadge = `<span style="font-size:11px;font-weight:700;color:#fff">${DIR_BADGE_LABELS[activeDir] || activeDir}</span>`;
   const progGrid = `<div class="prog-grid" style="margin-bottom:10px">
     <table><thead><tr>
       <th style="width:68px;background:var(--blue);vertical-align:middle">${dirBadge}</th>

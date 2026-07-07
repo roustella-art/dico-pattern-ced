@@ -1868,6 +1868,7 @@ function skToggleProgress(presetName, mode, interp, tempoKey) {
   const k = `${presetName}__${mode}__${interp}__${tempoKey}`;
   prog[k] = !prog[k];
   localStorage.setItem(SK_PROG_KEY, JSON.stringify(prog));
+  checkSound(prog[k]);
   skRenderProgTable(presetName);
 }
 
@@ -1891,7 +1892,7 @@ function skRenderProgTable(presetName) {
   const modeBadge = `<span style="font-size:9px;font-weight:700;color:#fff;background:${color};border-radius:6px;padding:1px 6px;opacity:.9">${SK_MODE_LABELS[mode] || mode}</span>`;
 
   const gridRows = TEMPOS.map(tempo => {
-    let row = `<tr><td class="tempo" style="text-align:center;padding:4px 6px;cursor:pointer" onclick="skSetLaboTempo('${tempo.key}')">
+    let row = `<tr><td class="tempo" style="text-align:center;padding:4px 6px;cursor:pointer;user-select:none" onclick="skSetLaboTempo('${tempo.key}')">
       <div style="display:flex;align-items:center;justify-content:center;gap:4px;margin-bottom:3px">${tempo.icon}</div>
       <span style="font-size:10px;color:${tempo.color};font-weight:700;display:block">${SETTINGS.tempoPresets[tempo.key]} <span style="font-size:8px;font-weight:500">bpm</span></span>
     </td>`;
@@ -2508,8 +2509,9 @@ function renderShaker() {
   border-radius: 8px; overflow: hidden;
 }
 .sk-seg button {
-  flex: 1; border: none; background: transparent; padding: 8px 4px;
-  font-size: 12px; font-weight: 500; color: var(--text2); cursor: pointer;
+  flex: 1; border: none; background: #fff; padding: 9px 4px;
+  font-size: 12px; font-weight: 600; color: var(--text2); cursor: pointer;
+  transition: all .15s;
 }
 .sk-seg button + button { border-left: 1px solid var(--border); }
 .sk-seg button.active.sk-mode-strict  { background: #2a7de1; color: #fff; font-weight: 700; }
