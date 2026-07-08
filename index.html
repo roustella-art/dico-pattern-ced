@@ -68,15 +68,8 @@
 
   /* HEADER — dark warm teal */
   header{background:var(--header-bg);color:var(--header-text);padding:calc(10px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) 4px calc(14px + env(safe-area-inset-left));display:flex;flex-direction:column;flex-shrink:0;border-top:3px solid transparent;transition:border-color .2s;overflow:hidden}
-  @keyframes shuffle-pulse{0%,100%{border-top-color:#FF6B35;box-shadow:0 0 0 rgba(255,107,53,.3)}50%{border-top-color:#FF6B35;box-shadow:0 0 8px rgba(255,107,53,.5)}}
   @keyframes shuffle-pulse-badge{0%,100%{opacity:.8}50%{opacity:1}}
-  header.header-shuffle{animation:shuffle-pulse 2s ease-in-out infinite}
-  header.header-shuffle h1,
-  header.header-shuffle .brand-sub,
-  header.header-shuffle svg:not(button svg),
-  header.header-shuffle #header-stats,
-  header.header-shuffle .metro-pulse,
-  header.header-shuffle #header-pulse{filter:grayscale(100%);transition:filter .2s}
+  body.shuffle-active #nav-indicator{background:#FF6B35}
   header h1{font-size:18px;font-weight:700;letter-spacing:-.3px;line-height:1.1;color:var(--header-text)}
   .brand-sub{font-size:10.5px;color:rgba(244,238,226,.55);font-weight:400;font-style:italic;margin-top:2px;letter-spacing:.1px}
 
@@ -320,6 +313,7 @@
   .toggle-switch.on::after{transform:translateX(18px)}
   .toggle-switch.on.tog-green{background:var(--green)}
   .toggle-switch.on.tog-orange{background:var(--orange)}
+  .toggle-switch.on.tog-red{background:var(--red)}
   .toggle-switch:active::after{width:23px}
   /* Rangée de réglage on/off : libellé + sous-texte à gauche, switch à droite */
   .switch-row{display:flex;align-items:center;gap:12px;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}
@@ -392,6 +386,7 @@
       <button id="string-group-btn" class="h-icon-btn" onclick="cycleStringGroup()" title="Groupe de cordes — DGBE · ADGB · EADG" style="font-size:9px;font-weight:700;letter-spacing:.3px;min-width:34px">DGBE</button>
       <button id="neck-toggle-btn" class="h-icon-btn" onclick="toggleNeckPosition()" title="Basculer mid/high neck" style="font-size:10px;font-weight:700">mid</button>
       <button id="loop-ext-btn" class="h-icon-btn" onclick="cycleLoopExt()" title="Loop étendu — Base · −1 · +1 · +2 · +3 · +4" style="font-size:10px;font-weight:700;letter-spacing:.3px">L+0</button>
+      <button id="light-toggle-btn" class="h-icon-btn" onclick="toggleLightMode()" title="Mode Lite — version simplifiée des patterns" style="font-size:10px;font-weight:700;letter-spacing:.3px">LT</button>
       <button class="h-icon-btn" id="gear-btn" style="color:#E53935"
         onclick="openSettings()"
         aria-label="Réglages" title="Réglages">
@@ -923,6 +918,8 @@ function resetGammeStrings(patId) {
 function getGammeSelectedDir(patId) {
   const pat = PATTERNS.find(p => p.id === patId);
   if (!pat || !pat.hasDirectionTabs || !pat.directions) return null;
+  // Mode Light : direction imposée à Mix quand elle existe pour ce pattern
+  if (SETTINGS.lightMode && pat.versionTabs && pat.versionTabs.includes('M')) return 'M';
   const saved = state.gammeSelectedDir && state.gammeSelectedDir[patId];
   if (pat.versionTabs) {
     return (saved && pat.versionTabs.includes(saved)) ? saved : pat.versionTabs[0];
@@ -934,8 +931,9 @@ function getGammeSelectedDir(patId) {
 function getGammeSelectedForme(patId) {
   const pat = PATTERNS.find(p => p.id === patId);
   if (!pat || !pat.formeTabs) return null;
+  const allowed = getLightModeFormeTabs(pat);
   const saved = state.gammeSelectedForme && state.gammeSelectedForme[patId];
-  return (saved && pat.formeTabs.includes(saved)) ? saved : pat.formeTabs[0];
+  return (saved && allowed.includes(saved)) ? saved : allowed[0];
 }
 
 function getGammePenta(patId) {
@@ -1557,6 +1555,19 @@ function updateHeaderUI() {
     loopExtBtn.style.pointerEvents = inLabo ? 'none' : '';
   }
 
+  // Bouton Mode Light (Row 1) — non applicable au Labo
+  const lightBtn = document.getElementById('light-toggle-btn');
+  if (lightBtn) {
+    lightBtn.classList.toggle('hidden', !SETTINGS.showLightBtn);
+    lightBtn.textContent = SETTINGS.lightMode ? 'LT' : 'PRO';
+    lightBtn.style.background  = SETTINGS.lightMode ? 'rgba(244,238,226,.08)' : 'var(--red)';
+    lightBtn.style.borderColor = SETTINGS.lightMode ? 'rgba(244,238,226,.12)' : 'var(--red)';
+    lightBtn.style.color       = SETTINGS.lightMode ? 'var(--header-text)' : '#fff';
+    const inLaboLight = state.tab === 'shaker';
+    lightBtn.style.opacity       = inLaboLight ? '0.3' : '';
+    lightBtn.style.pointerEvents = inLaboLight ? 'none' : '';
+  }
+
   // Bouton Shuffle (Row 1)
   const shuffleBtn = document.getElementById('shuffle-toggle-btn');
   if (shuffleBtn) {
@@ -1602,6 +1613,26 @@ function toggleNeckPosition() {
   try { if (navigator.vibrate) navigator.vibrate([40, 20, 40]); } catch(ex){}
 }
 
+function toggleLightMode() {
+  setLightMode(!SETTINGS.lightMode);
+}
+
+function setLightMode(val) {
+  if (SETTINGS.lightMode === val) return;
+  SETTINGS.lightMode = val;
+  saveSettings();
+  updateHeaderUI();
+  updateNavIndicator();
+  previewStop();
+  render();
+  try { if (navigator.vibrate) navigator.vibrate([40, 20, 40]); } catch(ex){}
+  // Rafraîchir le bouton segmenté si le panneau Réglages est ouvert
+  if (document.getElementById('settings-overlay')) {
+    closeSettings();
+    setTimeout(() => openSettings('affichage'), 50);
+  }
+}
+
 function toggleShowNeckBtn() {
   SETTINGS.showNeckBtn = !SETTINGS.showNeckBtn;
   saveSettings();
@@ -1617,7 +1648,7 @@ function toggleHeaderEl(key, value) {
 
 function toggleAllHeaderEls(value) {
   ['showTrain','showCountin','showClick','showSubdivBtn','showMetroSolo',
-   'showShuffleBtn','showStringBtn','showNeckBtn','showLoopExtBtn','showHeaderStats']
+   'showShuffleBtn','showStringBtn','showNeckBtn','showLoopExtBtn','showHeaderStats','showLightBtn']
     .forEach(key => { SETTINGS[key] = value; });
   saveSettings();
   updateHeaderUI();
@@ -1749,6 +1780,9 @@ function updateNavIndicator() {
   if (!indicator || !active) return;
   indicator.style.left = active.offsetLeft + 'px';
   indicator.style.width = active.offsetWidth + 'px';
+  // Couleur : Shuffle (orange) est prioritaire sur Pro (rouge), sinon couleur par défaut
+  indicator.style.background = SETTINGS.shuffleMode ? 'var(--orange)'
+    : (!SETTINGS.lightMode ? 'var(--red)' : 'var(--blue)');
 }
 window.addEventListener('resize', updateNavIndicator);
 
@@ -1968,6 +2002,15 @@ function openSettings(tab) {
       <div id="pane-affichage" style="display:${settingsTab==='affichage'?'block':'none'}">
 
         <div class="group">
+          <label class="group-label">Lite / Pro</label>
+          <div class="seg" id="seg-light-mode">
+            <button class="${SETTINGS.lightMode ? 'active' : ''}" onclick="setLightMode(true)">Lite</button>
+            <button class="${!SETTINGS.lightMode ? 'active' : ''}" onclick="setLightMode(false)" style="${!SETTINGS.lightMode ? 'background:var(--red);border-color:var(--red);color:#fff' : ''}">Pro</button>
+          </div>
+          <div class="hint">${SETTINGS.lightMode ? 'Lite — version simplifiée des patterns' : 'Pro — version complète des patterns'}</div>
+        </div>
+
+        <div class="group">
           <label class="group-label">Loop étendu</label>
           <div class="seg" id="seg-loop-ext">
             ${[-1,0,1,2,3,4].map(n => `
@@ -2057,6 +2100,7 @@ function openSettings(tab) {
             { key:'showStringBtn',   label:'Groupe de cordes',   hint:'Basculer DGBE · ADGB · EADG depuis le header' },
             { key:'showNeckBtn',     label:'Mid / High',         hint:'Basculer la position du manche depuis le header' },
             { key:'showLoopExtBtn',  label:'Loop étendu',        hint:'Cycler Base · −1 · +1 · +2 · +3 depuis le header' },
+            { key:'showLightBtn',    label:'Lite / Pro',         hint:'Basculer Lite / Pro depuis le header' },
             { key:'showHeaderStats', label:'Stats streak',       hint:'Afficher la série, le record et le total' },
           ].map(item => `
           <div class="switch-row">
@@ -2281,15 +2325,14 @@ function toggleShuffleMode() {
 }
 
 function syncShuffleModeUI() {
-  // Animation header quand shuffle est actif
-  const header = document.querySelector('header');
-  if (header) header.classList.toggle('header-shuffle', SETTINGS.shuffleMode);
+  document.body.classList.toggle('shuffle-active', SETTINGS.shuffleMode);
   // Bouton SH dans la Row 1
   const shuffleBtn = document.getElementById('shuffle-toggle-btn');
   if (shuffleBtn) shuffleBtn.classList.toggle('active', SETTINGS.shuffleMode);
   // Badge legacy — masqué (remplacé par le bouton SH)
   const badge = document.getElementById('header-shuffle-badge');
   if (badge) badge.style.display = 'none';
+  updateNavIndicator();
 }
 
 function toggleTrainMode() {

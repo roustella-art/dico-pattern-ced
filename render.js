@@ -305,7 +305,8 @@ function buildGammeProgGrid(p) {
     : '#56864A';
 
   // Utiliser customInterps si présent, sinon utiliser INTERPS global
-  const interpsToUse = p.customInterps || INTERPS;
+  // Mode Light : une seule colonne (Pick bas / Down)
+  const interpsToUse = getLightModeInterps(p.customInterps || INTERPS);
   const interpLabels = p.customInterps
     ? { Down: 'Pick ↓', Up: 'Pick ↑', Sweep: 'Sweep' }
     : INTERP_LABELS;
@@ -354,6 +355,8 @@ function renderPatternGroupBody(pats, key) {
         const hasPentaDirs = Object.keys(p.directions).some(k => k.startsWith('Penta '));
         const pentaBtnStyle = `font-size:13px;font-weight:700;padding:6px 12px;border-radius:8px;border:1px solid #e53e3e;cursor:pointer;background:${isPenta?'#e53e3e':'transparent'};color:${isPenta?'#fff':'#e53e3e'};transition:all .15s`;
         const pentaBtn = hasPentaDirs ? `<button id="gamme-penta-btn-${p.id}" onclick="toggleGammePenta('${p.id}')" style="${pentaBtnStyle}">Penta</button>` : '';
+        // Mode Light : direction imposée à Mix → sélecteur de version masqué (rien à choisir)
+        const lightForcesMix = SETTINGS.lightMode && p.versionTabs.includes('M');
         const versionRow = p.versionTabs.map(vk => {
           const btnId = 'gamme-dir-btn-' + p.id + '-' + vk;
           const label = (p.versionLabels && p.versionLabels[vk]) || vk;
@@ -364,10 +367,12 @@ function renderPatternGroupBody(pats, key) {
             : `flex:1;font-size:13px;font-weight:600;padding:6px 10px;border-radius:8px;border:1px solid var(--border);cursor:pointer;background:transparent;color:var(--text2);transition:all .15s`;
           return `<button id="${btnId}" onclick="setGammeDirection('${p.id}','${vk}')" style="${vBtnStyle}">${label}</button>`;
         }).join('');
-        const useScrollForme = p.formeTabs.length > 5;
+        // Mode Light : ne proposer que les formes autorisées (voir LIGHT_MODE_FORME_EXCLUSIONS)
+        const formesToShow = getLightModeFormeTabs(p);
+        const useScrollForme = formesToShow.length > 5;
         const chipStyle = (isActive) =>
           `flex-shrink:0;font-size:13px;font-weight:${isActive?'700':'600'};padding:7px 14px;border-radius:20px;border:1.5px solid ${isActive?'var(--blue)':'var(--border)'};cursor:pointer;background:${isActive?'var(--blue)':'transparent'};color:${isActive?'#fff':'var(--text2)'};transition:all .15s;white-space:nowrap`;
-        const formeRow = p.formeTabs.map(fk => {
+        const formeRow = formesToShow.map(fk => {
           const btnId = 'gamme-forme-btn-' + p.id + '-' + fk.replace(/[↔→\s]/g, '_');
           const st = useScrollForme ? chipStyle(fk===selectedForme) : btnStyle(fk===selectedForme);
           return `<button id="${btnId}" onclick="setGammeForme('${p.id}','${fk}')" style="${st}">${fk}</button>`;
@@ -384,10 +389,11 @@ function renderPatternGroupBody(pats, key) {
             <label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:block">${p.formeSelectorLabel||'Forme'}</label>
             ${formeContainer}
           </div>
+          ${lightForcesMix ? '' : `
           <div style="margin-bottom:10px">
             <label style="font-size:11px;color:var(--text2);text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px;display:block">${p.versionSelectorLabel||'Version'}</label>
             <div style="display:flex;gap:6px">${versionRow}${pentaBtn}</div>
-          </div>`;
+          </div>`}`;
       } else {
         // Sélecteur simple (patterns existants) — masqué s'il n'y a qu'une seule option
         const dirKeys = Object.keys(p.directions);
@@ -589,7 +595,7 @@ function renderPatternGroupBody(pats, key) {
   const DIR_BG      = {U:'rgba(44,100,240,0.07)', D:'rgba(210,180,30,0.08)', M:'rgba(200,60,110,0.07)'};
   const dirColor    = DIR_COLORS[activeDir] || '#56864A';
   const dirBgColor  = DIR_BG[activeDir] || 'transparent';
-  const interpsToUse = p.customInterps || INTERPS;
+  const interpsToUse = getLightModeInterps(p.customInterps || INTERPS);
   const { gridRows } = buildProgGridRows(p.id, p.dir, dirColor, interpsToUse);
   const thStyle = i => PREVIEW.interp===i
     ? 'background:var(--orange);color:#fff;'
@@ -1031,6 +1037,7 @@ function renderGlobalProgress() {
     </div>`;
   });
 
+  html += `<div style="text-align:center;font-size:11px;color:var(--text3);margin-top:4px">Objectif 100% en mode Pro</div>`;
   html += `</div></div></details>`;
 
   html += `

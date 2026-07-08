@@ -43,6 +43,8 @@ const SETTINGS = {
   showNeckBtn: false,      // afficher/masquer le bouton mid/high dans le header
   showShuffleBtn: false,   // afficher bouton Shuffle dans la row 1 du header
   showLoopExtBtn: false,   // afficher bouton Loop étendu dans la row 1 du header
+  lightMode: true,         // mode Light par défaut (Light/Pro) : formes/direction/interp réduites (Patterns uniquement, pas le Labo)
+  showLightBtn: false,     // afficher bouton Mode Light dans la row 1 du header
   showStringBtn: false,    // afficher bouton groupe de cordes dans la row 1 du header
   showSubdivBtn: false,    // afficher bouton subdivision rythmique dans le header
   showTrain: false,        // afficher bouton Train. dans le header
@@ -82,6 +84,8 @@ function loadSettings() {
     if (s.showNeckBtn !== undefined) SETTINGS.showNeckBtn = s.showNeckBtn;
     if (s.showShuffleBtn !== undefined) SETTINGS.showShuffleBtn = s.showShuffleBtn;
     if (s.showLoopExtBtn !== undefined) SETTINGS.showLoopExtBtn = s.showLoopExtBtn;
+    if (s.lightMode !== undefined) SETTINGS.lightMode = s.lightMode;
+    if (s.showLightBtn !== undefined) SETTINGS.showLightBtn = s.showLightBtn;
     if (s.showStringBtn  !== undefined) SETTINGS.showStringBtn  = s.showStringBtn;
     if (s.showSubdivBtn !== undefined) SETTINGS.showSubdivBtn = s.showSubdivBtn;
     if (s.showTrain !== undefined) SETTINGS.showTrain = s.showTrain;
@@ -132,6 +136,8 @@ function saveSettings() {
       showNeckBtn: SETTINGS.showNeckBtn,
       showShuffleBtn: SETTINGS.showShuffleBtn,
       showLoopExtBtn: SETTINGS.showLoopExtBtn,
+      lightMode: SETTINGS.lightMode,
+      showLightBtn: SETTINGS.showLightBtn,
       showStringBtn:  SETTINGS.showStringBtn,
       showSubdivBtn: SETTINGS.showSubdivBtn,
       showTrain: SETTINGS.showTrain,
@@ -376,6 +382,32 @@ function getPatternPct(patId) {
     if (state.progress[getProgressKey(patId, f, mode, i, t)]) done++;
   })));
   return total > 0 ? Math.round(done / total * 100) : 0;
+}
+
+// ── MODE LIGHT ────────────────────────────────────────────────────────────────
+/**
+ * Retourne les formes à afficher pour un pattern, filtrées si le mode Light est actif
+ * et que la famille de formes du pattern a une entrée dans LIGHT_MODE_FORME_EXCLUSIONS.
+ * @param {Object} p - Pattern (doit avoir p.formeTabs)
+ * @returns {Array<string>} formeTabs éventuellement filtré
+ */
+function getLightModeFormeTabs(p) {
+  if (!p || !p.formeTabs) return p ? p.formeTabs : [];
+  if (!SETTINGS.lightMode) return p.formeTabs;
+  const excluded = LIGHT_MODE_FORME_EXCLUSIONS[p.formeTabs.join(',')];
+  if (!excluded) return p.formeTabs;
+  const filtered = p.formeTabs.filter(f => !excluded.includes(f));
+  return filtered.length ? filtered : p.formeTabs;
+}
+
+/**
+ * Ne garde que la première interprétation (Pick bas / Down) quand le mode Light est actif.
+ * @param {Array<string>} interps - Liste complète des interprétations (INTERPS ou p.customInterps)
+ * @returns {Array<string>}
+ */
+function getLightModeInterps(interps) {
+  if (!SETTINGS.lightMode || !interps || !interps.length) return interps;
+  return [interps[0]];
 }
 
 /**
