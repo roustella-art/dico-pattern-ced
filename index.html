@@ -363,21 +363,21 @@
         </svg>
         <div id="brand-text" style="min-width:0">
           <h1>Dico Pattern</h1>
-          <div class="brand-sub">le dictionnaire de patterns</div>
+          <div class="brand-sub">explorer • maîtriser • créer</div>
         </div>
       </div>
       <div id="header-shuffle-badge" style="display:none;align-items:center;gap:6px;padding:4px 10px;background:rgba(255,107,53,.15);border:1.5px solid #FF6B35;border-radius:8px;font-size:11px;font-weight:700;color:#FF6B35;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0;animation:shuffle-pulse-badge .8s ease-in-out infinite">♩ Shuffle</div>
       <div style="flex:1"></div>
-      <div id="header-stats" style="display:none;align-items:center;gap:6px;padding:0 8px;flex-shrink:0;font-size:12px;font-weight:700">
-        <div style="display:flex;align-items:center;gap:3px;color:#FF6B35">
+      <div id="header-stats" style="display:none;align-items:center;gap:4px;padding:0 4px;flex-shrink:0;font-size:10px;font-weight:700">
+        <div style="display:flex;align-items:center;gap:2px;color:#FF6B35">
           <span>🔥</span>
           <span id="stats-streak"></span>
         </div>
-        <div style="display:flex;align-items:center;gap:3px;color:#FFB703">
+        <div style="display:flex;align-items:center;gap:2px;color:#FFB703">
           <span>⚡</span>
           <span id="stats-record"></span>
         </div>
-        <div style="display:flex;align-items:center;gap:3px;color:#4ECDC4">
+        <div style="display:flex;align-items:center;gap:2px;color:#4ECDC4">
           <span>📅</span>
           <span id="stats-total"></span>
         </div>
@@ -1519,10 +1519,16 @@ function updateHeaderUI() {
     statsEl.style.display = SETTINGS.showHeaderStats ? 'flex' : 'none';
     if (SETTINGS.showHeaderStats) updateHeaderStatsDisplay();
   }
-  // Quand les stats sont visibles, masquer le texte "Dico Pattern / le dictionnaire de patterns"
-  // pour éviter que la Row 1 passe sur deux lignes
+  // Masquer le texte "Dico Pattern / le dictionnaire de patterns" si plus de 3 raccourcis sont visibles
   const brandText = document.getElementById('brand-text');
-  if (brandText) brandText.classList.toggle('hidden', !!SETTINGS.showHeaderStats);
+  if (brandText) {
+    const buttonIds = ['shuffle-toggle-btn', 'string-group-btn', 'neck-toggle-btn', 'loop-ext-btn', 'light-toggle-btn'];
+    const visibleCount = buttonIds.filter(id => {
+      const el = document.getElementById(id);
+      return el && !el.classList.contains('hidden');
+    }).length + (SETTINGS.showHeaderStats ? 1 : 0);
+    brandText.classList.toggle('hidden', visibleCount > 3);
+  }
 
   // Bouton groupe de cordes (Row 1) — couleur propre à chaque groupe
   const stringBtn = document.getElementById('string-group-btn');
@@ -2120,7 +2126,7 @@ function openSettings(tab) {
           <button class="sf-btn" onclick="doImportJSON()">↑ Importer JSON</button>
         </div>
         <button class="sf-reset" onclick="resetApp()">Réinitialiser l'app</button>
-        <div class="sf-version">v6.5</div>
+        <div class="sf-version">v6.6</div>
       </div>
     </div>
   </div>`;
