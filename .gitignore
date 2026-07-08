@@ -1,5 +1,20 @@
 .DS_Store
 node_modules
 www
-ios
-android
+
+# Capacitor : assets web copiés automatiquement par `npx cap sync` (régénérés depuis www/)
+ios/App/App/public
+android/app/src/main/assets/public
+
+# iOS : artefacts de build
+ios/DerivedData
+ios/App/output
+ios/App/CapApp-SPM/.swiftpm
+
+# Android : artefacts de build + fichiers spécifiques à la machine
+android/.gradle
+android/.idea
+android/build
+android/app/build
+android/capacitor-cordova-android-plugins/build
+android/local.properties

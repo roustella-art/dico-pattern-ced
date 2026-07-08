@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Dico Pattern</string>
+    <string name="title_activity_main">Dico Pattern</string>
+    <string name="package_name">com.cedm4.dicopattern</string>
+    <string name="custom_url_scheme">com.cedm4.dicopattern</string>
+</resources>
