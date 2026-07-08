@@ -21,7 +21,7 @@
     --text:#1B1815;--text2:#5C5250;--text3:#7E746A;
     --border:#E8DFD0;--radius:12px;
     --header-bg:#1F2D33;--header-text:#F4EEE2;
-    --nav-h:64px;--header-h:56px;
+    --nav-h:50px;--header-h:56px;
   }
   @media (prefers-color-scheme:dark){
     :root{
@@ -60,19 +60,14 @@
   html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text)}
   #app{display:flex;flex-direction:column;height:100dvh;max-width:640px;margin:0 auto}
 
-  /* Landscape mode: only on tablet/iPad — hauteur > 500px en paysage */
-  /* iPhone 12 landscape = ~390px height → exclus. iPad landscape = 768px+ → inclus */
-  @media (orientation: landscape) and (min-height: 500px) {
+  /* Landscape mode : pleine largeur sur tablette ET téléphone, avec zones de sécurité
+     pour l'encoche/caméra qui se retrouve sur le côté gauche ou droit selon la rotation */
+  @media (orientation: landscape) {
     #app{max-width:100%;padding:0}
   }
 
-  /* Force portrait layout on smartphone in landscape (small height ≤ 500px) */
-  @media (orientation: landscape) and (max-height: 500px) {
-    #app{max-width:640px;height:auto;min-height:100dvh}
-  }
-
   /* HEADER — dark warm teal */
-  header{background:var(--header-bg);color:var(--header-text);padding:10px 14px 4px;display:flex;flex-direction:column;flex-shrink:0;border-top:3px solid transparent;transition:border-color .2s;overflow:hidden}
+  header{background:var(--header-bg);color:var(--header-text);padding:calc(10px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) 4px calc(14px + env(safe-area-inset-left));display:flex;flex-direction:column;flex-shrink:0;border-top:3px solid transparent;transition:border-color .2s;overflow:hidden}
   @keyframes shuffle-pulse{0%,100%{border-top-color:#FF6B35;box-shadow:0 0 0 rgba(255,107,53,.3)}50%{border-top-color:#FF6B35;box-shadow:0 0 8px rgba(255,107,53,.5)}}
   @keyframes shuffle-pulse-badge{0%,100%{opacity:.8}50%{opacity:1}}
   header.header-shuffle{animation:shuffle-pulse 2s ease-in-out infinite}
@@ -141,10 +136,10 @@
   .metro-row.hd-compact{gap:5px}
 
   /* MAIN CONTENT */
-  main{flex:1;overflow-y:auto;padding:12px}
+  main{flex:1;overflow-y:auto;padding:12px calc(12px + env(safe-area-inset-right)) 12px calc(12px + env(safe-area-inset-left))}
 
   /* BOTTOM NAV */
-  nav{flex-shrink:0;width:100%;height:calc(var(--nav-h) + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--border);display:flex;padding-bottom:env(safe-area-inset-bottom);position:relative}
+  nav{flex-shrink:0;width:100%;height:calc(var(--nav-h) + env(safe-area-inset-bottom));background:var(--card);border-top:1px solid var(--border);display:flex;padding:0 env(safe-area-inset-right) env(safe-area-inset-bottom) env(safe-area-inset-left);position:relative}
   #nav-indicator{position:absolute;top:0;left:0;width:0;height:3px;background:var(--blue);border-radius:0 0 3px 3px;transition:left .28s cubic-bezier(.4,0,.2,1),width .28s cubic-bezier(.4,0,.2,1);pointer-events:none}
   nav button{flex:1;border:none;background:none;font-size:10px;color:var(--text2);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;cursor:pointer;transition:all .15s;-webkit-touch-callout:none;-webkit-user-select:none;user-select:none;-webkit-tap-highlight-color:transparent}
   nav button .ico{font-size:22px;line-height:1}
@@ -259,7 +254,7 @@
   /* HEADER GEAR — legacy, kept for compat (utilise .h-icon-btn) */
 
   /* SETTINGS MODAL */
-  .settings-overlay{position:fixed;inset:0;z-index:1000;background:rgba(15,25,55,.85);display:flex;align-items:flex-start;justify-content:center;padding:24px 14px;overflow-y:auto;animation:fadeIn .18s ease}
+  .settings-overlay{position:fixed;inset:0;z-index:1000;background:rgba(15,25,55,.85);display:flex;align-items:flex-start;justify-content:center;padding:calc(24px + env(safe-area-inset-top)) calc(14px + env(safe-area-inset-right)) calc(24px + env(safe-area-inset-bottom)) calc(14px + env(safe-area-inset-left));overflow-y:auto;animation:fadeIn .18s ease}
   @keyframes fadeIn{from{opacity:0}to{opacity:1}}
   @keyframes fadeInDown{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:translateY(0)}}
   @keyframes fadeInOut{0%{opacity:0;transform:scale(.9)};20%{opacity:1;transform:scale(1)};80%{opacity:1;transform:scale(1)};100%{opacity:0;transform:scale(.9)}}
@@ -2654,7 +2649,7 @@ function showResumePrompt() {
   if (document.getElementById('resume-prompt')) return;
   const div = document.createElement('div');
   div.id = 'resume-prompt';
-  div.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--orange);color:#fff;text-align:center;padding:14px 16px;font-size:13px;font-weight:600;cursor:pointer;letter-spacing:.2px;box-shadow:0 2px 12px rgba(0,0,0,.3);-webkit-tap-highlight-color:transparent;animation:fadeIn .15s ease';
+  div.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:9999;background:var(--orange);color:#fff;text-align:center;padding:calc(14px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) 14px calc(16px + env(safe-area-inset-left));font-size:13px;font-weight:600;cursor:pointer;letter-spacing:.2px;box-shadow:0 2px 12px rgba(0,0,0,.3);-webkit-tap-highlight-color:transparent;animation:fadeIn .15s ease';
   div.textContent = '▶  Appuyer pour reprendre la lecture';
   div.addEventListener('touchstart', onResumeGesture, { passive: true, once: true });
   div.addEventListener('click',      onResumeGesture, { once: true });
@@ -2666,12 +2661,16 @@ function hideResumePrompt() {
   if (el) el.remove();
 }
 
-async function onResumeGesture() {
+function onResumeGesture() {
   hideResumePrompt();
-  // Fermer les anciens contextes suspendus — previewCtx()/metroCtx() en créeront
-  // de nouveaux dans ce geste utilisateur (garantis en état 'running' sur iOS)
-  if (PREVIEW.ctx) { try { await PREVIEW.ctx.close(); } catch(e){} PREVIEW.ctx = null; }
-  if (METRO.ctx)   { try { await METRO.ctx.close();   } catch(e){} METRO.ctx   = null; }
+  // Détacher les anciens contextes puis les fermer en arrière-plan (sans attendre) —
+  // previewCtx()/metroCtx() doivent créer les nouveaux de façon SYNCHRONE dans ce
+  // geste utilisateur pour qu'iOS les autorise à produire du son ; un `await` ici
+  // ferait sortir la création du nouveau contexte du geste et le son resterait muet.
+  const oldPreviewCtx = PREVIEW.ctx; PREVIEW.ctx = null;
+  const oldMetroCtx   = METRO.ctx;   METRO.ctx   = null;
+  if (oldPreviewCtx) oldPreviewCtx.close().catch(()=>{});
+  if (oldMetroCtx)   oldMetroCtx.close().catch(()=>{});
   // Relancer directement dans le geste (pas de setTimeout — doit rester synchrone)
   if (_bgSavedPreviewId) {
     const id = _bgSavedPreviewId; _bgSavedPreviewId = null;

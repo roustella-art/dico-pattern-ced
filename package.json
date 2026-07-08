@@ -1,0 +1,31 @@
+{
+  "name": "dico-pattern-ced",
+  "version": "1.0.0",
+  "description": "App PWA d'entraînement guitare (patterns techniques + gammes).",
+  "main": "audio.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "build:www": "./build-www.sh",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/roustella-art/dico-pattern-ced.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/roustella-art/dico-pattern-ced/issues"
+  },
+  "homepage": "https://github.com/roustella-art/dico-pattern-ced#readme",
+  "dependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
+    "@capacitor/ios": "^8.4.1"
+  }
+}
