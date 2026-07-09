@@ -2960,7 +2960,7 @@ function toggleParcoursCell(key, btn, color) {
       // Mettre à jour le % de la direction
       let tot = 0, don = 0;
       const dp = PATTERNS.find(p => p.id === patId);
-      if (dp) INTERPS.forEach(i => TEMPOS.forEach(t => {
+      if (dp) getLightModeInterps(INTERPS).forEach(i => TEMPOS.forEach(t => {
         tot++; if (state.progress[getProgressKey(dp.id, 1, dir, i, t)]) don++;
       }));
       const dpct = tot ? Math.round(don/tot*100) : 0;
