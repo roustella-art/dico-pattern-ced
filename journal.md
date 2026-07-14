@@ -2,6 +2,83 @@
 
 ---
 
+## Session du 14 juillet 2026
+
+### Mode Guidé — progression par niveaux débloquables (Patterns)
+
+**Fichiers modifiés :** `data.js`, `state.js`, `render.js`, `index.html`
+
+Ajout d'un mode Guidé (actif par défaut) qui structure l'onglet Patterns en 7 niveaux à débloquer successivement, pensé pour les premières heures d'utilisation.
+
+- `data.js` : `PATTERN_LEVEL_GROUPS` (liste des groupes par niveau, définie par l'utilisateur) et `PATTERN_LEVEL_ORDER` (index de tri dérivé).
+- `state.js` : `getUnlockedLevel()` / `isLevelUnlocked(n)` / `isLevelComplete(n)` / `isAllLevelsComplete()` — un niveau se débloque quand tous ses groupes sont à 100% (`getGroupPct`).
+- `render.js` : le tri "Progressif" suit cet ordre personnalisé, avec un en-tête "Niveau X" entre chaque groupe. Les niveaux non débloqués affichent une carte verrouillée (icône cadenas SVG maison, `lockIconSVG()`) au lieu du détail. Bordure de carte colorée par niveau (vert 1-2, orange 3-5, rouge 6-7).
+- Tri "Favoris" reste utilisable même en mode Guidé (utile le temps de la progression) ; "Alphabétique" et "Aléatoire" restent verrouillés sur Progressif.
+- Toggle "Guidé / Complet" dans Réglages → Affichage (`SETTINGS.guidedMode`, défaut `true`), rendu en bouton segmenté gris/rouge.
+
+---
+
+### Popups de récompense par niveau + déblocages progressifs
+
+**Fichiers modifiés :** `index.html`, `state.js`
+
+Chaque niveau terminé à 100% déclenche un popup de félicitations qui débloque automatiquement un outil de l'app (déclenchés depuis `toggleParcoursCell`) :
+
+| Niveau | Récompense | Réglage activé |
+|---|---|---|
+| 1 | Mode Entraînement | `SETTINGS.showTrain` |
+| 2 | Labo (Shaker) | `isLaboUnlocked()`, `updateLaboNavVisibility()` masque/affiche l'onglet nav |
+| 3 | Mid/High manche | `SETTINGS.showNeckBtn` |
+| 4 | Groupe de cordes | `SETTINGS.showStringBtn` |
+| 5 | Loop étendu | `SETTINGS.showLoopExtBtn` |
+| 6 | Shuffle (précise que sa progression est indépendante, repart de 0%) | `SETTINGS.showShuffleBtn` |
+| 7 | Mode Pro (bascule automatique) | `SETTINGS.lightMode = false` |
+
+Le Labo reste accessible en permanence dès qu'on passe en mode Pro, même en revenant au niveau 1 (`isLaboUnlocked()` tient aussi compte de `!SETTINGS.lightMode`).
+
+Outil de debug associé : 5 à 11 taps rapides sur le logo du header remplissent la progression jusqu'au niveau correspondant (5 = Niveau 1 … 11 = Niveau 7), en laissant volontairement une case à cocher pour déclencher la récompense en conditions réelles (`debugFillToLevel(n)`).
+
+---
+
+### Bugfix — Shuffle du Labo qui cassait la progression Patterns
+
+**Fichiers modifiés :** `shaker.js`
+
+Charger un preset Labo marqué "shuffle" faisait basculer le flag global `SETTINGS.shuffleMode` — qui pilote aussi le suffixe de clé `__sh` de toute la progression Patterns (`getProgressKey`). Résultat : la progression et le déblocage du Labo semblaient réinitialisés tant que le Shuffle restait actif.
+
+**Fix :** nouveau flag local `skPresetShuffle`, entièrement découplé de `SETTINGS.shuffleMode`, utilisé uniquement pour le nudge rythmique et le tag du journal du Labo. Réinitialisé dans `skClearAll()`.
+
+---
+
+### Progression % Lite-aware
+
+**Fichiers modifiés :** `state.js`, `render.js`
+
+`getGroupPct`, `getPatternPct` et `renderGlobalProgress` comptent désormais uniquement les combinaisons formes/versions/interprétations effectivement visibles selon le mode Lite ou Pro actif (via `getLightModeFormeTabs`/`getLightModeVersionTabs`/`getLightModeInterps`), au lieu de compter systématiquement contre le total complet. Un niveau rempli à 100% en Lite affiche bien 100%, et remonte naturellement en repassant en Pro.
+
+---
+
+### Onboarding — refonte de l'accueil
+
+**Fichiers modifiés :** `onboarding.js`, `index.html`
+
+- À la fin du questionnaire (`onboardingComplete()`), l'app atterrit directement sur l'onglet Patterns (au lieu d'un Journal vide) et affiche le popup de bienvenue Patterns.
+- Le fond derrière le questionnaire d'onboarding est un aplat couleur header (`var(--header-bg)`) au lieu du contenu applicatif flouté — crée une vraie rupture visuelle à l'arrivée sur Patterns.
+- Mode Entraînement calé automatiquement sur les tempos choisis à l'onboarding : `trainBpmStart` = tempo Lent, `trainBpmMax` = tempo Chaud (pas et fréquence d'incrément inchangés : +5 BPM / boucle).
+- Nouveau texte d'accueil : *"Ton échauffement quotidien pour progresser à la guitare."*
+- Toutes les questions du questionnaire passées en tutoiement (joues-tu / pratiques-tu / t'inspire / ton style / ton profil).
+- Toast vert de fin d'onboarding supprimé (jugé polluant visuellement, sans information utile).
+
+---
+
+### Divers
+
+**Fichiers modifiés :** `render.js`
+
+L'onglet Journal s'ouvre désormais par défaut sur "Progression" plutôt que "Historique" (`journalSubTab` initialisé à `'stats'`).
+
+---
+
 ## Session du 18 juin 2026
 
 ### Taille réglable des tablatures

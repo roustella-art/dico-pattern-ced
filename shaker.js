@@ -19,6 +19,9 @@ const SK_PRESETS_KEY    = 'shaker_presets';
 let skSteps           = [];
 let skLastAssignments = [];
 let skPlayMode        = 'strict';
+// Shuffle propre au preset Labo chargé — distinct de SETTINGS.shuffleMode (Patterns) pour ne
+// jamais faire basculer le mode Shuffle global (et sa progression indépendante __sh) depuis le Labo
+let skPresetShuffle   = false;
 let skPatronOffset    = 1;
 let skLoopTimer       = null;
 let skIsPlaying       = false;
@@ -669,6 +672,7 @@ function skClearAll() {
   skLastAssignments = [];
   skOpenStep = -1;
   skCurrentPreset = '';
+  skPresetShuffle = false;
   skBuildStepsUI();
   skGenerateAndShow();
   skBuildPresetSelect();
@@ -780,7 +784,7 @@ function skToTimedEvents(arr, baseNoteDur) {
       a.notes.forEach((n, j) => {
         const g = globalIdx + j;
         // Nudge basé sur la position globale : note impaire (g%2===1) = swinguée de 0.34×nd
-        const nudge = SETTINGS.shuffleMode && (g % 2 === 1) ? (2 * 0.67 - 1) * nd : 0;
+        const nudge = skPresetShuffle && (g % 2 === 1) ? (2 * 0.67 - 1) * nd : 0;
         events.push({ string: a.string, fret: n, startTime: t + j * nd + nudge, dur: nd });
       });
       globalIdx += a.notes.length;
@@ -822,7 +826,7 @@ function playShaker() {
   skIsPlaying        = true;
 
   // Journal + streak : chaque lancement de lecture Labo compte comme une session
-  addLaboJournalEntry(skCurrentPreset, HCTRL.bpm, SETTINGS.trainMode, SETTINGS.trainPyramide, SETTINGS.shuffleMode);
+  addLaboJournalEntry(skCurrentPreset, HCTRL.bpm, SETTINGS.trainMode, SETTINGS.trainPyramide, skPresetShuffle);
 
   const m2    = skBuildMeasure2(skLastAssignments);
   const m1exp = skExpandRepeats(skLastAssignments);
@@ -1425,11 +1429,7 @@ function skLoadPresetByName(name) {
     const hbpm = document.getElementById('header-bpm-val');
     if (hbpm) hbpm.textContent = HCTRL.bpm;
   }
-  if (SETTINGS.shuffleMode !== !!p.shuffle) {
-    SETTINGS.shuffleMode = !!p.shuffle;
-    saveSettings();
-    if (typeof syncShuffleModeUI === 'function') syncShuffleModeUI();
-  }
+  skPresetShuffle = !!p.shuffle;
   skBuildStepsUI();
   skGenerateAndShow();
   skBuildFavBar();
@@ -1798,7 +1798,7 @@ function skConfirmSave() {
     createdAt: existing ? existing.createdAt : Date.now(),
     playMode: skPlayMode,
     bpm: HCTRL.bpm,
-    ...(SETTINGS.shuffleMode ? { shuffle: true } : {}),
+    ...(skPresetShuffle ? { shuffle: true } : {}),
   };
   if (!db.folders.includes(folder)) db.folders.push(folder);
   // Gestion groupe : ajouter le sous-dossier au groupe sélectionné, le retirer des autres.
@@ -1891,12 +1891,15 @@ function skRenderProgTable(presetName) {
 
   const modeBadge = `<span style="font-size:9px;font-weight:700;color:#fff;background:${color};border-radius:6px;padding:1px 6px;opacity:.9">${SK_MODE_LABELS[mode] || mode}</span>`;
 
+  // Mode Lite : une seule colonne (Pick bas / Down) dans le tableau de progression du Labo
+  const interpsToUse = getLightModeInterps(INTERPS);
+
   const gridRows = TEMPOS.map(tempo => {
     let row = `<tr><td class="tempo" style="text-align:center;padding:4px 6px;cursor:pointer;user-select:none" onclick="skSetLaboTempo('${tempo.key}')">
       <div style="display:flex;align-items:center;justify-content:center;gap:4px;margin-bottom:3px">${tempo.icon}</div>
       <span style="font-size:10px;color:${tempo.color};font-weight:700;display:block">${SETTINGS.tempoPresets[tempo.key]} <span style="font-size:8px;font-weight:500">bpm</span></span>
     </td>`;
-    INTERPS.forEach(interp => {
+    interpsToUse.forEach(interp => {
       const k    = `${presetName}__${mode}__${interp}__${tempo.key}`;
       const done = !!prog[k];
       const chkStyle = done ? `background:${color};border-color:${color};` : '';
@@ -1914,7 +1917,7 @@ function skRenderProgTable(presetName) {
     <div class="prog-grid" style="margin-bottom:10px">
       <table><thead><tr>
         <th style="width:68px;background:${color};vertical-align:middle">${modeBadge}</th>
-        ${INTERPS.map(i=>`<th data-interp-th="${i}" onclick="skSetInterp('${i}')"
+        ${interpsToUse.map(i=>`<th data-interp-th="${i}" onclick="skSetInterp('${i}')"
           style="cursor:pointer;transition:all .15s;${PREVIEW.interp===i ? 'background:var(--orange);color:#fff;' : 'background:var(--blue);color:rgba(255,255,255,.75);'}">${INTERP_LABELS[i]}</th>`).join('')}
       </tr></thead>
       <tbody>${gridRows}</tbody></table>

@@ -3,6 +3,27 @@
 // Contient : PATTERNS, MODES, MODE_LABELS, INTERPS, INTERP_LABELS, TEMPOS, FINGERINGS
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ── PROGRESSION PERSONNALISÉE (onglet Patterns, tri "Progressif") ─────────────
+// Ordre de progression défini manuellement par niveau (1 = le plus facile).
+// PATTERN_LEVEL_GROUPS liste les groupes (clé cat+num) niveau par niveau ;
+// PATTERN_LEVEL_ORDER en dérive un index de tri global + le niveau de chaque groupe.
+const PATTERN_LEVEL_GROUPS = [
+  ['A4P1', 'A6P1', 'A4P3', 'A4P4', 'A4P0'],
+  ['A3P1', 'A4P5', 'A4P7', 'A3P7', 'A3P8', 'A6P0'],
+  ['A3P9', 'A3P0', 'A6P3', 'A3P4', 'A6P5', 'A5P0'],
+  ['A4P9', 'A4P6', 'A3P6', 'A3P5', 'A6P4'],
+  ['A2P0', 'A5P1', 'A5P2', 'A2P1'],
+  ['A1P0', 'A6P2', 'A8P1'],
+  ['A4P2', 'A3P2', 'A3P3', 'A4P8'],
+];
+
+const PATTERN_LEVEL_ORDER = {};
+PATTERN_LEVEL_GROUPS.forEach((groupKeys, levelIdx) => {
+  groupKeys.forEach((key, i) => {
+    PATTERN_LEVEL_ORDER[key] = { level: levelIdx + 1, index: levelIdx * 1000 + i };
+  });
+});
+
 // ── MODE LIGHT ──────────────────────────────────────────────────────────────
 // Formes à exclure par famille (clé = p.formeTabs.join(',') exact) quand SETTINGS.lightMode
 // est actif. Une famille absente de cette table n'est pas filtrée (toutes les formes restent

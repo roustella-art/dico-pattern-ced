@@ -363,7 +363,7 @@
         </svg>
         <div id="brand-text" style="min-width:0">
           <h1>Dico Pattern</h1>
-          <div class="brand-sub">explorer • maîtriser • créer</div>
+          <div class="brand-sub">explorer • progresser • créer</div>
         </div>
       </div>
       <div id="header-shuffle-badge" style="display:none;align-items:center;gap:6px;padding:4px 10px;background:rgba(255,107,53,.15);border:1.5px solid #FF6B35;border-radius:8px;font-size:11px;font-weight:700;color:#FF6B35;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0;animation:shuffle-pulse-badge .8s ease-in-out infinite">♩ Shuffle</div>
@@ -1628,11 +1628,26 @@ function setLightMode(val) {
   SETTINGS.lightMode = val;
   saveSettings();
   updateHeaderUI();
+  updateLaboNavVisibility();
   updateNavIndicator();
   previewStop();
   render();
   try { if (navigator.vibrate) navigator.vibrate([40, 20, 40]); } catch(ex){}
   // Rafraîchir le bouton segmenté si le panneau Réglages est ouvert
+  if (document.getElementById('settings-overlay')) {
+    closeSettings();
+    setTimeout(() => openSettings('affichage'), 50);
+  }
+}
+
+function setGuidedMode(val) {
+  if (SETTINGS.guidedMode === val) return;
+  SETTINGS.guidedMode = val;
+  saveSettings();
+  updateLaboNavVisibility();
+  updateNavIndicator();
+  render();
+  try { if (navigator.vibrate) navigator.vibrate([40, 20, 40]); } catch(ex){}
   if (document.getElementById('settings-overlay')) {
     closeSettings();
     setTimeout(() => openSettings('affichage'), 50);
@@ -1754,6 +1769,7 @@ function tabWrapClick(patId) { previewPlay(patId); }
 
 // ─── TABS ─────────────────────────────────────────────────────────────────────
 function showTab(tab) {
+  if (tab === 'shaker' && !isLaboUnlocked()) return; // Labo verrouillé (mode Guidé)
   // Double-tap sur l'onglet actif : ferme les cartes, stop la preview, reset vers métronome
   if (tab === state.tab && tab === 'patterns') {
     previewStop();
@@ -1777,6 +1793,242 @@ function showTab(tab) {
   render();
   updateHeaderUI();
   updateHeaderStatsDisplay();
+}
+
+// Masque/affiche l'onglet Labo dans la nav selon isLaboUnlocked() (mode Guidé)
+function updateLaboNavVisibility() {
+  const btn = document.getElementById('nav-shaker');
+  if (!btn) return;
+  btn.style.display = isLaboUnlocked() ? '' : 'none';
+}
+
+// Affiche une fois le popup "Bravo, Labo débloqué !" quand le mode Guidé vient de débloquer le Labo
+function checkLaboUnlockCelebration() {
+  if (!SETTINGS.guidedMode || state.laboUnlockedSeen || !isLaboUnlocked()) return;
+  state.laboUnlockedSeen = true;
+  saveState();
+  updateLaboNavVisibility();
+  updateNavIndicator();
+  const overlay = document.createElement('div');
+  overlay.id = 'labo-unlock-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px)';
+  overlay.innerHTML = `
+    <div style="background:var(--card);border-radius:18px;max-width:380px;width:100%;padding:28px 24px 24px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.4)">
+      <div style="font-size:44px;margin-bottom:10px">🎉</div>
+      <div style="font-size:19px;font-weight:800;color:var(--text);margin-bottom:8px">Bravo !</div>
+      <div style="font-size:14px;color:var(--text2);line-height:1.5;margin-bottom:22px">Tu as terminé les niveaux 1 et 2 — le <strong>Labo</strong> est maintenant débloqué. Tu peux y composer tes propres exercices !</div>
+      <button onclick="document.getElementById('labo-unlock-overlay').remove()" style="width:100%;background:var(--blue);color:#fff;border:none;padding:13px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">Découvrir le Labo</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+// Affiche une fois le popup "Passage en mode Pro" quand le niveau 7 (le dernier) atteint 100%,
+// et active automatiquement le mode Pro (SETTINGS.lightMode = false).
+function checkProUnlockCelebration() {
+  if (state.proUnlockedSeen || !isAllLevelsComplete()) return;
+  state.proUnlockedSeen = true;
+  saveState();
+  SETTINGS.lightMode = false;
+  saveSettings();
+  updateHeaderUI();
+  updateLaboNavVisibility();
+  updateNavIndicator();
+  render();
+  const overlay = document.createElement('div');
+  overlay.id = 'pro-unlock-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px)';
+  overlay.innerHTML = `
+    <div style="background:var(--card);border-radius:18px;max-width:380px;width:100%;padding:28px 24px 24px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.4)">
+      <div style="font-size:44px;margin-bottom:10px">🏆</div>
+      <div style="font-size:19px;font-weight:800;color:var(--text);margin-bottom:8px">Félicitations !</div>
+      <div style="font-size:14px;color:var(--text2);line-height:1.5;margin-bottom:22px">Tu as terminé les <strong>7 niveaux</strong> de progression. Tu passes désormais en mode <strong style="color:var(--red)">Pro</strong> — la version complète des patterns est débloquée !</div>
+      <button onclick="document.getElementById('pro-unlock-overlay').remove()" style="width:100%;background:var(--red);color:#fff;border:none;padding:13px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">Continuer en Pro</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+// Affiche une fois le popup "Mode entraînement débloqué" quand le Niveau 1 atteint 100%,
+// et active automatiquement le raccourci Train. dans le header (SETTINGS.showTrain).
+function checkTrainUnlockCelebration() {
+  if (state.trainUnlockedSeen || !isLevel1Complete()) return;
+  state.trainUnlockedSeen = true;
+  saveState();
+  SETTINGS.showTrain = true;
+  saveSettings();
+  updateHeaderUI();
+  const overlay = document.createElement('div');
+  overlay.id = 'train-unlock-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px)';
+  overlay.innerHTML = `
+    <div style="background:var(--card);border-radius:18px;max-width:380px;width:100%;padding:28px 24px 24px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.4)">
+      <div style="font-size:44px;margin-bottom:10px">🎉</div>
+      <div style="font-size:19px;font-weight:800;color:var(--text);margin-bottom:8px">Niveau 1 terminé !</div>
+      <div style="font-size:14px;color:var(--text2);line-height:1.5;margin-bottom:22px">Tu débloques le <strong>mode Entraînement</strong> (raccourci ↗ dans le header) : il monte le tempo tout seul à chaque répétition, pour progresser sans y penser. Un 2ᵉ clic active le mode pyramide (montée puis redescente).</div>
+      <button onclick="document.getElementById('train-unlock-overlay').remove()" style="width:100%;background:var(--blue);color:#fff;border:none;padding:13px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">Compris</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+// ── DEBUG — 5 taps rapides sur le logo : injecte une progression de test ──────
+// Coche tous les groupes du Niveau 1 et du Niveau 2 (sauf A6P0), pour tester
+// rapidement le déblocage du Labo/popup sans tout recocher à la main.
+function _debugFillGroup100(groupKey) {
+  const pats = PATTERNS.filter(p => p.cat + 'P' + p.num === groupKey);
+  pats.forEach(p => {
+    if (p.hasDirectionTabs && p.versionTabs && p.formeTabs) {
+      const versionsToUse = getLightModeVersionTabs(p);
+      const formesToUse = getLightModeFormeTabs(p);
+      const interpsToUse = getLightModeInterps(p.customInterps || INTERPS);
+      versionsToUse.forEach(vk => {
+        formesToUse.forEach(fk => {
+          const progressId = p.id + '__' + vk + '_' + fk;
+          interpsToUse.forEach(i => TEMPOS.forEach(t => {
+            state.progress[getProgressKey(progressId, 1, 'U', i, t)] = true;
+          }));
+        });
+      });
+    } else if (p.special && p.hasDirectionTabs && p.directions) {
+      const interpsToUse = getLightModeInterps(p.customInterps || INTERPS);
+      Object.keys(p.directions).forEach(dirKey => {
+        const progressId = p.id + '__' + dirKey.replace(/[→↔]/g, '-');
+        interpsToUse.forEach(i => TEMPOS.forEach(t => {
+          state.progress[getProgressKey(progressId, 1, 'U', i, t)] = true;
+        }));
+      });
+    } else if (p.dir) {
+      const interpsToUse = getLightModeInterps(p.customInterps || INTERPS);
+      interpsToUse.forEach(i => TEMPOS.forEach(t => {
+        state.progress[getProgressKey(p.id, 1, p.dir, i, t)] = true;
+      }));
+    }
+  });
+}
+
+// Remet à false une seule case de progression déjà cochée dans un groupe (la dernière générée),
+// pour laisser exactement une case à cocher par l'utilisateur lors du test.
+function _debugUnsetOneCell(groupKey) {
+  const p = PATTERNS.find(x => x.cat + 'P' + x.num === groupKey);
+  if (!p) return;
+  const lastT = TEMPOS[TEMPOS.length - 1];
+  if (p.hasDirectionTabs && p.versionTabs && p.formeTabs) {
+    const versionsToUse = getLightModeVersionTabs(p);
+    const formesToUse = getLightModeFormeTabs(p);
+    const interpsToUse = getLightModeInterps(p.customInterps || INTERPS);
+    const progressId = p.id + '__' + versionsToUse[versionsToUse.length - 1] + '_' + formesToUse[formesToUse.length - 1];
+    delete state.progress[getProgressKey(progressId, 1, 'U', interpsToUse[interpsToUse.length - 1], lastT)];
+  } else if (p.special && p.hasDirectionTabs && p.directions) {
+    const dirKeys = Object.keys(p.directions);
+    const progressId = p.id + '__' + dirKeys[dirKeys.length - 1].replace(/[→↔]/g, '-');
+    const interpsToUse = getLightModeInterps(p.customInterps || INTERPS);
+    delete state.progress[getProgressKey(progressId, 1, 'U', interpsToUse[interpsToUse.length - 1], lastT)];
+  } else if (p.dir) {
+    const interpsToUse = getLightModeInterps(p.customInterps || INTERPS);
+    delete state.progress[getProgressKey(p.id, 1, p.dir, interpsToUse[interpsToUse.length - 1], lastT)];
+  }
+}
+
+// Construit et affiche un popup de récompense de niveau générique (modèle commun aux niveaux 3-6)
+function _showLevelUnlockOverlay(overlayId, emoji, title, message, btnLabel, btnColor) {
+  const overlay = document.createElement('div');
+  overlay.id = overlayId;
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px)';
+  overlay.innerHTML = `
+    <div style="background:var(--card);border-radius:18px;max-width:380px;width:100%;padding:28px 24px 24px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.4)">
+      <div style="font-size:44px;margin-bottom:10px">${emoji}</div>
+      <div style="font-size:19px;font-weight:800;color:var(--text);margin-bottom:8px">${title}</div>
+      <div style="font-size:14px;color:var(--text2);line-height:1.5;margin-bottom:22px">${message}</div>
+      <button onclick="document.getElementById('${overlayId}').remove()" style="width:100%;background:${btnColor};color:#fff;border:none;padding:13px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">${btnLabel}</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
+// Niveau 3 terminé → débloque le sélecteur de position Mid/High du manche
+function checkNeckUnlockCelebration() {
+  if (state.neckUnlockedSeen || !isLevelComplete(3)) return;
+  state.neckUnlockedSeen = true;
+  saveState();
+  SETTINGS.showNeckBtn = true;
+  saveSettings();
+  updateHeaderUI();
+  _showLevelUnlockOverlay('neck-unlock-overlay', '🎉', 'Niveau 3 terminé !',
+    'Tu débloques le raccourci <strong>Mid/High</strong> dans le header : il déplace instantanément la zone d\'affichage du manche entre la case 5 (Mid) et la case 12 (High), pour explorer tes patterns ailleurs sur le manche.',
+    'Compris', 'var(--blue)');
+}
+
+// Niveau 4 terminé → débloque le sélecteur de groupe de cordes
+function checkStringUnlockCelebration() {
+  if (state.stringUnlockedSeen || !isLevelComplete(4)) return;
+  state.stringUnlockedSeen = true;
+  saveState();
+  SETTINGS.showStringBtn = true;
+  saveSettings();
+  updateHeaderUI();
+  _showLevelUnlockOverlay('string-unlock-overlay', '🎉', 'Niveau 4 terminé !',
+    'Tu débloques le raccourci <strong>Groupe de cordes</strong> dans le header : change instantanément le jeu de 4 cordes utilisé pour tes patterns (aigu/médium/grave), pour varier les zones du manche.',
+    'Compris', 'var(--blue)');
+}
+
+// Niveau 5 terminé → débloque le Loop étendu
+function checkLoopExtUnlockCelebration() {
+  if (state.loopExtUnlockedSeen || !isLevelComplete(5)) return;
+  state.loopExtUnlockedSeen = true;
+  saveState();
+  SETTINGS.showLoopExtBtn = true;
+  saveSettings();
+  updateHeaderUI();
+  _showLevelUnlockOverlay('loopext-unlock-overlay', '🎉', 'Niveau 5 terminé !',
+    'Tu débloques le raccourci <strong>Loop étendu</strong> dans le header : il prolonge le pattern en pyramide (+1 à +4) au lieu de le boucler à l\'identique, pour des enchaînements plus longs et plus musicaux.',
+    'Compris', 'var(--blue)');
+}
+
+// Niveau 6 terminé → débloque le mode Shuffle
+function checkShuffleUnlockCelebration() {
+  if (state.shuffleUnlockedSeen || !isLevelComplete(6)) return;
+  state.shuffleUnlockedSeen = true;
+  saveState();
+  SETTINGS.showShuffleBtn = true;
+  saveSettings();
+  updateHeaderUI();
+  _showLevelUnlockOverlay('shuffle-unlock-overlay', '🎉', 'Niveau 6 terminé !',
+    'Tu débloques le mode <strong>Shuffle</strong> (raccourci SH dans le header) : il te propose des patterns aléatoires pour sortir de l\'ordre habituel. Attention, sa progression est <strong>indépendante</strong> — elle repart de 0% et ne compte pas dans ta progression par niveaux.',
+    'Compris', 'var(--orange)');
+}
+
+// ── DEBUG — taps rapides sur le logo (5 à 11) : remplit les niveaux 1..N-1 à 100% et le
+// niveau N à 100% sauf UNE case, pour tester rapidement la récompense de chaque niveau.
+// 5 taps = Niveau 1 · 6 = Niveau 2 · 7 = Niveau 3 · ... · 11 = Niveau 7
+function debugFillToLevel(n) {
+  n = Math.max(1, Math.min(PATTERN_LEVEL_GROUPS.length, n));
+  state.progress = {};
+  state.trainUnlockedSeen   = n > 1; // Niveau 1 déjà "vu" si on teste un niveau ultérieur
+  state.laboUnlockedSeen    = n > 2; // Labo débloqué dès le Niveau 2 terminé
+  state.neckUnlockedSeen    = n > 3;
+  state.stringUnlockedSeen  = n > 4;
+  state.loopExtUnlockedSeen = n > 5;
+  state.shuffleUnlockedSeen = n > 6;
+  state.proUnlockedSeen     = false; // jamais atteint ici (une case reste toujours à cocher)
+  if (n <= 2) localStorage.removeItem('dico-labo-welcome-done');
+
+  PATTERN_LEVEL_GROUPS.forEach((groupKeys, i) => {
+    if (i < n - 1) {
+      groupKeys.forEach(g => _debugFillGroup100(g));
+    } else if (i === n - 1) {
+      groupKeys.forEach(g => _debugFillGroup100(g));
+      _debugUnsetOneCell(groupKeys[groupKeys.length - 1]);
+    }
+  });
+  saveState();
+  state.openCards = {};
+  updateLaboNavVisibility();
+  updateNavIndicator();
+  render();
+  try { if (navigator.vibrate) navigator.vibrate([20,30,20,30,60]); } catch(ex){}
+  const prevLevelsMsg = n > 1 ? `Niveaux 1 à ${n - 1} à 100%, ` : '';
+  alert(`🧪 Progression de test injectée : ${prevLevelsMsg}Niveau ${n} presque fini (une case à cocher). Coche-la pour déclencher la récompense du Niveau ${n}.`);
 }
 
 // Positionne la barre flottante au-dessus de l'onglet actif (glisse en douceur)
@@ -2008,6 +2260,15 @@ function openSettings(tab) {
       <div id="pane-affichage" style="display:${settingsTab==='affichage'?'block':'none'}">
 
         <div class="group">
+          <label class="group-label">Mode guidé</label>
+          <div class="seg" id="seg-guided-mode">
+            <button class="${SETTINGS.guidedMode ? 'active' : ''}" onclick="setGuidedMode(true)">Guidé</button>
+            <button class="${!SETTINGS.guidedMode ? 'active' : ''}" onclick="setGuidedMode(false)">Complet</button>
+          </div>
+          <div class="hint">${SETTINGS.guidedMode ? 'Guidé — les niveaux se débloquent un par un (termine un niveau à 100% pour accéder au suivant)' : 'Complet — tous les niveaux et tris sont accessibles librement'}</div>
+        </div>
+
+        <div class="group">
           <label class="group-label">Lite / Pro</label>
           <div class="seg" id="seg-light-mode">
             <button class="${SETTINGS.lightMode ? 'active' : ''}" onclick="setLightMode(true)">Lite</button>
@@ -2126,7 +2387,7 @@ function openSettings(tab) {
           <button class="sf-btn" onclick="doImportJSON()">↑ Importer JSON</button>
         </div>
         <button class="sf-reset" onclick="resetApp()">Réinitialiser l'app</button>
-        <div class="sf-version">v6.6</div>
+        <div class="sf-version">v6.30</div>
       </div>
     </div>
   </div>`;
@@ -2763,6 +3024,10 @@ document.addEventListener('mousedown',  wakeLockResetInactiveTimer, { passive: t
 
 // ─── BOOT ─────────────────────────────────────────────────────────────────────
 loadState();
+updateLaboNavVisibility();  // masque l'onglet Labo tant que le Labo n'est pas débloqué (mode Guidé)
+if (!isLaboUnlocked() && state.tab === 'shaker') state.tab = 'patterns';
+// Première utilisation : afficher Patterns en fond (flouté par l'onboarding) plutôt que Journal vide
+if (typeof hasCompletedOnboarding === 'function' && !hasCompletedOnboarding()) state.tab = 'patterns';
 showOnboarding();           // affiche le questionnaire de niveau à la première utilisation
 applyDarkMode();            // applique le dark mode si activé dans les settings
 applyTabColor();            // applique la couleur des tablatures sauvegardée
@@ -2947,21 +3212,30 @@ function toggleParcoursCell(key, btn, color) {
   }
   // Mettre à jour l'affichage du pourcentage
   refreshSpecialProgressPercent(key);
+  // Vérifier le déblocage du Labo (mode Guidé) avant tout code pouvant lever une exception ci-dessous
+  if (done) {
+    checkTrainUnlockCelebration();
+    checkLaboUnlockCelebration();
+    checkNeckUnlockCelebration();
+    checkStringUnlockCelebration();
+    checkLoopExtUnlockCelebration();
+    checkShuffleUnlockCelebration();
+    checkProUnlockCelebration();
+  }
   // Mettre à jour aussi les pourcentages par direction s'il s'agit d'un pattern normal
+  // (clé à exactement 5 segments : patId__fing__dir__interp__tempo — les patterns unifiés/gammes
+  // ont un progressId contenant lui-même un '_', donc 6 segments ou plus, et ne passent pas ici)
   const parts = key.split('__');
-  if (parts.length >= 5) {
+  if (parts.length === 5) {
     const patId = parts[0];
     const dir = parts[2];
     const pat = PATTERNS.find(p => p.id === patId);
     if (pat) {
       const groupKey = pat.cat + 'P' + pat.num;
-      // Mettre à jour la progress bar uniquement (pas les couleurs)
-      refreshDirPctsNoColor(groupKey);
       // Mettre à jour le % de la direction
       let tot = 0, don = 0;
-      const dp = PATTERNS.find(p => p.id === patId);
-      if (dp) getLightModeInterps(INTERPS).forEach(i => TEMPOS.forEach(t => {
-        tot++; if (state.progress[getProgressKey(dp.id, 1, dir, i, t)]) don++;
+      if (getLightModeInterps(INTERPS)) getLightModeInterps(INTERPS).forEach(i => TEMPOS.forEach(t => {
+        tot++; if (state.progress[getProgressKey(pat.id, 1, dir, i, t)]) don++;
       }));
       const dpct = tot ? Math.round(don/tot*100) : 0;
       const dirPctEl = document.getElementById('dirpct-' + groupKey + '-' + dir);

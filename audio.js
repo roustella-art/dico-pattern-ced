@@ -1306,10 +1306,20 @@ function navHidePressStart(e) {
     toggleNavVisibility();
   }, 480);
 }
+let _logoTapCount = 0, _logoTapTimer = null;
 function navHidePressEnd(e) {
   clearTimeout(_navHidePressTimer);
   _navHidePressTimer = null;
-  // Pas d'action sur tap court — le logo n'a pas d'autre fonction
+  if (_navHideLongFired) return; // un long press vient de se déclencher : on ignore le tap
+  // Taps courts rapprochés sur le logo : injecte une progression de test (debug)
+  // 5 taps = Niveau 1 presque fini · 6 = Niveau 2 · 7 = Niveau 3 · ... · 11 = Niveau 7
+  _logoTapCount++;
+  if (_logoTapTimer) clearTimeout(_logoTapTimer);
+  _logoTapTimer = setTimeout(() => {
+    const n = _logoTapCount;
+    _logoTapCount = 0; _logoTapTimer = null;
+    if (n >= 5 && typeof debugFillToLevel === 'function') debugFillToLevel(n - 4);
+  }, 600);
 }
 function navHidePressCancel() {
   clearTimeout(_navHidePressTimer);

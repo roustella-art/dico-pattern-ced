@@ -8,7 +8,7 @@
 // ─────────────────────────────────────────────────────────────────────────────
 
 // ─── RENDER ───────────────────────────────────────────────────────────────────
-let journalSubTab = 'journal'; // 'journal' | 'stats'
+let journalSubTab = 'stats'; // 'journal' | 'stats' — Progression par défaut à l'arrivée sur Journal
 
 const DIR_BTN_COLORS = {
   U: { bg:'rgba(26,122,94,.13)',  color:'#1a7a5e', border:'#1a7a5e' },
@@ -73,7 +73,8 @@ function getDailyRandomPatterns() {
     // Calculer progression réelle sur toutes les directions du groupe
     let total = 0, done = 0, discovered = false;
     PATTERNS.filter(q => q.cat + 'P' + q.num === gkey).forEach(q => {
-      [1].forEach(f => INTERPS.forEach(i => TEMPOS.forEach(t => {
+      const interpsToUse = getLightModeInterps(INTERPS);
+      [1].forEach(f => interpsToUse.forEach(i => TEMPOS.forEach(t => {
         const pk = getProgressKey(q.id, f, q.dir, i, t);
         total++;
         if (state.progress[pk]) { done++; discovered = true; }
@@ -139,7 +140,8 @@ function renderParcours() {
     let totalE = 0, doneE = 0;
     Object.values(groups).forEach(g => {
       g.patterns.forEach(p => {
-        [1].forEach(f => INTERPS.forEach(i => TEMPOS.forEach(t => {
+        const interpsToUse = getLightModeInterps(INTERPS);
+        [1].forEach(f => interpsToUse.forEach(i => TEMPOS.forEach(t => {
           totalE++;
           if (state.progress[getProgressKey(p.id, f, p.dir, i, t)]) doneE++;
         })));
@@ -519,7 +521,7 @@ function renderPatternGroupBody(pats, key) {
     const dc = DIR_BTN_COLORS[d] || { bg:'var(--blue-light)', color:'var(--blue)', border:'var(--blue)' };
     let tot = 0, don = 0;
     const dp = pats.find(x => x.dir === d);
-    if (dp) INTERPS.forEach(i => TEMPOS.forEach(t => {
+    if (dp) getLightModeInterps(INTERPS).forEach(i => TEMPOS.forEach(t => {
       tot++; if (state.progress[getProgressKey(dp.id,1,d,i,t)]) don++;
     }));
     const dpct = tot ? Math.round(don/tot*100) : 0;
@@ -670,6 +672,15 @@ function diffTag(d) {
   return `<span class="tag diff-adv">${d}</span>`;
 }
 
+function lockIconSVG(size, color) {
+  size = size || 12; color = color || 'var(--text2)';
+  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:-2px">
+    <rect x="5" y="11" width="14" height="10" rx="2"/>
+    <path d="M8 11V7a4 4 0 018 0v4"/>
+    <circle cx="12" cy="16" r="1.3" fill="${color}" stroke="none"/>
+  </svg>`;
+}
+
 function dirLabel(d) {
   return {U:'⬆ Ascendant',D:'⬇ Descendant',M:'↕ Mix'}[d] || d;
 }
@@ -680,16 +691,25 @@ function dirLabel(d) {
  */
 function renderPatterns() {
   if (!state.patternSort) state.patternSort = 'progressif';
+  // Mode Guidé : tri forcé sur Progressif, sauf Favoris qui reste utilisable (utile le temps de la progression)
+  if (SETTINGS.guidedMode && state.patternSort !== 'favoris') state.patternSort = 'progressif';
 
   const sorts = ['progressif','alphabetique','aleatoire','favoris'];
   const sortLabels = {progressif:'Progressif', alphabetique:'Alphabétique', aleatoire:'Aléatoire', favoris:'Favoris'};
   let html = `<div class="filter-seg">`;
   sorts.forEach(s => {
     const active = state.patternSort === s ? 'active' : '';
+    const locked = SETTINGS.guidedMode && s !== 'progressif' && s !== 'favoris';
     const favStyle = s === 'favoris' && active ? 'style="background:#E91E63;border-color:#E91E63;color:#fff"' : s === 'favoris' ? 'style="color:#E91E63"' : '';
-    html += `<button class="${active} sort-${s}" onclick="setPatternSort('${s}')" ${favStyle}>${sortLabels[s]}</button>`;
+    html += `<button class="${active} sort-${s}" ${locked ? 'style="opacity:.35;pointer-events:none"' : `onclick="setPatternSort('${s}')" ${favStyle}`}>${sortLabels[s]}</button>`;
   });
   html += `</div>`;
+
+  if (SETTINGS.guidedMode) {
+    html += `<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--text2);margin:-6px 0 10px;padding-left:2px">
+      <span>${lockIconSVG(12)} Mode guidé actif — termine un niveau à 100% pour débloquer le suivant</span>
+    </div>`;
+  }
 
   if (SETTINGS.showDiffFilter) {
     if (!state.diffFilter) state.diffFilter = 'all';
@@ -726,9 +746,9 @@ function renderPatterns() {
 
   if (state.patternSort === 'progressif') {
     sortedEntries = sortedEntries.sort((a, b) => {
-      const da = diffOrder[a[1][0].difficulty] ?? 3;
-      const db = diffOrder[b[1][0].difficulty] ?? 3;
-      if (da !== db) return da - db;
+      const ia = PATTERN_LEVEL_ORDER[a[0]] ? PATTERN_LEVEL_ORDER[a[0]].index : 9999;
+      const ib = PATTERN_LEVEL_ORDER[b[0]] ? PATTERN_LEVEL_ORDER[b[0]].index : 9999;
+      if (ia !== ib) return ia - ib;
       return a[0].localeCompare(b[0]);
     });
   } else if (state.patternSort === 'alphabetique') {
@@ -742,16 +762,47 @@ function renderPatterns() {
     sortedEntries.sort((a, b) => a[0].localeCompare(b[0]));
   }
 
+  const unlockedLevel = SETTINGS.guidedMode ? getUnlockedLevel() : null;
+
+  let lastLevel = null;
+  let isFirstGroup = true;
   sortedEntries.forEach(([key, pats]) => {
     // Passer les gammes (qui seront affichées dans une section séparée)
     if (pats[0].cat === 'gamme') return;
+
+    const lvl = PATTERN_LEVEL_ORDER[key] ? PATTERN_LEVEL_ORDER[key].level : null;
+
+    if (state.patternSort === 'progressif') {
+      if (lvl !== lastLevel) {
+        lastLevel = lvl;
+        const lockedLevelIcon = (unlockedLevel && lvl && lvl > unlockedLevel) ? ' ' + lockIconSVG(11) : '';
+        html += `<div style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--text2);margin:${isFirstGroup ? '4px' : '18px'} 0 8px;padding-left:2px">${lvl ? 'Niveau ' + lvl + lockedLevelIcon : 'Autres'}</div>`;
+      }
+    }
+    isFirstGroup = false;
+
+    // Mode Guidé : niveau pas encore débloqué → carte verrouillée, pas de détail
+    if (unlockedLevel && lvl && lvl > unlockedLevel) {
+      html += `
+      <div class="card" style="border-left:4px solid var(--border);opacity:.55">
+        <div style="padding:12px 14px;display:flex;align-items:center;gap:8px">
+          <span style="line-height:0">${lockIconSVG(18)}</span>
+          <div style="flex:1;min-width:0">
+            <h2 style="font-size:14px;margin:0;font-weight:700;color:var(--text2)">${key}</h2>
+            <div style="font-size:11px;color:var(--text2);opacity:.8">Termine le niveau ${unlockedLevel} pour débloquer</div>
+          </div>
+        </div>
+      </div>`;
+      return;
+    }
 
     const base = pats[0];
     const isOpen = state.openCards[key];
     const pct = getGroupPct(key); // toutes directions confondues
     const allIds = pats.map(p=>p.id).join(',');
 
-    const diffBorder = {Basique:'#4a9e6b',Technique:'#d49800',Complexe:'#d63031'}[base.difficulty]||'var(--border)';
+    const lvlForBorder = PATTERN_LEVEL_ORDER[key] ? PATTERN_LEVEL_ORDER[key].level : null;
+    const diffBorder = lvlForBorder ? (lvlForBorder <= 2 ? '#4a9e6b' : lvlForBorder <= 5 ? '#d49800' : '#d63031') : 'var(--border)';
     const isConsolidated = !!(base.hasDirectionTabs && base.versionTabs);
 
     html += `
@@ -934,10 +985,12 @@ function renderGlobalProgress() {
   const allGroupKeys = [...new Set(PATTERNS.map(p => p.cat + 'P' + p.num))];
   allGroupKeys.forEach(gkey => {
     PATTERNS.filter(p => p.cat + 'P' + p.num === gkey).forEach(p => {
-      const interpsToUse = p.customInterps || INTERPS;
+      const interpsToUse = getLightModeInterps(p.customInterps || INTERPS);
       if (p.hasDirectionTabs && p.versionTabs && p.formeTabs) {
-        p.versionTabs.forEach(vk => {
-          p.formeTabs.forEach(fk => {
+        const versionsToUse = getLightModeVersionTabs(p);
+        const formesToUse = getLightModeFormeTabs(p);
+        versionsToUse.forEach(vk => {
+          formesToUse.forEach(fk => {
             const pid = p.id + '__' + vk + '_' + fk;
             interpsToUse.forEach(i => TEMPOS.forEach(t => {
               totalAll++;
@@ -1003,6 +1056,9 @@ function renderGlobalProgress() {
   html += `</div>`;
 
   // ═══ 2 — PROGRESSION GLOBALE ═════════════════════════════════════════════════
+  // Mode de progression affiché : Shuffle est prioritaire, sinon Lite/Pro
+  const progModeLabel = SETTINGS.shuffleMode ? 'Shuffle' : (SETTINGS.lightMode ? 'Lite' : 'Pro');
+  const progModeColor = SETTINGS.shuffleMode ? 'var(--orange)' : (SETTINGS.lightMode ? 'rgba(244,238,226,.5)' : 'var(--red)');
   html += `
   <div style="background:var(--blue);border-radius:var(--radius);padding:13px 16px;margin-bottom:10px">
     <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
@@ -1010,7 +1066,10 @@ function renderGlobalProgress() {
         <div style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1.2px;color:rgba(244,238,226,.6)">Global</div>
         <div style="font-size:19px;font-weight:800;color:var(--header-text)">Progression</div>
       </div>
-      <div style="font-size:28px;font-weight:800;color:${globalPct>0?'var(--header-text)':'rgba(244,238,226,.35)'}">${globalPct}%</div>
+      <div style="text-align:right">
+        <div style="font-size:28px;font-weight:800;color:${globalPct>0?'var(--header-text)':'rgba(244,238,226,.35)'}">${globalPct}%</div>
+        <div style="font-size:10px;font-weight:700;color:${progModeColor}">${progModeLabel}</div>
+      </div>
     </div>
     <div style="height:4px;background:rgba(244,238,226,.2);border-radius:2px">
       <div style="height:4px;background:var(--orange);border-radius:2px;width:${globalPct}%"></div>
@@ -1037,7 +1096,6 @@ function renderGlobalProgress() {
     </div>`;
   });
 
-  html += `<div style="text-align:center;font-size:11px;color:var(--text3);margin-top:4px">Objectif 100% en mode Pro</div>`;
   html += `</div></div></details>`;
 
   html += `

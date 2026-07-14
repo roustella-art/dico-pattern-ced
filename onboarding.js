@@ -5,7 +5,7 @@ const ONBOARDING_CONFIG = {
   // Écran de bienvenue
   welcome: {
     title: "Bienvenue dans Dico Pattern",
-    description: "L'application qui vous permet de progresser chaque jour à la guitare. De débutant à virtuose, affinez votre pratique avec une app pensée pour VOTRE niveau.",
+    description: "Ton échauffement quotidien pour progresser à la guitare.",
     emoji: "🎸",
   },
 
@@ -13,7 +13,7 @@ const ONBOARDING_CONFIG = {
   questions: [
     {
       id: 'years',
-      title: "Depuis combien d'années jouez-vous ?",
+      title: "Depuis combien d'années joues-tu ?",
       type: 'select',
       options: [
         { value: 0.5, label: "Moins de 6 mois", score: 0 },
@@ -26,7 +26,7 @@ const ONBOARDING_CONFIG = {
     },
     {
       id: 'hours',
-      title: "Combien d'heures par semaine pratiquez-vous ?",
+      title: "Combien d'heures par semaine pratiques-tu ?",
       type: 'select',
       options: [
         { value: 1, label: "Moins de 1h", score: 0 },
@@ -38,7 +38,7 @@ const ONBOARDING_CONFIG = {
     },
     {
       id: 'profile',
-      title: "Quel style de guitariste vous inspire ?",
+      title: "Quel style de guitariste t'inspire ?",
       type: 'select',
       options: [
         { value: 'cobain', label: "Kurt Cobain — Grunge / Alt-rock", score: 1 },
@@ -78,7 +78,7 @@ const ONBOARDING_CONFIG = {
     },
     none: {
       label: "Pas d'inspiration particulière",
-      description: "On va trouver votre style ensemble !",
+      description: "On va trouver ton style ensemble !",
       styleScore: 1,
       subdivMultiplier: 1.0,
     },
@@ -171,6 +171,9 @@ function applyOnboardingSettings(presets) {
   PREVIEW.bpm = presets.tempoPresets.lent;
   const hbpm = document.getElementById('header-bpm-val');
   if (hbpm) hbpm.textContent = HCTRL.bpm;
+  // Mode entraînement calé sur la tranche de tempo de l'utilisateur : départ = Lent, plafond = Chaud
+  SETTINGS.trainBpmStart = presets.tempoPresets.lent;
+  SETTINGS.trainBpmMax = presets.tempoPresets.chaud;
   saveSettings();
   if (typeof syncSubdivUI === 'function') syncSubdivUI();
 }
@@ -192,12 +195,11 @@ function showOnboarding() {
     left: 0;
     right: 0;
     bottom: 0;
-    background: rgba(0,0,0,.6);
+    background: var(--header-bg);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 10000;
-    backdrop-filter: blur(2px);
   `;
 
   const content = document.createElement('div');
@@ -325,7 +327,7 @@ function showResultsScreen(container) {
       <div style="width:64px;height:64px;border-radius:50%;background:rgba(76,160,100,.12);display:flex;align-items:center;justify-content:center;margin:0 auto 20px">
         <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
       </div>
-      <h1 style="font-size:22px;font-weight:800;margin:0 0 6px;color:var(--text)">Votre profil</h1>
+      <h1 style="font-size:22px;font-weight:800;margin:0 0 6px;color:var(--text)">Ton profil</h1>
       <p style="color:var(--blue);font-size:13px;font-weight:700;margin:0 0 24px;letter-spacing:.3px">${presets.label} · ${presets.profile}</p>
 
       <div style="background:var(--card);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:16px">
@@ -384,9 +386,10 @@ function onboardingComplete(levelLabel) {
 
   if (typeof syncTempoPresetsUI === 'function') syncTempoPresetsUI();
 
-  // Toast de confirmation
-  showOnboardingToast(`${levelLabel} configuré — App prête à l'emploi.`);
-
+  // Atterrir directement sur l'onglet Patterns (mode Guidé) plutôt que sur un Journal vide
+  if (typeof showTab === 'function') showTab('patterns');
+  // Afficher directement le popup de bienvenue Patterns (indépendamment du flag "déjà vu")
+  if (typeof showPatternsWelcomeForce === 'function') showPatternsWelcomeForce();
 }
 
 function showOnboardingToast(message) {

@@ -22,6 +22,13 @@ let state = {
   gammeActiveStrings: {}, // { "gammeP1": [true,true,true,true,true,true] } — [e,B,G,D,A,E]
   gammeSelectedDir: {},  // { "pentaTrans1": "1→2" } — direction active par gamme avec directions multiples
   rhythmicStringSelect: {}, // { "rhythmic-test": "A" } — corde sélectionnée pour les patterns stringSelector
+  laboUnlockedSeen: false, // true dès que le popup "Labo débloqué" (mode Guidé) a été affiché une fois
+  proUnlockedSeen: false,  // true dès que le popup "passage en mode Pro" (niveau 7 à 100%) a été affiché une fois
+  trainUnlockedSeen: false, // true dès que le popup "Mode entraînement débloqué" (niveau 1 à 100%) a été affiché une fois
+  neckUnlockedSeen: false,    // true dès que le popup "Mid/High débloqué" (niveau 3 à 100%) a été affiché une fois
+  stringUnlockedSeen: false,  // true dès que le popup "Groupe de cordes débloqué" (niveau 4 à 100%) a été affiché une fois
+  loopExtUnlockedSeen: false, // true dès que le popup "Loop étendu débloqué" (niveau 5 à 100%) a été affiché une fois
+  shuffleUnlockedSeen: false, // true dès que le popup "Shuffle débloqué" (niveau 6 à 100%) a été affiché une fois
 };
 
 // ─── SETTINGS (cordes / son / case de départ) ────────────────────────────────
@@ -45,6 +52,7 @@ const SETTINGS = {
   showLoopExtBtn: false,   // afficher bouton Loop étendu dans la row 1 du header
   lightMode: true,         // mode Light par défaut (Light/Pro) : formes/direction/interp réduites (Patterns uniquement, pas le Labo)
   showLightBtn: false,     // afficher bouton Mode Light dans la row 1 du header
+  guidedMode: true,        // mode Guidé par défaut : niveaux à débloquer un par un (onglet Patterns, tri Progressif)
   showStringBtn: false,    // afficher bouton groupe de cordes dans la row 1 du header
   showSubdivBtn: false,    // afficher bouton subdivision rythmique dans le header
   showTrain: false,        // afficher bouton Train. dans le header
@@ -86,6 +94,7 @@ function loadSettings() {
     if (s.showLoopExtBtn !== undefined) SETTINGS.showLoopExtBtn = s.showLoopExtBtn;
     if (s.lightMode !== undefined) SETTINGS.lightMode = s.lightMode;
     if (s.showLightBtn !== undefined) SETTINGS.showLightBtn = s.showLightBtn;
+    if (s.guidedMode !== undefined) SETTINGS.guidedMode = s.guidedMode;
     if (s.showStringBtn  !== undefined) SETTINGS.showStringBtn  = s.showStringBtn;
     if (s.showSubdivBtn !== undefined) SETTINGS.showSubdivBtn = s.showSubdivBtn;
     if (s.showTrain !== undefined) SETTINGS.showTrain = s.showTrain;
@@ -138,6 +147,7 @@ function saveSettings() {
       showLoopExtBtn: SETTINGS.showLoopExtBtn,
       lightMode: SETTINGS.lightMode,
       showLightBtn: SETTINGS.showLightBtn,
+      guidedMode: SETTINGS.guidedMode,
       showStringBtn:  SETTINGS.showStringBtn,
       showSubdivBtn: SETTINGS.showSubdivBtn,
       showTrain: SETTINGS.showTrain,
@@ -329,6 +339,13 @@ function loadState() {
     if (saved.rhythmicStringSelect && typeof saved.rhythmicStringSelect === 'object') {
       state.rhythmicStringSelect = saved.rhythmicStringSelect;
     }
+    if (saved.laboUnlockedSeen !== undefined) state.laboUnlockedSeen = saved.laboUnlockedSeen;
+    if (saved.proUnlockedSeen !== undefined) state.proUnlockedSeen = saved.proUnlockedSeen;
+    if (saved.trainUnlockedSeen !== undefined) state.trainUnlockedSeen = saved.trainUnlockedSeen;
+    if (saved.neckUnlockedSeen !== undefined) state.neckUnlockedSeen = saved.neckUnlockedSeen;
+    if (saved.stringUnlockedSeen !== undefined) state.stringUnlockedSeen = saved.stringUnlockedSeen;
+    if (saved.loopExtUnlockedSeen !== undefined) state.loopExtUnlockedSeen = saved.loopExtUnlockedSeen;
+    if (saved.shuffleUnlockedSeen !== undefined) state.shuffleUnlockedSeen = saved.shuffleUnlockedSeen;
   } catch(e) { console.warn('loadState:', e); }
   loadPatNotes();
   loadPatTrace();
@@ -348,6 +365,13 @@ function saveState() {
       gammeActiveStrings:    state.gammeActiveStrings,
       gammeSelectedDir:      state.gammeSelectedDir,
       rhythmicStringSelect:  state.rhythmicStringSelect,
+      laboUnlockedSeen: state.laboUnlockedSeen,
+      proUnlockedSeen: state.proUnlockedSeen,
+      trainUnlockedSeen: state.trainUnlockedSeen,
+      neckUnlockedSeen: state.neckUnlockedSeen,
+      stringUnlockedSeen: state.stringUnlockedSeen,
+      loopExtUnlockedSeen: state.loopExtUnlockedSeen,
+      shuffleUnlockedSeen: state.shuffleUnlockedSeen,
     }));
   } catch(e) { console.warn('saveState:', e); }
 }
@@ -377,7 +401,8 @@ function getPatternPct(patId) {
   const pat = PATTERNS.find(p => p.id === patId);
   const mode = pat ? pat.dir : 'U';
   let total = 0, done = 0;
-  [1].forEach(f => INTERPS.forEach(i => TEMPOS.forEach(t => {
+  const interpsToUse = getLightModeInterps(INTERPS);
+  [1].forEach(f => interpsToUse.forEach(i => TEMPOS.forEach(t => {
     total++;
     if (state.progress[getProgressKey(patId, f, mode, i, t)]) done++;
   })));
@@ -411,6 +436,18 @@ function getLightModeInterps(interps) {
 }
 
 /**
+ * Retourne les versions (directions) à compter pour un pattern, réduites à Mix seule
+ * quand le mode Light est actif et que ce pattern propose Mix (voir getGammeSelectedDir).
+ * @param {Object} p - Pattern (doit avoir p.versionTabs)
+ * @returns {Array<string>}
+ */
+function getLightModeVersionTabs(p) {
+  if (!p || !p.versionTabs) return p ? p.versionTabs : [];
+  if (!SETTINGS.lightMode) return p.versionTabs;
+  return p.versionTabs.includes('M') ? ['M'] : p.versionTabs;
+}
+
+/**
  * Calcule le pourcentage de progression global d'un groupe (toutes directions confondues)
  * Gère les cas spéciaux (gammes avec directions tabs, groupes de cordes)
  * @param {string} groupKey - Clé du groupe (ex: 'A4P1')
@@ -422,10 +459,13 @@ function getGroupPct(groupKey) {
   pats.forEach(p => {
     if (p.hasDirectionTabs && p.versionTabs && p.formeTabs) {
       // Pattern unifié avec versionTabs × formeTabs (ex: A2P1 — special ou non)
-      p.versionTabs.forEach(vk => {
-        p.formeTabs.forEach(fk => {
+      // Mode Light : versions/formes réduites au sous-ensemble affiché dans l'UI
+      const versionsToUse = getLightModeVersionTabs(p);
+      const formesToUse = getLightModeFormeTabs(p);
+      versionsToUse.forEach(vk => {
+        formesToUse.forEach(fk => {
           const progressId = p.id + '__' + vk + '_' + fk;
-          const interpsToUse = p.customInterps || INTERPS;
+          const interpsToUse = getLightModeInterps(p.customInterps || INTERPS);
           interpsToUse.forEach(i => TEMPOS.forEach(t => {
             total++;
             if (state.progress[getProgressKey(progressId, 1, 'U', i, t)]) done++;
@@ -436,15 +476,83 @@ function getGroupPct(groupKey) {
       // Gamme avec onglets de direction simples : une progression par direction
       Object.keys(p.directions).forEach(dirKey => {
         const progressId = p.id + '__' + dirKey.replace(/[→↔]/g, '-');
-        const interpsToUse = p.customInterps || INTERPS;
+        const interpsToUse = getLightModeInterps(p.customInterps || INTERPS);
         interpsToUse.forEach(i => TEMPOS.forEach(t => {
           total++;
           if (state.progress[getProgressKey(progressId, 1, 'U', i, t)]) done++;
         }));
       });
+    } else if (p.dir) {
+      // Pattern simple (une seule direction fixe, ex: A4P1)
+      const interpsToUse = getLightModeInterps(p.customInterps || INTERPS);
+      interpsToUse.forEach(i => TEMPOS.forEach(t => {
+        total++;
+        if (state.progress[getProgressKey(p.id, 1, p.dir, i, t)]) done++;
+      }));
     }
   });
   return total ? Math.round(done / total * 100) : 0;
+}
+
+// ── MODE GUIDÉ ────────────────────────────────────────────────────────────────
+/**
+ * Retourne le plus haut niveau débloqué (1 = toujours débloqué). Un niveau N+1 se débloque
+ * quand tous les groupes du niveau N sont à 100% de progression (voir getGroupPct).
+ * Si SETTINGS.guidedMode est désactivé, tous les niveaux sont considérés débloqués.
+ * @returns {number}
+ */
+function getUnlockedLevel() {
+  if (!SETTINGS.guidedMode) return PATTERN_LEVEL_GROUPS.length;
+  for (let i = 0; i < PATTERN_LEVEL_GROUPS.length; i++) {
+    const allDone = PATTERN_LEVEL_GROUPS[i].every(key => getGroupPct(key) === 100);
+    if (!allDone) return i + 1;
+  }
+  return PATTERN_LEVEL_GROUPS.length;
+}
+
+/**
+ * Indique si un niveau donné est accessible (débloqué) selon getUnlockedLevel().
+ * @param {number} level
+ * @returns {boolean}
+ */
+function isLevelUnlocked(level) {
+  return level <= getUnlockedLevel();
+}
+
+/**
+ * Indique si l'onglet Labo est accessible : toujours vrai hors mode Guidé, ou une fois
+ * les niveaux 1 et 2 terminés à 100% en mode Guidé (i.e. le niveau 3 est débloqué).
+ * @returns {boolean}
+ */
+function isLaboUnlocked() {
+  return !SETTINGS.guidedMode || !SETTINGS.lightMode || getUnlockedLevel() >= 3;
+}
+
+/**
+ * Indique si TOUS les niveaux de progression (1 à 7) sont terminés à 100%, y compris le
+ * dernier (contrairement à getUnlockedLevel() qui ne garantit que "niveau atteignable").
+ * @returns {boolean}
+ */
+function isAllLevelsComplete() {
+  return PATTERN_LEVEL_GROUPS.every(levelGroups => levelGroups.every(key => getGroupPct(key) === 100));
+}
+
+/**
+ * Indique si le Niveau 1 est terminé à 100% (tous ses groupes).
+ * @returns {boolean}
+ */
+function isLevel1Complete() {
+  return PATTERN_LEVEL_GROUPS[0].every(key => getGroupPct(key) === 100);
+}
+
+/**
+ * Indique si un niveau donné (1-indexé) est terminé à 100% (tous ses groupes).
+ * @param {number} n
+ * @returns {boolean}
+ */
+function isLevelComplete(n) {
+  const groupKeys = PATTERN_LEVEL_GROUPS[n - 1];
+  return !!groupKeys && groupKeys.every(key => getGroupPct(key) === 100);
 }
 
 
