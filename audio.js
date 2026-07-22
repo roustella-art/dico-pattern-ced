@@ -9,13 +9,99 @@
 // ─── METRONOME ────────────────────────────────────────────────────────────────
 const METRO = { ctx:null, running:false, bpm:60, nextBeat:0, timer:null, patId:null };
 
+// ── Lecture native (contourne le switch silencieux, cf. note plus bas) ────────
+// Sur iOS, le Web Audio API reste piégé dans la gestion audio interne de WKWebView, qui peut
+// réécraser la config AVAudioSession native (bug WebKit documenté). Seule une lecture 100% native
+// (AVAudioPlayer, via ce plugin) ignore fiablement le switch silencieux. Web Audio (oscillateurs)
+// reste utilisé pour la synthèse des notes de pattern et comme fallback PWA/web.
+const IS_NATIVE = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+if (IS_NATIVE) {
+  console.warn('DIAG: Capacitor.Plugins =', window.Capacitor.Plugins ? Object.keys(window.Capacitor.Plugins) : 'undefined');
+  console.warn('DIAG: NoteSynth présent ?', !!(window.Capacitor.Plugins && window.Capacitor.Plugins.NoteSynth));
+}
+let _nativeAudioReady = false;
+if (IS_NATIVE && window.Capacitor.Plugins && window.Capacitor.Plugins.NativeAudio) {
+  window.Capacitor.Plugins.NativeAudio.preload({
+    assetId: 'click',
+    assetPath: 'public/assets/audio/click.wav',
+    audioChannelNum: 1,
+    isUrl: false
+  }).then(() => { _nativeAudioReady = true; }).catch(e => {
+    // Le WebView Capacitor charge parfois la page 2 fois au démarrage : la 1ère exécution du
+    // script précharge l'asset avec succès, la 2ème échoue avec "already exists" — l'asset est
+    // bel et bien chargé côté natif, donc on considère quand même le natif prêt dans ce cas.
+    const msg = (e && (e.errorMessage || e.message || String(e))) || '';
+    if (/already exists/i.test(msg)) { _nativeAudioReady = true; }
+    else console.warn('NativeAudio preload error:', e);
+  });
+}
+function _playNativeClick() {
+  try { window.Capacitor.Plugins.NativeAudio.play({ assetId: 'click' }); } catch(e) {}
+}
+
+// ── Déblocage switch silencieux iOS ────────────────────────────────────────────
+// Sur iOS/WKWebView (PWA Safari ET Capacitor natif), le Web Audio API (AudioContext) respecte
+// TOUJOURS le switch silencieux physique, quel que soit son contenu — même un buffer silencieux
+// joué depuis l'intérieur d'un AudioContext (confirmé bug WebKit connu, cf. bugs.webkit.org/
+// show_bug.cgi?id=237322). Seuls les éléments HTML5 <audio>/<video> (HTMLMediaElement) ignorent
+// le switch. Technique "unmute-ios-audio" : jouer un son silencieux via une vraie balise <audio>
+// lors du tout premier geste utilisateur "débloque" ensuite tous les AudioContext de la page, qui
+// héritent de ce déblocage et ignorent à leur tour le switch silencieux.
+let _iosAudioUnlocked = false;
+function _buildSilentWavURL(durationSec, sampleRate) {
+  durationSec = durationSec || 0.3; sampleRate = sampleRate || 8000;
+  const numSamples = Math.floor(durationSec * sampleRate);
+  const dataSize = numSamples; // 8-bit mono PCM → 1 octet/sample
+  const buf = new ArrayBuffer(44 + dataSize);
+  const view = new DataView(buf);
+  const writeStr = (offset, str) => { for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i)); };
+  writeStr(0, 'RIFF'); view.setUint32(4, 36 + dataSize, true); writeStr(8, 'WAVE');
+  writeStr(12, 'fmt '); view.setUint32(16, 16, true); view.setUint16(20, 1, true); view.setUint16(22, 1, true);
+  view.setUint32(24, sampleRate, true); view.setUint32(28, sampleRate, true);
+  view.setUint16(32, 1, true); view.setUint16(34, 8, true);
+  writeStr(36, 'data'); view.setUint32(40, dataSize, true);
+  for (let i = 0; i < numSamples; i++) view.setUint8(44 + i, 128); // silence = point médian en 8-bit non signé
+  return URL.createObjectURL(new Blob([buf], { type: 'audio/wav' }));
+}
+function _unlockIOSAudioViaMediaElement() {
+  if (_iosAudioUnlocked) return;
+  _iosAudioUnlocked = true;
+  try {
+    const el = document.createElement('audio');
+    el.setAttribute('playsinline', '');
+    el.setAttribute('webkit-playsinline', '');
+    el.volume = 0.01;
+    el.src = _buildSilentWavURL();
+    const p = el.play();
+    if (p && p.catch) p.catch(() => {});
+  } catch(e) {}
+}
+['touchstart', 'mousedown'].forEach(evt => {
+  document.addEventListener(evt, _unlockIOSAudioViaMediaElement, { once: true, passive: true });
+});
+
+// Filet de sécurité complémentaire (AudioContext) — inoffensif, laissé en place au cas où une
+// version de WebKit en tiendrait compte pour d'autres cas (contexte recréé après backgrounding).
+function _unlockIOSAudioSession(ctx) {
+  try {
+    const buffer = ctx.createBuffer(1, 1, 22050);
+    const src = ctx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(ctx.destination);
+    if (src.start) src.start(0); else if (src.noteOn) src.noteOn(0);
+  } catch(e) {}
+}
+
 /**
  * Crée ou récupère le Web Audio Context du métronome
  * Résume automatiquement s'il est suspendu (iOS handling)
  * @returns {AudioContext} Contexte audio
  */
 function metroCtx() {
-  if (!METRO.ctx) METRO.ctx = new (window.AudioContext || window.webkitAudioContext)();
+  if (!METRO.ctx) {
+    METRO.ctx = new (window.AudioContext || window.webkitAudioContext)();
+    _unlockIOSAudioSession(METRO.ctx);
+  }
   if (METRO.ctx.state === 'suspended') METRO.ctx.resume();
   return METRO.ctx;
 }
@@ -26,17 +112,21 @@ function metroCtx() {
  */
 function metroClick(time) {
   const ctx = METRO.ctx;
-  const osc = ctx.createOscillator();
-  const gain = ctx.createGain();
-  osc.connect(gain); gain.connect(ctx.destination);
-  osc.frequency.value = 880;
-  const cg = (SETTINGS.clickVolume || 60) * 0.006; // même réglage que clic preview
-  gain.gain.setValueAtTime(cg, time);
-  gain.gain.exponentialRampToValueAtTime(0.001, time + 0.045);
-  osc.start(time); osc.stop(time + 0.05);
-  // flash visuel — utilise la classe .flash (palette CSS)
+  if (!(IS_NATIVE && _nativeAudioReady)) {
+    // Web Audio (PWA / fallback) — reste soumis au switch silencieux sur iOS
+    const osc = ctx.createOscillator();
+    const gain = ctx.createGain();
+    osc.connect(gain); gain.connect(ctx.destination);
+    osc.frequency.value = 880;
+    const cg = (SETTINGS.clickVolume || 60) * 0.006; // même réglage que clic preview
+    gain.gain.setValueAtTime(cg, time);
+    gain.gain.exponentialRampToValueAtTime(0.001, time + 0.045);
+    osc.start(time); osc.stop(time + 0.05);
+  }
+  // flash visuel + son natif — ctx.currentTime sert uniquement de référence de timing ici
   const ahead = Math.max(0, (time - ctx.currentTime) * 1000);
   setTimeout(() => {
+    if (IS_NATIVE && _nativeAudioReady) _playNativeClick();
     const dot = document.getElementById('metro-dot-' + METRO.patId);
     if (dot) { dot.classList.add('flash'); setTimeout(() => dot.classList.remove('flash'), 90); }
     // En mode métronome solo (global) : flash header-pulse en cyan
@@ -166,6 +256,7 @@ const PREVIEW = { ctx:null, masterGain:null, patId:null, timer:null, clickTimer:
 function previewCtx() {
   if (!PREVIEW.ctx || PREVIEW.ctx.state === 'closed') {
     PREVIEW.ctx = new (window.AudioContext||window.webkitAudioContext)();
+    _unlockIOSAudioSession(PREVIEW.ctx);
   }
   if (PREVIEW.ctx.state === 'suspended') PREVIEW.ctx.resume();
   return PREVIEW.ctx;
@@ -528,6 +619,19 @@ function getActiveSound() {
 }
 
 function pluckNote(ctx, masterGain, freq, time, gainMult = 1.0, freqEnd = null, bendDur = null) {
+  // Portage natif Swift/AVAudioEngine (NoteSynth) : contourne le switch silencieux iOS, qui
+  // n'est jamais atteint par le Web Audio API (celui-ci tourne dans le process WebContent
+  // séparé de WKWebView — cf. AppDelegate.swift pour le détail du bug et sa résolution).
+  if (IS_NATIVE && window.Capacitor.Plugins.NoteSynth) {
+    const delaySeconds = Math.max(0, time - ctx.currentTime);
+    window.Capacitor.Plugins.NoteSynth.playNote({
+      freq, sound: getActiveSound(), gainMult,
+      freqEnd: freqEnd === null ? undefined : freqEnd,
+      bendDur: bendDur === null ? undefined : bendDur,
+      delaySeconds
+    }).catch(e => console.warn('NoteSynth.playNote error:', e));
+    return;
+  }
   const env  = ctx.createGain();
   const filt = ctx.createBiquadFilter();
   filt.type = 'lowpass';
@@ -722,6 +826,9 @@ function pluckNote(ctx, masterGain, freq, time, gainMult = 1.0, freqEnd = null, 
 }
 
 function previewStop() {
+  if (IS_NATIVE && window.Capacitor.Plugins.NoteSynth) {
+    window.Capacitor.Plugins.NoteSynth.stopAll().catch(()=>{});
+  }
   if (PREVIEW.masterGain && PREVIEW.ctx) {
     const t = PREVIEW.ctx.currentTime;
     PREVIEW.masterGain.gain.cancelScheduledValues(t);
@@ -1237,6 +1344,13 @@ function trainBpmIncrement(nextCycleT) {
 }
 
 function scheduleClick(ctx, t) {
+  if (IS_NATIVE && _nativeAudioReady) {
+    const delaySeconds = Math.max(0, t - ctx.currentTime);
+    setTimeout(() => {
+      try { window.Capacitor.Plugins.NativeAudio.play({ assetId: 'click' }); } catch(e){}
+    }, delaySeconds * 1000);
+    return;
+  }
   const osc = ctx.createOscillator();
   const env = ctx.createGain();
   osc.connect(env); env.connect(PREVIEW.masterGain);
@@ -1306,20 +1420,9 @@ function navHidePressStart(e) {
     toggleNavVisibility();
   }, 480);
 }
-let _logoTapCount = 0, _logoTapTimer = null;
 function navHidePressEnd(e) {
   clearTimeout(_navHidePressTimer);
   _navHidePressTimer = null;
-  if (_navHideLongFired) return; // un long press vient de se déclencher : on ignore le tap
-  // Taps courts rapprochés sur le logo : injecte une progression de test (debug)
-  // 5 taps = Niveau 1 presque fini · 6 = Niveau 2 · 7 = Niveau 3 · ... · 11 = Niveau 7
-  _logoTapCount++;
-  if (_logoTapTimer) clearTimeout(_logoTapTimer);
-  _logoTapTimer = setTimeout(() => {
-    const n = _logoTapCount;
-    _logoTapCount = 0; _logoTapTimer = null;
-    if (n >= 5 && typeof debugFillToLevel === 'function') debugFillToLevel(n - 4);
-  }, 600);
 }
 function navHidePressCancel() {
   clearTimeout(_navHidePressTimer);
@@ -1807,8 +1910,8 @@ function previewPlay(patId) {
 // ─── BIP FEEDBACK ──────────────────────────────────────────────────────────────
 function playBip() {
   try {
-    const ctx = METRO.ctx || new (window.AudioContext || window.webkitAudioContext)();
-    if (ctx.state === 'suspended') ctx.resume();
+    if (IS_NATIVE && _nativeAudioReady) { _playNativeClick(); return; }
+    const ctx = metroCtx();
     const time = ctx.currentTime;
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();

@@ -1388,6 +1388,18 @@ function skInitReorderable(containerId, itemSelector, groupSelector, opts = {}) 
   container.addEventListener('lostpointercapture', (e) => { if (e.pointerType !== 'touch' && armed) finish(); });
 }
 
+// Palette de pads type boîte à rythme — cycle par index
+const SK_PAD_PALETTE = [
+  { base:'#2a7de1', light:'#5aa0f0', dark:'#1d5aa0' }, // bleu
+  { base:'#c0392b', light:'#e05a4a', dark:'#8f2a1f' }, // rouge
+  { base:'#8e44ad', light:'#b366d9', dark:'#642f7a' }, // violet
+  { base:'#16a085', light:'#3fd1b3', dark:'#0e7a63' }, // teal
+  { base:'#d4622e', light:'#e8935f', dark:'#a34a20' }, // orange
+  { base:'#56864a', light:'#7bb06c', dark:'#3d6135' }, // vert
+  { base:'#e6a817', light:'#f5c95a', dark:'#b3800f' }, // or
+  { base:'#e91e63', light:'#f06090', dark:'#ad1447' }, // rose
+];
+
 function skBuildFavBar() {
   const bar = document.getElementById('sk-fav-bar');
   if (!bar) return;
@@ -1399,10 +1411,12 @@ function skBuildFavBar() {
   }
   // L'ordre affiché ici suit skSortByPresetOrder — réorganisable depuis l'onglet
   // "★ Épinglés" de la bibliothèque (glisser vertical), pas directement ici.
-  bar.innerHTML = pinnedNames.map(name => {
+  // Limité à 8 pads max pour rester compact sur smartphone
+  bar.innerHTML = pinnedNames.slice(0, 8).map((name, i) => {
     const active = name === skCurrentPreset;
-    return `<button class="sk-fav-chip${active ? ' active' : ''}" onclick="skLoadPresetByName('${name.replace(/'/g,"\\'")}')">
-      ${name}
+    const c = SK_PAD_PALETTE[i % SK_PAD_PALETTE.length];
+    return `<button class="sk-fav-chip${active ? ' active' : ''}" style="--pad-base:${c.base};--pad-light:${c.light};--pad-dark:${c.dark}" onclick="skLoadPresetByName('${name.replace(/'/g,"\\'")}')">
+      <span class="sk-fav-chip-label">${name}</span>
     </button>`;
   }).join('');
 }
@@ -2190,18 +2204,37 @@ function renderShaker() {
 }
 .sk-io-action-btn:active { background: var(--bg); opacity: .8; }
 .sk-fav-bar {
-  display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px;
-  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px;
 }
-.sk-fav-bar::-webkit-scrollbar { display: none; }
 .sk-fav-chip {
-  flex-shrink: 0; border: 1.5px solid var(--border); background: var(--card);
-  border-radius: 20px; padding: 6px 14px; font-size: 12px; font-weight: 600;
-  color: var(--text); cursor: pointer; white-space: nowrap; transition: all .15s;
+  aspect-ratio: 1 / 0.5; border: none; border-radius: 8px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  padding: 3px 5px; -webkit-tap-highlight-color: transparent;
+  transition: transform .08s ease, box-shadow .08s ease;
+  background: linear-gradient(160deg, var(--pad-light), var(--pad-base));
+  box-shadow: 0 2px 0 var(--pad-dark), 0 3px 4px rgba(0,0,0,.22), inset 0 1px 1px rgba(255,255,255,.35);
 }
-.sk-fav-chip.active { border-color: var(--blue); color: var(--blue); background: var(--blue-light); }
-.sk-fav-chip:active  { opacity: .7; }
-.sk-fav-empty { font-size: 11px; color: var(--text2); font-style: italic; padding: 4px 0; }
+.sk-fav-chip:active {
+  transform: translateY(2px);
+  box-shadow: 0 0 0 var(--pad-dark), 0 1px 1px rgba(0,0,0,.2), inset 0 1px 2px rgba(0,0,0,.3);
+}
+.sk-fav-chip.active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 var(--pad-dark), 0 0 0 1.5px #fff, 0 1px 3px rgba(0,0,0,.22), inset 0 1px 1px rgba(0,0,0,.15);
+}
+.sk-fav-chip-label {
+  font-size: 9.5px; font-weight: 700; color: #fff; line-height: 1.15;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  text-shadow: 0 1px 2px rgba(0,0,0,.3);
+}
+.sk-fav-empty { grid-column: 1 / -1; font-size: 11px; color: var(--text2); font-style: italic; padding: 10px 0; text-align: center; }
+.sk-lib-mini-btn {
+  flex-shrink: 0; border: none; background: var(--blue); color: #fff;
+  border-radius: 7px; padding: 5px 10px; font-size: 10.5px; font-weight: 600;
+  cursor: pointer; display: flex; align-items: center; gap: 5px;
+  -webkit-tap-highlight-color: transparent; transition: opacity .15s;
+}
+.sk-lib-mini-btn:active { opacity: .7; }
 .sk-lib-open-btn {
   width: 100%; border: none; background: var(--blue);
   border-radius: 10px; padding: 12px; font-size: 13px; font-weight: 600; color: #fff;
@@ -2646,6 +2679,19 @@ function renderShaker() {
 
 <div class="sk-wrap">
 
+  <div style="display:flex;align-items:center;gap:8px;margin-top:0;margin-bottom:4px">
+    <span class="sk-section-label" style="margin:0">Presets <span style="color:#f0a500">★</span></span>
+    <div style="flex:1"></div>
+    <button class="sk-lib-mini-btn" onclick="skOpenLibrary()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Bibliothèque
+    </button>
+  </div>
+  <input type="file" id="sk-import-file" accept=".json" style="display:none" onchange="skHandleImportFile(event)">
+  <div class="sk-fav-bar" id="sk-fav-bar" style="margin-bottom:14px">
+    <span class="sk-fav-empty">Épingle des presets depuis la bibliothèque ★</span>
+  </div>
+
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
     <div class="sk-section-label" style="margin-bottom:0;flex-shrink:0;cursor:pointer;user-select:none" onclick="skToggleSeqCollapse()">
       <span id="sk-seq-chevron">${skSeqCollapsed ? '▶' : '▼'}</span> Séquence — <span id="sk-step-count">${skSteps.length}</span> / ${SK_MAX_STEPS} pas
@@ -2695,18 +2741,7 @@ function renderShaker() {
 
   <div id="sk-prog-wrap"></div>
 
-  <div style="margin-top:6px;margin-bottom:4px">
-    <span class="sk-section-label" style="margin:0">Presets <span style="color:#f0a500">★</span></span>
-  </div>
-  <input type="file" id="sk-import-file" accept=".json" style="display:none" onchange="skHandleImportFile(event)">
-  <div class="sk-fav-bar" id="sk-fav-bar">
-    <span class="sk-fav-empty">Épingle des presets depuis la bibliothèque ★</span>
-  </div>
-  <button class="sk-lib-open-btn" onclick="skOpenLibrary()">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-    Bibliothèque
-  </button>
-  <div style="display:flex;gap:8px;margin-top:8px">
+  <div style="display:flex;gap:8px;margin-top:8px;margin-bottom:14px">
     <button class="sk-io-action-btn" onclick="skImportPresetCode()" title="Importer un preset depuis un code partagé">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
       Importer
