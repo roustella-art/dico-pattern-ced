@@ -942,6 +942,7 @@ function playShaker() {
 function skStartCursor(eventsIgnored, totalTimeIgnored, patStart, ctx) {
   (PREVIEW.cursorTimeouts || []).forEach(t => clearTimeout(t));
   PREVIEW.cursorTimeouts = [];
+  let skLastScrolledPreId = null; // reset à chaque (re)lancement : force le 1er auto-scroll
 
   const quarter = 60 / PREVIEW.bpm;
 
@@ -1050,7 +1051,30 @@ function skStartCursor(eventsIgnored, totalTimeIgnored, patStart, ctx) {
         curEl.style.top    = preEl.offsetTop + 'px';
         curEl.style.height = (6 * lineH) + 'px';
         curEl.style.display = 'block';
-        curEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+
+        // Suivi horizontal — à chaque note, instantané (pas de behavior:'smooth' qui accumulerait
+        // du retard aux tempos rapides). Garde le curseur visible dans son bloc .sk-tab-display.
+        const hWrap = preEl.parentElement;
+        if (hWrap) {
+          const margin = 32;
+          const cursorX = step.col * charW;
+          const wLeft   = hWrap.scrollLeft;
+          const wWidth  = hWrap.clientWidth;
+          if (cursorX < wLeft + margin) {
+            hWrap.scrollLeft = Math.max(0, cursorX - margin);
+          } else if (cursorX > wLeft + wWidth - margin) {
+            hWrap.scrollLeft = cursorX - wWidth + margin + margin;
+          }
+        }
+
+        // Auto-scroll vertical (page) uniquement au changement de bloc/mesure (pas à chaque note) :
+        // évite de redémarrer une animation "smooth" à chaque note, qui accumule du retard aux
+        // tempos rapides. 'center' (au lieu de 'nearest') garde de la marge sous le curseur pour
+        // ne pas couper les dernières mesures visibles.
+        if (skLastScrolledPreId !== step.preId) {
+          skLastScrolledPreId = step.preId;
+          curEl.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        }
       }, delay);
       PREVIEW.cursorTimeouts.push(tid);
     });
