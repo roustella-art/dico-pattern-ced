@@ -26,7 +26,7 @@ let skPatronOffset    = 1;
 let skLoopTimer       = null;
 let skIsPlaying       = false;
 let skOpenStep        = -1;  // index de l'accordéon ouvert (-1 = aucun)
-let skSeqCollapsed    = false;
+let skSeqCollapsed    = true;
 
 // ── DONNÉES PATTERNS ──────────────────────────────────────────────────────────
 function skBuildPatGroups() {
@@ -224,6 +224,8 @@ function skBuildStepsUI(keepOpen) {
 
   if (countEl) countEl.textContent = skSteps.length;
   if (addBtn)  addBtn.disabled = skSteps.length >= SK_MAX_STEPS;
+  const modeWrap = document.getElementById('sk-mode-lecture-wrap');
+  if (modeWrap) modeWrap.style.display = skSteps.length ? '' : 'none';
 
   if (!skSteps.length) { list.innerHTML = ''; skOpenStep = -1; return; }
 
@@ -562,6 +564,7 @@ function skGenerateAndShow() {
 
   if (!assignments.length) {
     wrap.innerHTML = `<div class="sk-tab-display"><div class="sk-empty-state">Ajoute et configure au moins un pas pour voir la tablature</div></div>`;
+    wrap.onclick = () => skOpenSeqFromEmptyState();
     skLastAssignments = [];
     skUpdateInfoBar([]);
     return;
@@ -683,6 +686,12 @@ function skClearAll() {
   if (btn)   btn.style.background = '';
 }
 
+// Clic sur le message vide de la tablature → ouvre le tiroir Séquence (le triangle
+// du tiroir passe aussi à l'état ouvert, cohérent avec un clic manuel sur le chevron).
+function skOpenSeqFromEmptyState() {
+  if (skSeqCollapsed) skToggleSeqCollapse();
+}
+
 // ── ÉDITION GLOBALE ───────────────────────────────────────────────────────────
 function skToggleSeqCollapse() {
   skSeqCollapsed = !skSeqCollapsed;
@@ -690,6 +699,8 @@ function skToggleSeqCollapse() {
   const chevron = document.getElementById('sk-seq-chevron');
   if (body)    body.style.display    = skSeqCollapsed ? 'none' : 'block';
   if (chevron) chevron.textContent   = skSeqCollapsed ? '▶' : '▼';
+  const saveBtn = document.getElementById('sk-fav-save-btn');
+  if (saveBtn) saveBtn.style.display = skSeqCollapsed ? 'none' : '';
   if (skSeqCollapsed) {
     const panel = document.getElementById('sk-global-panel');
     const btn   = document.getElementById('sk-global-edit-btn');
@@ -1171,7 +1182,9 @@ function skSavePresetsToStorage(flat) {
 }
 
 // ── FAVORIS ───────────────────────────────────────────────────────────────────
-const SK_MAX_PINNED = 20;
+const SK_MAX_PINNED = 24;
+const SK_PADS_PER_PAGE = 8;
+let skFavPage = 0; // page de pads actuellement affichée (0-based, 3 pages de 8)
 
 function skTogglePin(name) {
   const db = skLoadPresetsV2();
@@ -1424,19 +1437,25 @@ const SK_PAD_PALETTE = [
   { base:'#e91e63', light:'#f06090', dark:'#ad1447' }, // rose
 ];
 
+const SK_FAV_PAGE_COUNT = SK_MAX_PINNED / SK_PADS_PER_PAGE; // 3 pages fixes, toujours visibles
+
 function skBuildFavBar() {
   const bar = document.getElementById('sk-fav-bar');
+  const dots = document.getElementById('sk-fav-dots');
   if (!bar) return;
   const db = skLoadPresetsV2();
   const pinnedNames = skSortByPresetOrder(Object.keys(db.presets).filter(n => db.presets[n].pinned));
-  if (!pinnedNames.length) {
-    bar.innerHTML = `<span class="sk-fav-empty">Épingle des presets depuis la bibliothèque ★</span>`;
-    return;
-  }
+  if (skFavPage >= SK_FAV_PAGE_COUNT) skFavPage = SK_FAV_PAGE_COUNT - 1;
+  if (skFavPage < 0) skFavPage = 0;
+  const pageNames = pinnedNames.slice(skFavPage * SK_PADS_PER_PAGE, skFavPage * SK_PADS_PER_PAGE + SK_PADS_PER_PAGE);
   // L'ordre affiché ici suit skSortByPresetOrder — réorganisable depuis l'onglet
   // "★ Épinglés" de la bibliothèque (glisser vertical), ou par appui long sur un pad ici.
-  // Limité à 8 pads max pour rester compact sur smartphone
-  bar.innerHTML = pinnedNames.slice(0, 8).map((name, i) => {
+  // 3 pages de 8 pads FIXES (= la limite de 24 presets épinglés), toujours navigables au
+  // swipe même vides — ça montre à l'utilisateur la place disponible pour ses favoris.
+  const slots = pageNames.slice();
+  while (slots.length < SK_PADS_PER_PAGE) slots.push(null);
+  bar.innerHTML = slots.map((name, i) => {
+    if (!name) return `<div class="sk-fav-chip sk-fav-chip-empty"></div>`;
     const active = name === skCurrentPreset;
     const colorIdx = db.presets[name].padColorIdx ?? i;
     const c = SK_PAD_PALETTE[colorIdx % SK_PAD_PALETTE.length];
@@ -1444,7 +1463,44 @@ function skBuildFavBar() {
       <span class="sk-fav-chip-label">${name}</span>
     </button>`;
   }).join('');
+  if (dots) {
+    // Purement visuels — la navigation se fait au swipe (skInitFavBarSwipe), pas au tap
+    dots.innerHTML = Array.from({ length: SK_FAV_PAGE_COUNT }, (_, p) =>
+      `<span class="sk-fav-dot${p === skFavPage ? ' active' : ''}"></span>`
+    ).join('');
+  }
   skInitFavPadLongPress();
+  skInitFavBarSwipe();
+}
+
+function skGoFavPage(p) {
+  if (p < 0 || p >= SK_FAV_PAGE_COUNT) return;
+  skFavPage = p;
+  skBuildFavBar();
+}
+
+// Swipe horizontal sur la barre de pads pour changer de page (plus fiable au doigt
+// que les petits points, gardés comme indicateur de position uniquement).
+let _skFavSwipeBound = false;
+function skInitFavBarSwipe() {
+  const bar = document.getElementById('sk-fav-bar');
+  if (!bar || _skFavSwipeBound) return;
+  _skFavSwipeBound = true;
+  let startX = 0, startY = 0, tracking = false;
+  bar.addEventListener('touchstart', e => {
+    if (e.touches.length !== 1) return;
+    startX = e.touches[0].clientX;
+    startY = e.touches[0].clientY;
+    tracking = true;
+  }, { passive: true });
+  bar.addEventListener('touchend', e => {
+    if (!tracking) return;
+    tracking = false;
+    const dx = e.changedTouches[0].clientX - startX;
+    const dy = e.changedTouches[0].clientY - startY;
+    if (Math.abs(dx) < 40 || Math.abs(dx) < Math.abs(dy) * 1.5) return;
+    skGoFavPage(skFavPage + (dx < 0 ? 1 : -1));
+  }, { passive: true });
 }
 
 // ── ÉDITEUR DE PAD (appui long) : couleur + déplacement dans la grille 4×2 ────
@@ -1459,16 +1515,17 @@ function skSetPadColor(name, idx) {
 
 function skMoveFavPad(name, dir) {
   const db = skLoadPresetsV2();
-  const pinnedNames = skSortByPresetOrder(Object.keys(db.presets).filter(n => db.presets[n].pinned)).slice(0, 8);
-  const idx = pinnedNames.indexOf(name);
+  const allPinned = skSortByPresetOrder(Object.keys(db.presets).filter(n => db.presets[n].pinned));
+  const pageNames = allPinned.slice(skFavPage * SK_PADS_PER_PAGE, skFavPage * SK_PADS_PER_PAGE + SK_PADS_PER_PAGE);
+  const idx = pageNames.indexOf(name);
   if (idx === -1) return;
   if (dir === 'left'  && idx % 4 === 0) return;
   if (dir === 'right' && idx % 4 === 3) return;
   const deltas = { up:-4, down:4, left:-1, right:1 };
   const swapIdx = idx + deltas[dir];
-  if (swapIdx < 0 || swapIdx >= pinnedNames.length) return;
-  [pinnedNames[idx], pinnedNames[swapIdx]] = [pinnedNames[swapIdx], pinnedNames[idx]];
-  skUpdatePresetOrderForSubset(pinnedNames);
+  if (swapIdx < 0 || swapIdx >= pageNames.length) return;
+  [pageNames[idx], pageNames[swapIdx]] = [pageNames[swapIdx], pageNames[idx]];
+  skUpdatePresetOrderForSubset(pageNames);
   skBuildFavBar();
   skOpenPadEditor(name);
 }
@@ -1476,7 +1533,8 @@ function skMoveFavPad(name, dir) {
 function skOpenPadEditor(name) {
   const db = skLoadPresetsV2();
   if (!db.presets[name]) return;
-  const pinnedNames = skSortByPresetOrder(Object.keys(db.presets).filter(n => db.presets[n].pinned)).slice(0, 8);
+  const allPinned = skSortByPresetOrder(Object.keys(db.presets).filter(n => db.presets[n].pinned));
+  const pinnedNames = allPinned.slice(skFavPage * SK_PADS_PER_PAGE, skFavPage * SK_PADS_PER_PAGE + SK_PADS_PER_PAGE);
   const idx = pinnedNames.indexOf(name);
   const currentColorIdx = (db.presets[name].padColorIdx ?? (idx >= 0 ? idx : 0)) % SK_PAD_PALETTE.length;
   const canLeft  = idx > 0 && idx % 4 !== 0;
@@ -2377,6 +2435,19 @@ function renderShaker() {
   transform: translateY(1px);
   box-shadow: 0 1px 0 var(--pad-dark), 0 0 0 1.5px #fff, 0 1px 3px rgba(0,0,0,.22), inset 0 1px 1px rgba(0,0,0,.15);
 }
+.sk-fav-chip-empty {
+  background: linear-gradient(160deg, var(--card), var(--bg));
+  box-shadow: 0 2px 0 var(--border), 0 2px 3px rgba(0,0,0,.08), inset 0 1px 1px rgba(255,255,255,.5);
+  cursor: default;
+}
+.sk-fav-dots {
+  display: flex; align-items: center; justify-content: center; gap: 5px; pointer-events: none;
+}
+.sk-fav-dot {
+  width: 5px; height: 5px; border-radius: 50%;
+  background: var(--border); transition: background .15s, transform .15s;
+}
+.sk-fav-dot.active { background: var(--blue); transform: scale(1.3); }
 .sk-fav-chip-label {
   font-size: 9.5px; font-weight: 700; color: #fff; line-height: 1.15;
   display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
@@ -2862,16 +2933,17 @@ function renderShaker() {
     </button>
   </div>
   <input type="file" id="sk-import-file" accept=".json" style="display:none" onchange="skHandleImportFile(event)">
-  <div class="sk-fav-bar" id="sk-fav-bar" style="margin-bottom:14px">
+  <div class="sk-fav-bar" id="sk-fav-bar" style="margin-bottom:6px">
     <span class="sk-fav-empty">Épingle des presets depuis la bibliothèque ★</span>
   </div>
+  <div class="sk-fav-dots" id="sk-fav-dots" style="margin-bottom:14px"></div>
 
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
     <div class="sk-section-label" style="margin-bottom:0;flex-shrink:0;cursor:pointer;user-select:none" onclick="skToggleSeqCollapse()">
       <span id="sk-seq-chevron">${skSeqCollapsed ? '▶' : '▼'}</span> Séquence — <span id="sk-step-count">${skSteps.length}</span> / ${SK_MAX_STEPS} pas
     </div>
     <div style="flex:1"></div>
-    <button class="sk-fav-save-btn" onclick="skOpenSaveDialog()">＋ Save</button>
+    <button class="sk-fav-save-btn" id="sk-fav-save-btn" onclick="skOpenSaveDialog()" style="display:${skSeqCollapsed ? 'none' : ''}">＋ Save</button>
   </div>
   <div id="sk-seq-body" style="display:${skSeqCollapsed ? 'none' : 'block'}">
   <div class="sk-steps-list" id="sk-steps-list"></div>
@@ -2910,17 +2982,19 @@ function renderShaker() {
   </div>
   </div><!-- /sk-seq-body -->
 
-  <div class="sk-tab-wrap" id="sk-tab-wrap">
+  <div class="sk-tab-wrap" id="sk-tab-wrap" onclick="skOpenSeqFromEmptyState()">
     <div class="sk-tab-display">
       <div class="sk-empty-state">Ajoute au moins un pas pour composer ton exercice</div>
     </div>
   </div>
 
+  <div id="sk-mode-lecture-wrap" style="display:${skSteps.length ? '' : 'none'}">
   <div class="sk-section-label" style="margin-top:14px">Mode de lecture</div>
   <div class="sk-seg" id="sk-mode-seg" style="margin-bottom:14px">
     <button class="sk-mode-strict ${skPlayMode==='strict'?'active':''}"   onclick="skSetPlayMode('strict')">Strict</button>
     <button class="sk-mode-mirror ${skPlayMode==='mirror'?'active':''}"   onclick="skSetPlayMode('mirror')">Inversé</button>
     <button class="sk-mode-inverse ${skPlayMode==='inverse'?'active':''}" onclick="skSetPlayMode('inverse')">Miroir</button>
+  </div>
   </div>
 
   <div id="sk-prog-wrap"></div>

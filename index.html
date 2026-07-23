@@ -1888,7 +1888,7 @@ function showSilentSwitchWarning() {
     <div style="background:var(--card);border-radius:18px;max-width:380px;width:100%;padding:28px 24px 24px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.4)">
       <div style="font-size:44px;margin-bottom:10px">🔇</div>
       <div style="font-size:19px;font-weight:800;color:var(--text);margin-bottom:8px">Mode silencieux activé</div>
-      <div style="font-size:14px;color:var(--text2);line-height:1.5;margin-bottom:22px">Ton iPhone est en mode silencieux (petit interrupteur sur le côté) : tu n'entendras ni le clic du métronome ni les notes de la preview. Désactive-le pour profiter du son.</div>
+      <div style="font-size:14px;color:var(--text2);line-height:1.5;margin-bottom:22px">Ton iPhone est en mode silencieux (interrupteur ou bouton Action sur le côté, selon le modèle) : tu n'entendras ni le clic du métronome ni les notes de la preview. Désactive-le pour profiter du son.</div>
       <button onclick="document.getElementById('silent-switch-overlay').remove()" style="width:100%;background:var(--blue);color:#fff;border:none;padding:13px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">Compris</button>
     </div>`;
   document.body.appendChild(overlay);
@@ -2511,7 +2511,7 @@ function openSettings(tab) {
           <button class="sf-btn" onclick="doImportJSON()">↑ Importer JSON</button>
         </div>
         <button class="sf-reset" onclick="resetApp()">Réinitialiser l'app</button>
-        <div class="sf-version">v6.36</div>
+        <div class="sf-version">v6.43</div>
       </div>
     </div>
   </div>`;
