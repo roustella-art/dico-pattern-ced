@@ -29,6 +29,7 @@ let state = {
   stringUnlockedSeen: false,  // true dès que le popup "Groupe de cordes débloqué" (niveau 4 à 100%) a été affiché une fois
   loopExtUnlockedSeen: false, // true dès que le popup "Loop étendu débloqué" (niveau 5 à 100%) a été affiché une fois
   shuffleUnlockedSeen: false, // true dès que le popup "Shuffle débloqué" (niveau 6 à 100%) a été affiché une fois
+  laboForceUnlocked: false, // true si l'utilisateur a choisi de débloquer le Labo en avance (avant le niveau 2)
 };
 
 // ─── SETTINGS (cordes / son / case de départ) ────────────────────────────────
@@ -346,6 +347,7 @@ function loadState() {
     if (saved.stringUnlockedSeen !== undefined) state.stringUnlockedSeen = saved.stringUnlockedSeen;
     if (saved.loopExtUnlockedSeen !== undefined) state.loopExtUnlockedSeen = saved.loopExtUnlockedSeen;
     if (saved.shuffleUnlockedSeen !== undefined) state.shuffleUnlockedSeen = saved.shuffleUnlockedSeen;
+    if (saved.laboForceUnlocked !== undefined) state.laboForceUnlocked = saved.laboForceUnlocked;
   } catch(e) { console.warn('loadState:', e); }
   loadPatNotes();
   loadPatTrace();
@@ -372,6 +374,7 @@ function saveState() {
       stringUnlockedSeen: state.stringUnlockedSeen,
       loopExtUnlockedSeen: state.loopExtUnlockedSeen,
       shuffleUnlockedSeen: state.shuffleUnlockedSeen,
+      laboForceUnlocked: state.laboForceUnlocked,
     }));
   } catch(e) { console.warn('saveState:', e); }
 }
@@ -525,7 +528,7 @@ function isLevelUnlocked(level) {
  * @returns {boolean}
  */
 function isLaboUnlocked() {
-  return !SETTINGS.guidedMode || !SETTINGS.lightMode || getUnlockedLevel() >= 3;
+  return !SETTINGS.guidedMode || !SETTINGS.lightMode || getUnlockedLevel() >= 3 || state.laboForceUnlocked;
 }
 
 /**
