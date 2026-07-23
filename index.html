@@ -58,6 +58,10 @@
     --header-bg:#1F2D33;--header-text:#F4EEE2;
   }
   html,body{height:100%;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:var(--bg);color:var(--text)}
+  /* Désactive la sélection tactile (surlignage bleu iOS) déclenchée par l'appui long partout dans l'app,
+     sauf dans les champs de saisie où l'utilisateur doit pouvoir sélectionner/copier du texte */
+  *{-webkit-touch-callout:none;-webkit-user-select:none;user-select:none}
+  input,textarea,[contenteditable="true"]{-webkit-user-select:text;user-select:text}
   #app{display:flex;flex-direction:column;height:100dvh;max-width:640px;margin:0 auto}
 
   /* Landscape mode : pleine largeur sur tablette ET téléphone, avec zones de sécurité
@@ -1870,6 +1874,7 @@ async function maybeWarnSilentSwitch() {
     const res = await window.Capacitor.Plugins.SilentSwitch.isSilent();
     if (!res.isSilent) return;
     _silentSwitchWarnedThisSession = true;
+    if (typeof previewStop === 'function') previewStop();
     showSilentSwitchWarning();
   } catch(e) { console.warn('maybeWarnSilentSwitch error:', e); }
 }
@@ -2506,7 +2511,7 @@ function openSettings(tab) {
           <button class="sf-btn" onclick="doImportJSON()">↑ Importer JSON</button>
         </div>
         <button class="sf-reset" onclick="resetApp()">Réinitialiser l'app</button>
-        <div class="sf-version">v6.30</div>
+        <div class="sf-version">v6.36</div>
       </div>
     </div>
   </div>`;
@@ -3296,7 +3301,11 @@ if ('serviceWorker' in navigator) {
 // ─── FONCTIONS DE GESTION D'ÉTAT ─────────────────────────────────────────────
 function toggleCard(key) {
   const wasOpen = state.openCards[key];
-  state.openCards[key] = !state.openCards[key];
+  // Si on OUVRE cette carte, fermer toutes les autres (un seul tiroir ouvert à la fois)
+  if (!wasOpen) {
+    Object.keys(state.openCards).forEach(k => { if (k !== key) state.openCards[k] = false; });
+  }
+  state.openCards[key] = !wasOpen;
   // Si on FERME la carte, arrêter la preview/métronome
   if (wasOpen && !state.openCards[key]) {
     previewStop();

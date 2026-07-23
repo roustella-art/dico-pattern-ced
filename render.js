@@ -10,6 +10,14 @@
 // ─── RENDER ───────────────────────────────────────────────────────────────────
 let journalSubTab = 'stats'; // 'journal' | 'stats' — Progression par défaut à l'arrivée sur Journal
 
+// Colore les flèches ↓/↑ dans un libellé "Pick ↓" / "Pick ↑" avec les mêmes couleurs
+// que celles utilisées pour le picking dans l'affichage de la tablature (voir ARROW_DOWN_COLOR/ARROW_UP_COLOR)
+function colorizeInterpArrow(label) {
+  return label
+    .replace('↓', `<span style="color:${ARROW_DOWN_COLOR}">↓</span>`)
+    .replace('↑', `<span style="color:${ARROW_UP_COLOR}">↑</span>`);
+}
+
 const DIR_BTN_COLORS = {
   U: { bg:'rgba(26,122,94,.13)',  color:'#1a7a5e', border:'#1a7a5e' },
   D: { bg:'rgba(184,74,32,.13)',  color:'#b84a20', border:'#b84a20' },
@@ -326,7 +334,7 @@ function buildGammeProgGrid(p) {
     <table><thead><tr>
       <th style="width:68px;background:var(--blue);vertical-align:middle">${badgeLabel}</th>
       ${interpsToUse.map(i => `<th data-interp-th="${i}" onclick="setPreviewInterp('${i}')"
-        style="cursor:pointer;transition:all .15s;${PREVIEW.interp===i ? 'background:var(--orange);color:#fff;' : 'background:var(--blue);color:rgba(255,255,255,.75);'}">${interpLabels[i]}</th>`).join('')}
+        style="cursor:pointer;transition:all .15s;${PREVIEW.interp===i ? 'background:var(--orange);color:#fff;' : 'background:var(--blue);color:rgba(255,255,255,.75);'}">${colorizeInterpArrow(interpLabels[i])}</th>`).join('')}
     </tr></thead>
     <tbody style="background:transparent">${gridRows}</tbody></table></div>`;
 
@@ -608,7 +616,7 @@ function renderPatternGroupBody(pats, key) {
     <table><thead><tr>
       <th style="width:68px;background:var(--blue);vertical-align:middle">${dirBadge}</th>
       ${interpsToUse.map(i=>`<th data-interp-th="${i}" onclick="setPreviewInterp('${i}')"
-        style="cursor:pointer;transition:all .15s;${thStyle(i)}">${INTERP_LABELS[i]}</th>`).join('')}
+        style="cursor:pointer;transition:all .15s;${thStyle(i)}">${colorizeInterpArrow(INTERP_LABELS[i])}</th>`).join('')}
     </tr></thead>
     <tbody style="background:${dirBgColor}">${gridRows}</tbody></table></div>`;
 
@@ -689,6 +697,23 @@ function dirLabel(d) {
  * Redessine l'onglet Patterns avec tri : Progressif / Alphabétique / Aléatoire
  * @returns {string} HTML du contenu Patterns
  */
+// Numéro d'exercice canonique (ordre Progressif, niveau par niveau) — stable quel que soit
+// le filtre de difficulté actif, sert de référence "(Ex.N)" affichée dans les autres tris
+function getExerciseNumberMap() {
+  const allKeys = new Set();
+  PATTERNS.filter(p => p.cat !== 'arpeges' && p.cat !== 'gamme' && !p.laboOnly)
+    .forEach(p => allKeys.add(p.cat + 'P' + p.num));
+  const sortedKeys = [...allKeys].sort((a, b) => {
+    const ia = PATTERN_LEVEL_ORDER[a] ? PATTERN_LEVEL_ORDER[a].index : 9999;
+    const ib = PATTERN_LEVEL_ORDER[b] ? PATTERN_LEVEL_ORDER[b].index : 9999;
+    if (ia !== ib) return ia - ib;
+    return a.localeCompare(b);
+  });
+  const map = {};
+  sortedKeys.forEach((k, i) => { map[k] = i + 1; });
+  return map;
+}
+
 function renderPatterns() {
   if (!state.patternSort) state.patternSort = 'progressif';
   // Mode Guidé : tri forcé sur Progressif, sauf Favoris qui reste utilisable (utile le temps de la progression)
@@ -763,12 +788,11 @@ function renderPatterns() {
   }
 
   const unlockedLevel = SETTINGS.guidedMode ? getUnlockedLevel() : null;
+  const exerciseNumberMap = getExerciseNumberMap();
 
   let lastLevel = null;
   let isFirstGroup = true;
-  let exerciseNumber = 0;
   sortedEntries.forEach(([key, pats]) => {
-    if (state.patternSort === 'progressif') exerciseNumber++;
     // Passer les gammes (qui seront affichées dans une section séparée)
     if (pats[0].cat === 'gamme') return;
 
@@ -790,7 +814,7 @@ function renderPatterns() {
         <div style="padding:12px 14px;display:flex;align-items:center;gap:8px">
           <span style="line-height:0">${lockIconSVG(18)}</span>
           <div style="flex:1;min-width:0">
-            <h2 style="font-size:14px;margin:0;font-weight:700;color:var(--text2)">${state.patternSort === 'progressif' ? 'Exercice ' + exerciseNumber : key}</h2>
+            <h2 style="font-size:14px;margin:0;font-weight:700;color:var(--text2)">${state.patternSort === 'progressif' ? 'Exercice ' + exerciseNumberMap[key] : key}</h2>
             <div style="font-size:11px;color:var(--text2);opacity:.8">Termine le niveau ${unlockedLevel} pour débloquer</div>
           </div>
         </div>
@@ -812,9 +836,9 @@ function renderPatterns() {
       <div class="card-head" onclick="toggleCard('${key}')">
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:7px">
-            <h2 style="font-size:14px;margin:0;font-weight:700">${state.patternSort === 'progressif' ? 'Exercice ' + exerciseNumber : key}</h2>
+            <h2 style="font-size:14px;margin:0;font-weight:700">${state.patternSort === 'progressif' ? 'Exercice ' + exerciseNumberMap[key] : key}</h2>
             <span style="color:var(--text);opacity:.3;font-size:13px;font-weight:300">·</span>
-            <span style="font-size:13px;color:var(--text);opacity:.65;font-style:italic;font-weight:400">${base.name}</span>
+            <span style="font-size:13px;color:var(--text);opacity:.65;font-style:italic;font-weight:400">${base.name}${state.patternSort !== 'progressif' && exerciseNumberMap[key] ? ` (Ex.${exerciseNumberMap[key]})` : ''}</span>
           </div>
         </div>
         <div style="display:flex;align-items:center;gap:8px;flex-shrink:0">

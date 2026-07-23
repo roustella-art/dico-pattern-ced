@@ -1412,6 +1412,18 @@ function skInitReorderable(containerId, itemSelector, groupSelector, opts = {}) 
   container.addEventListener('lostpointercapture', (e) => { if (e.pointerType !== 'touch' && armed) finish(); });
 }
 
+// Palette de pads type boîte à rythme — cycle par index
+const SK_PAD_PALETTE = [
+  { base:'#2a7de1', light:'#5aa0f0', dark:'#1d5aa0' }, // bleu
+  { base:'#c0392b', light:'#e05a4a', dark:'#8f2a1f' }, // rouge
+  { base:'#8e44ad', light:'#b366d9', dark:'#642f7a' }, // violet
+  { base:'#16a085', light:'#3fd1b3', dark:'#0e7a63' }, // teal
+  { base:'#d4622e', light:'#e8935f', dark:'#a34a20' }, // orange
+  { base:'#56864a', light:'#7bb06c', dark:'#3d6135' }, // vert
+  { base:'#e6a817', light:'#f5c95a', dark:'#b3800f' }, // or
+  { base:'#e91e63', light:'#f06090', dark:'#ad1447' }, // rose
+];
+
 function skBuildFavBar() {
   const bar = document.getElementById('sk-fav-bar');
   if (!bar) return;
@@ -1422,13 +1434,146 @@ function skBuildFavBar() {
     return;
   }
   // L'ordre affiché ici suit skSortByPresetOrder — réorganisable depuis l'onglet
-  // "★ Épinglés" de la bibliothèque (glisser vertical), pas directement ici.
-  bar.innerHTML = pinnedNames.map(name => {
+  // "★ Épinglés" de la bibliothèque (glisser vertical), ou par appui long sur un pad ici.
+  // Limité à 8 pads max pour rester compact sur smartphone
+  bar.innerHTML = pinnedNames.slice(0, 8).map((name, i) => {
     const active = name === skCurrentPreset;
-    return `<button class="sk-fav-chip${active ? ' active' : ''}" onclick="skLoadPresetByName('${name.replace(/'/g,"\\'")}')">
-      ${name}
+    const colorIdx = db.presets[name].padColorIdx ?? i;
+    const c = SK_PAD_PALETTE[colorIdx % SK_PAD_PALETTE.length];
+    return `<button class="sk-fav-chip${active ? ' active' : ''}" data-preset-name="${name.replace(/"/g,'&quot;')}" style="--pad-base:${c.base};--pad-light:${c.light};--pad-dark:${c.dark}" onclick="skLoadPresetByName('${name.replace(/'/g,"\\'")}')">
+      <span class="sk-fav-chip-label">${name}</span>
     </button>`;
   }).join('');
+  skInitFavPadLongPress();
+}
+
+// ── ÉDITEUR DE PAD (appui long) : couleur + déplacement dans la grille 4×2 ────
+function skSetPadColor(name, idx) {
+  const db = skLoadPresetsV2();
+  if (!db.presets[name]) return;
+  db.presets[name].padColorIdx = idx;
+  skSavePresetsV2(db);
+  skBuildFavBar();
+  skOpenPadEditor(name);
+}
+
+function skMoveFavPad(name, dir) {
+  const db = skLoadPresetsV2();
+  const pinnedNames = skSortByPresetOrder(Object.keys(db.presets).filter(n => db.presets[n].pinned)).slice(0, 8);
+  const idx = pinnedNames.indexOf(name);
+  if (idx === -1) return;
+  if (dir === 'left'  && idx % 4 === 0) return;
+  if (dir === 'right' && idx % 4 === 3) return;
+  const deltas = { up:-4, down:4, left:-1, right:1 };
+  const swapIdx = idx + deltas[dir];
+  if (swapIdx < 0 || swapIdx >= pinnedNames.length) return;
+  [pinnedNames[idx], pinnedNames[swapIdx]] = [pinnedNames[swapIdx], pinnedNames[idx]];
+  skUpdatePresetOrderForSubset(pinnedNames);
+  skBuildFavBar();
+  skOpenPadEditor(name);
+}
+
+function skOpenPadEditor(name) {
+  const db = skLoadPresetsV2();
+  if (!db.presets[name]) return;
+  const pinnedNames = skSortByPresetOrder(Object.keys(db.presets).filter(n => db.presets[n].pinned)).slice(0, 8);
+  const idx = pinnedNames.indexOf(name);
+  const currentColorIdx = (db.presets[name].padColorIdx ?? (idx >= 0 ? idx : 0)) % SK_PAD_PALETTE.length;
+  const canLeft  = idx > 0 && idx % 4 !== 0;
+  const canRight = idx % 4 !== 3 && idx < pinnedNames.length - 1;
+  const canUp    = idx - 4 >= 0;
+  const canDown  = idx + 4 < pinnedNames.length;
+  const safeName = name.replace(/'/g,"\\'");
+
+  const swatches = SK_PAD_PALETTE.map((c, i) => `
+    <button class="sk-pad-swatch${i === currentColorIdx ? ' active' : ''}" style="--sw:${c.base}" onclick="skSetPadColor('${safeName}', ${i})"></button>
+  `).join('');
+
+  document.getElementById('sk-pad-dialog').innerHTML = `
+    <div class="sk-dialog-backdrop" onclick="skClosePadEditor()"></div>
+    <div class="sk-dialog-box">
+      <div class="sk-dialog-title">${name}</div>
+      <div class="sk-dialog-label" style="margin-bottom:8px">Couleur</div>
+      <div class="sk-pad-swatch-row">${swatches}</div>
+      <div class="sk-dialog-label" style="margin:16px 0 8px">Position</div>
+      <div class="sk-pad-move-grid">
+        <span></span>
+        <button class="sk-pad-move-btn" ${canUp?'':'disabled'} onclick="skMoveFavPad('${safeName}','up')">▲</button>
+        <span></span>
+        <button class="sk-pad-move-btn" ${canLeft?'':'disabled'} onclick="skMoveFavPad('${safeName}','left')">◀</button>
+        <span></span>
+        <button class="sk-pad-move-btn" ${canRight?'':'disabled'} onclick="skMoveFavPad('${safeName}','right')">▶</button>
+        <span></span>
+        <button class="sk-pad-move-btn" ${canDown?'':'disabled'} onclick="skMoveFavPad('${safeName}','down')">▼</button>
+        <span></span>
+      </div>
+      <div class="sk-dialog-actions">
+        <button class="sk-dialog-btn confirm" onclick="skClosePadEditor()">Fermer</button>
+      </div>
+    </div>`;
+  document.getElementById('sk-pad-dialog').style.display = 'block';
+}
+
+function skClosePadEditor() {
+  const d = document.getElementById('sk-pad-dialog');
+  if (d) { d.style.display = 'none'; d.innerHTML = ''; }
+}
+
+// Appui long (tactile + souris) sur un pad → ouvre l'éditeur, sans déclencher le
+// chargement du preset (onclick) qui suit normalement le relâchement.
+function skInitFavPadLongPress() {
+  const container = document.getElementById('sk-fav-bar');
+  if (!container || container.dataset.longPressBound) return;
+  container.dataset.longPressBound = '1';
+
+  let timer = null, longPressed = false, startX = 0, startY = 0, targetName = null;
+  const clearTimer = () => { if (timer) { clearTimeout(timer); timer = null; } };
+
+  const start = (x, y, name) => {
+    startX = x; startY = y; longPressed = false; targetName = name;
+    clearTimer();
+    timer = setTimeout(() => {
+      timer = null;
+      longPressed = true;
+      if (navigator.vibrate) navigator.vibrate(15);
+      skOpenPadEditor(targetName);
+    }, 420);
+  };
+  const move = (x, y) => {
+    if (timer && (Math.abs(x - startX) > 8 || Math.abs(y - startY) > 8)) clearTimer();
+  };
+  const cancel = () => clearTimer();
+
+  container.addEventListener('touchstart', (e) => {
+    const item = e.target.closest('.sk-fav-chip');
+    if (!item) return;
+    const t = e.changedTouches[0];
+    start(t.clientX, t.clientY, item.dataset.presetName);
+  }, { passive: true });
+  container.addEventListener('touchmove', (e) => {
+    const t = e.changedTouches[0];
+    if (t) move(t.clientX, t.clientY);
+  }, { passive: true });
+  container.addEventListener('touchend', cancel);
+  container.addEventListener('touchcancel', cancel);
+
+  container.addEventListener('mousedown', (e) => {
+    const item = e.target.closest('.sk-fav-chip');
+    if (!item) return;
+    start(e.clientX, e.clientY, item.dataset.presetName);
+  });
+  container.addEventListener('mousemove', (e) => move(e.clientX, e.clientY));
+  container.addEventListener('mouseup', cancel);
+  container.addEventListener('mouseleave', cancel);
+
+  // Bloque le clic (chargement du preset) juste après l'ouverture de l'éditeur par appui long
+  container.addEventListener('click', (e) => {
+    if (longPressed) {
+      e.preventDefault();
+      e.stopPropagation();
+      longPressed = false;
+    }
+  }, true);
 }
 
 // ── CHARGER UN PRESET ─────────────────────────────────────────────────────────
@@ -1471,7 +1616,6 @@ function skOpenLibrary() {
   const sheet = document.getElementById('sk-library-sheet');
   const overlay = document.getElementById('sk-library-overlay');
   if (sheet) { sheet.classList.add('open'); overlay.classList.add('open'); }
-  setTimeout(() => document.getElementById('sk-lib-search')?.focus(), 150);
 }
 
 function skCloseLibrary() {
@@ -1942,7 +2086,7 @@ function skRenderProgTable(presetName) {
       <table><thead><tr>
         <th style="width:68px;background:${color};vertical-align:middle">${modeBadge}</th>
         ${interpsToUse.map(i=>`<th data-interp-th="${i}" onclick="skSetInterp('${i}')"
-          style="cursor:pointer;transition:all .15s;${PREVIEW.interp===i ? 'background:var(--orange);color:#fff;' : 'background:var(--blue);color:rgba(255,255,255,.75);'}">${INTERP_LABELS[i]}</th>`).join('')}
+          style="cursor:pointer;transition:all .15s;${PREVIEW.interp===i ? 'background:var(--orange);color:#fff;' : 'background:var(--blue);color:rgba(255,255,255,.75);'}">${colorizeInterpArrow(INTERP_LABELS[i])}</th>`).join('')}
       </tr></thead>
       <tbody>${gridRows}</tbody></table>
     </div>
@@ -2213,19 +2357,39 @@ function renderShaker() {
   -webkit-tap-highlight-color: transparent;
 }
 .sk-io-action-btn:active { background: var(--bg); opacity: .8; }
+.sk-io-action-btn-sm { padding: 5px 6px; font-size: 10px; border-radius: 6px; }
 .sk-fav-bar {
-  display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 8px;
-  scrollbar-width: none; -webkit-overflow-scrolling: touch;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; margin-bottom: 8px;
 }
-.sk-fav-bar::-webkit-scrollbar { display: none; }
 .sk-fav-chip {
-  flex-shrink: 0; border: 1.5px solid var(--border); background: var(--card);
-  border-radius: 20px; padding: 6px 14px; font-size: 12px; font-weight: 600;
-  color: var(--text); cursor: pointer; white-space: nowrap; transition: all .15s;
+  height: 34px; width: 100%; border: none; border-radius: 8px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; text-align: center;
+  padding: 3px 5px; -webkit-tap-highlight-color: transparent;
+  transition: transform .08s ease, box-shadow .08s ease;
+  background: linear-gradient(160deg, var(--pad-light), var(--pad-base));
+  box-shadow: 0 2px 0 var(--pad-dark), 0 3px 4px rgba(0,0,0,.22), inset 0 1px 1px rgba(255,255,255,.35);
 }
-.sk-fav-chip.active { border-color: var(--blue); color: var(--blue); background: var(--blue-light); }
-.sk-fav-chip:active  { opacity: .7; }
-.sk-fav-empty { font-size: 11px; color: var(--text2); font-style: italic; padding: 4px 0; }
+.sk-fav-chip:active {
+  transform: translateY(2px);
+  box-shadow: 0 0 0 var(--pad-dark), 0 1px 1px rgba(0,0,0,.2), inset 0 1px 2px rgba(0,0,0,.3);
+}
+.sk-fav-chip.active {
+  transform: translateY(1px);
+  box-shadow: 0 1px 0 var(--pad-dark), 0 0 0 1.5px #fff, 0 1px 3px rgba(0,0,0,.22), inset 0 1px 1px rgba(0,0,0,.15);
+}
+.sk-fav-chip-label {
+  font-size: 9.5px; font-weight: 700; color: #fff; line-height: 1.15;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
+  text-shadow: 0 1px 2px rgba(0,0,0,.3);
+}
+.sk-fav-empty { grid-column: 1 / -1; font-size: 11px; color: var(--text2); font-style: italic; padding: 10px 0; text-align: center; }
+.sk-lib-mini-btn {
+  flex-shrink: 0; border: none; background: var(--blue); color: #fff;
+  border-radius: 7px; padding: 5px 10px; font-size: 10.5px; font-weight: 600;
+  cursor: pointer; display: flex; align-items: center; gap: 5px;
+  -webkit-tap-highlight-color: transparent; transition: opacity .15s;
+}
+.sk-lib-mini-btn:active { opacity: .7; }
 .sk-lib-open-btn {
   width: 100%; border: none; background: var(--blue);
   border-radius: 10px; padding: 12px; font-size: 13px; font-weight: 600; color: #fff;
@@ -2379,6 +2543,25 @@ function renderShaker() {
 }
 .sk-dialog-btn.cancel { background: var(--border); color: var(--text2); }
 .sk-dialog-btn.confirm { background: var(--green); color: #fff; }
+
+/* Éditeur de pad (appui long sur un favori) */
+.sk-pad-swatch-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.sk-pad-swatch {
+  width: 28px; height: 28px; border-radius: 50%; cursor: pointer;
+  border: 2px solid transparent; background: var(--sw);
+  -webkit-tap-highlight-color: transparent;
+}
+.sk-pad-swatch.active { border-color: #fff; box-shadow: 0 0 0 2px var(--sw); }
+.sk-pad-move-grid {
+  display: grid; grid-template-columns: repeat(3, 42px); grid-template-rows: repeat(3, 42px);
+  gap: 4px; justify-content: center;
+}
+.sk-pad-move-btn {
+  border: 1px solid var(--border); background: var(--card); border-radius: 8px;
+  font-size: 15px; color: var(--text); cursor: pointer; -webkit-tap-highlight-color: transparent;
+}
+.sk-pad-move-btn:active:not(:disabled) { background: var(--blue-light); }
+.sk-pad-move-btn:disabled { opacity: .25; cursor: default; }
 
 /* Steps list — accordion mode */
 .sk-steps-list { margin-bottom: 10px; }
@@ -2670,6 +2853,19 @@ function renderShaker() {
 
 <div class="sk-wrap">
 
+  <div style="display:flex;align-items:center;gap:8px;margin-top:0;margin-bottom:4px">
+    <span class="sk-section-label" style="margin:0">Presets <span style="color:#f0a500">★</span></span>
+    <div style="flex:1"></div>
+    <button class="sk-lib-mini-btn" onclick="skOpenLibrary()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+      Bibliothèque
+    </button>
+  </div>
+  <input type="file" id="sk-import-file" accept=".json" style="display:none" onchange="skHandleImportFile(event)">
+  <div class="sk-fav-bar" id="sk-fav-bar" style="margin-bottom:14px">
+    <span class="sk-fav-empty">Épingle des presets depuis la bibliothèque ★</span>
+  </div>
+
   <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px">
     <div class="sk-section-label" style="margin-bottom:0;flex-shrink:0;cursor:pointer;user-select:none" onclick="skToggleSeqCollapse()">
       <span id="sk-seq-chevron">${skSeqCollapsed ? '▶' : '▼'}</span> Séquence — <span id="sk-step-count">${skSteps.length}</span> / ${SK_MAX_STEPS} pas
@@ -2679,6 +2875,16 @@ function renderShaker() {
   </div>
   <div id="sk-seq-body" style="display:${skSeqCollapsed ? 'none' : 'block'}">
   <div class="sk-steps-list" id="sk-steps-list"></div>
+  <div style="display:flex;gap:6px;margin-bottom:8px">
+    <button class="sk-io-action-btn sk-io-action-btn-sm" onclick="skImportPresetCode()" title="Importer un preset depuis un code partagé">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      Importer
+    </button>
+    <button class="sk-io-action-btn sk-io-action-btn-sm" onclick="skExportPresetCode()" title="Générer un code à partager (forum, message...)">
+      <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 16 12 21 17 16"/><line x1="12" y1="21" x2="12" y2="9"/></svg>
+      Copier le preset
+    </button>
+  </div>
   <div style="display:flex;gap:8px;margin-bottom:10px">
     <button class="sk-add-step-btn" id="sk-add-step-btn" onclick="skAddStep()" ${skSteps.length >= SK_MAX_STEPS ? 'disabled' : ''} style="flex:1;margin-bottom:0">＋ Ajouter un pas</button>
     <button class="sk-btn" id="sk-global-edit-btn" onclick="skToggleGlobalPanel()" style="flex:0 0 auto;padding:10px 14px;font-size:14px" title="Édition globale"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:middle"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
@@ -2719,28 +2925,6 @@ function renderShaker() {
 
   <div id="sk-prog-wrap"></div>
 
-  <div style="margin-top:6px;margin-bottom:4px">
-    <span class="sk-section-label" style="margin:0">Presets <span style="color:#f0a500">★</span></span>
-  </div>
-  <input type="file" id="sk-import-file" accept=".json" style="display:none" onchange="skHandleImportFile(event)">
-  <div class="sk-fav-bar" id="sk-fav-bar">
-    <span class="sk-fav-empty">Épingle des presets depuis la bibliothèque ★</span>
-  </div>
-  <button class="sk-lib-open-btn" onclick="skOpenLibrary()">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-    Bibliothèque
-  </button>
-  <div style="display:flex;gap:8px;margin-top:8px">
-    <button class="sk-io-action-btn" onclick="skImportPresetCode()" title="Importer un preset depuis un code partagé">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-      Importer
-    </button>
-    <button class="sk-io-action-btn" onclick="skExportPresetCode()" title="Générer un code à partager (forum, message...)">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 16 12 21 17 16"/><line x1="12" y1="21" x2="12" y2="9"/></svg>
-      Copier le preset
-    </button>
-  </div>
-
 </div>
 
 <!-- Library bottom-sheet -->
@@ -2760,6 +2944,7 @@ function renderShaker() {
 
 <!-- Save dialog -->
 <div id="sk-save-dialog" style="display:none"></div>
+<div id="sk-pad-dialog" style="display:none"></div>
 `;
 }
 

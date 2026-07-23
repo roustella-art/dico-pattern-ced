@@ -5165,6 +5165,10 @@ const MODES = ["U","D","M"];
 const MODE_LABELS = {U:"Ascendant",D:"Descendant",M:"Mix"};
 const INTERPS = ["Down","Up","Leg"];
 const INTERP_LABELS = {Up:"Pick ↑",Down:"Pick ↓",Leg:"Legato"};
+// Couleurs des flèches de picking (tablature + tableaux de progression) — choisies pour
+// rester lisibles même sur fond bleu/orange actif (voir colorizeInterpArrow dans render.js)
+const ARROW_DOWN_COLOR = '#7EC8E3'; // bleu clair
+const ARROW_UP_COLOR   = '#D32F2F'; // rouge franc
 const TEMPOS = [
   { key:'lent',  label:'Tempo', range:'40–100',  rangeMin:40, rangeMax:100, color:'#4a9e6b',
     icon:`<svg width="22" height="10" viewBox="0 0 22 10" fill="none" xmlns="http://www.w3.org/2000/svg">

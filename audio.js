@@ -955,8 +955,8 @@ function tabWithSymbols(tabStr, interp, opts = {}) {
       if (interp === 'Sweep') {
         // Convertir n → ↓ bleu et V → ↑ orange
         let pickLine = lines[i];
-        pickLine = pickLine.replace(/n/g, '<span style="color:var(--blue);font-weight:700">↓</span>');
-        pickLine = pickLine.replace(/V/g, '<span style="color:var(--orange);font-weight:700">↑</span>');
+        pickLine = pickLine.replace(/n/g, `<span style="color:${ARROW_DOWN_COLOR};font-weight:700">↓</span>`);
+        pickLine = pickLine.replace(/V/g, `<span style="color:${ARROW_UP_COLOR};font-weight:700">↑</span>`);
         output.push(pickLine);
       }
       i++;
@@ -1042,8 +1042,8 @@ function tabWithSymbols(tabStr, interp, opts = {}) {
 
   // Coloriser les flèches médiator en orange (post-processing HTML)
   return output.join('\n')
-    .replace(/↑/g, '<span style="color:var(--orange)">↑</span>')
-    .replace(/↓/g, '<span style="color:#5BAEC4">↓</span>');
+    .replace(/↑/g, `<span style="color:${ARROW_UP_COLOR}">↑</span>`)
+    .replace(/↓/g, `<span style="color:${ARROW_DOWN_COLOR}">↓</span>`);
 }
 
 function interpButtons(vertical) {
@@ -1084,7 +1084,7 @@ function setPreviewInterp(interp) {
       else if (interpKey === 'Up') label = 'Pick ↑';
       else label = interpKey;
     }
-    th.textContent = label;
+    th.innerHTML = colorizeInterpArrow(label);
   });
   // Rafraîchir toutes les tabs visibles sans re-render
   document.querySelectorAll('[data-tab-id]').forEach(pre => {
