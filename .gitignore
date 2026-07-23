@@ -18,7 +18,3 @@ android/build
 android/app/build
 android/capacitor-cordova-android-plugins/build
 android/local.properties
-
-# Android : clé de signature - NE JAMAIS committer, à sauvegarder ailleurs en lieu sûr
-android/app/*.jks
-android/keystore.properties

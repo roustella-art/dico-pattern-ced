@@ -363,7 +363,7 @@
         </svg>
         <div id="brand-text" style="min-width:0">
           <h1>Dico Pattern</h1>
-          <div class="brand-sub">Exercices d'échauffements pour guitaristes</div>
+          <div class="brand-sub">explorer • progresser • créer</div>
         </div>
       </div>
       <div id="header-shuffle-badge" style="display:none;align-items:center;gap:6px;padding:4px 10px;background:rgba(255,107,53,.15);border:1.5px solid #FF6B35;border-radius:8px;font-size:11px;font-weight:700;color:#FF6B35;text-transform:uppercase;letter-spacing:.3px;flex-shrink:0;animation:shuffle-pulse-badge .8s ease-in-out infinite">♩ Shuffle</div>
@@ -440,12 +440,12 @@
       ontouchend="clearTimeout(_patWelTimer)" ontouchcancel="clearTimeout(_patWelTimer)">
       <span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg></span>Patterns
     </button>
-    <button onclick="laboNavClick()" id="nav-shaker"
+    <button onclick="showTab('shaker')" id="nav-shaker"
       onmousedown="_skWelTimer=setTimeout(()=>{if(typeof skShowWelcomeForce==='function')skShowWelcomeForce();},1500)"
       onmouseup="clearTimeout(_skWelTimer)" onmouseleave="clearTimeout(_skWelTimer)"
       ontouchstart="_skWelTimer=setTimeout(()=>{if(typeof skShowWelcomeForce==='function')skShowWelcomeForce();},1500)"
       ontouchend="clearTimeout(_skWelTimer)" ontouchcancel="clearTimeout(_skWelTimer)">
-      <span class="ico" style="position:relative"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(8,13) rotate(-20)"><path d="M-3,-9 L-3,5 Q-3,9 0,9 Q3,9 3,5 L3,-9" stroke-width="1.7"/><line x1="-4" y1="-10.5" x2="4" y2="-10.5" stroke-width="2" stroke-linecap="round"/><path d="M-2.5,2 L-2.5,5 Q-2.5,8.5 0,8.5 Q2.5,8.5 2.5,5 L2.5,2 Z" fill="currentColor" stroke="none" opacity="0.9"/></g><circle cx="16" cy="9" r="2.5" fill="currentColor" stroke="none"/><line x1="18.5" y1="9" x2="18.5" y2="2" stroke="currentColor" stroke-width="1.5"/><line x1="18.5" y1="2" x2="22" y2="3.5" stroke="currentColor" stroke-width="1.5"/></svg><span id="nav-shaker-lock" class="hidden" style="position:absolute;top:-3px;right:-6px;line-height:0"></span></span>Labo
+      <span class="ico"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><g transform="translate(8,13) rotate(-20)"><path d="M-3,-9 L-3,5 Q-3,9 0,9 Q3,9 3,5 L3,-9" stroke-width="1.7"/><line x1="-4" y1="-10.5" x2="4" y2="-10.5" stroke-width="2" stroke-linecap="round"/><path d="M-2.5,2 L-2.5,5 Q-2.5,8.5 0,8.5 Q2.5,8.5 2.5,5 L2.5,2 Z" fill="currentColor" stroke="none" opacity="0.9"/></g><circle cx="16" cy="9" r="2.5" fill="currentColor" stroke="none"/><line x1="18.5" y1="9" x2="18.5" y2="2" stroke="currentColor" stroke-width="1.5"/><line x1="18.5" y1="2" x2="22" y2="3.5" stroke="currentColor" stroke-width="1.5"/></svg></span>Labo
     </button>
     <button onclick="showTab('journal')" id="nav-journal"
       onmousedown="_obTimer=setTimeout(()=>{localStorage.removeItem('dico-onboarding-done');onboardingState={screen:0,answers:{},scores:{years:0,hours:0,profile:0}};showOnboarding();},1500)"
@@ -1519,6 +1519,16 @@ function updateHeaderUI() {
     statsEl.style.display = SETTINGS.showHeaderStats ? 'flex' : 'none';
     if (SETTINGS.showHeaderStats) updateHeaderStatsDisplay();
   }
+  // Masquer le texte "Dico Pattern / le dictionnaire de patterns" si plus de 3 raccourcis sont visibles
+  const brandText = document.getElementById('brand-text');
+  if (brandText) {
+    const buttonIds = ['shuffle-toggle-btn', 'string-group-btn', 'neck-toggle-btn', 'loop-ext-btn', 'light-toggle-btn'];
+    const visibleCount = buttonIds.filter(id => {
+      const el = document.getElementById(id);
+      return el && !el.classList.contains('hidden');
+    }).length + (SETTINGS.showHeaderStats ? 1 : 0);
+    brandText.classList.toggle('hidden', visibleCount > 3);
+  }
 
   // Bouton groupe de cordes (Row 1) — couleur propre à chaque groupe
   const stringBtn = document.getElementById('string-group-btn');
@@ -1573,18 +1583,6 @@ function updateHeaderUI() {
   // Badge Shuffle — masqué, le bouton SH le remplace
   const badge = document.getElementById('header-shuffle-badge');
   if (badge) badge.style.display = 'none';
-
-  // Masquer le texte "Dico Pattern / le dictionnaire de patterns" si plus de 3 raccourcis sont visibles
-  // (calculé ici, après la mise à jour des boutons ci-dessus, pour lire leur état hidden à jour)
-  const brandText = document.getElementById('brand-text');
-  if (brandText) {
-    const buttonIds = ['shuffle-toggle-btn', 'string-group-btn', 'neck-toggle-btn', 'loop-ext-btn', 'light-toggle-btn'];
-    const visibleCount = buttonIds.filter(id => {
-      const el = document.getElementById(id);
-      return el && !el.classList.contains('hidden');
-    }).length + (SETTINGS.showHeaderStats ? 1 : 0);
-    brandText.classList.toggle('hidden', visibleCount > 2);
-  }
 
   // ── ROW 2 : visibilité individuelle des boutons ───────────────────────────
   setVisible('header-train-btn',     SETTINGS.showTrain);
@@ -1670,20 +1668,9 @@ function toggleHeaderEl(key, value) {
 }
 
 function toggleAllHeaderEls(value) {
-  [
-    { key:'showTrain',      unlockFlag:'trainUnlockedSeen' },
-    { key:'showCountin' },
-    { key:'showClick' },
-    { key:'showSubdivBtn' },
-    { key:'showMetroSolo' },
-    { key:'showShuffleBtn',   unlockFlag:'shuffleUnlockedSeen' },
-    { key:'showStringBtn',    unlockFlag:'stringUnlockedSeen' },
-    { key:'showNeckBtn',      unlockFlag:'neckUnlockedSeen' },
-    { key:'showLoopExtBtn',   unlockFlag:'loopExtUnlockedSeen' },
-    { key:'showHeaderStats' },
-    { key:'showLightBtn' },
-  ].filter(item => !item.unlockFlag || !SETTINGS.guidedMode || state[item.unlockFlag])
-    .forEach(item => { SETTINGS[item.key] = value; });
+  ['showTrain','showCountin','showClick','showSubdivBtn','showMetroSolo',
+   'showShuffleBtn','showStringBtn','showNeckBtn','showLoopExtBtn','showHeaderStats','showLightBtn']
+    .forEach(key => { SETTINGS[key] = value; });
   saveSettings();
   updateHeaderUI();
   // Resync les toggles visuels dans le panneau
@@ -1812,50 +1799,7 @@ function showTab(tab) {
 function updateLaboNavVisibility() {
   const btn = document.getElementById('nav-shaker');
   if (!btn) return;
-  const unlocked = isLaboUnlocked();
-  btn.style.display = '';
-  btn.style.opacity = unlocked ? '' : '.45';
-  const lockBadge = document.getElementById('nav-shaker-lock');
-  if (lockBadge) {
-    lockBadge.classList.toggle('hidden', unlocked);
-    if (!unlocked && typeof lockIconSVG === 'function') lockBadge.innerHTML = lockIconSVG(11, 'var(--orange)');
-  }
-}
-
-// Clic sur l'onglet Labo : ouvre normalement si débloqué, sinon propose de débloquer en avance
-function laboNavClick() {
-  if (isLaboUnlocked()) { showTab('shaker'); return; }
-  showLaboEarlyUnlockPrompt();
-}
-
-// Popup affiché quand l'utilisateur clique sur le Labo alors qu'il est encore verrouillé (mode Guidé) :
-// explique le conseil (finir le niveau 2) mais permet de débloquer tout de suite si besoin.
-function showLaboEarlyUnlockPrompt() {
-  const existing = document.getElementById('labo-early-unlock-overlay');
-  if (existing) existing.remove();
-  const overlay = document.createElement('div');
-  overlay.id = 'labo-early-unlock-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px)';
-  overlay.innerHTML = `
-    <div style="background:var(--card);border-radius:18px;max-width:380px;width:100%;padding:28px 24px 24px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.4)">
-      <div style="font-size:44px;margin-bottom:10px">🔒</div>
-      <div style="font-size:19px;font-weight:800;color:var(--text);margin-bottom:8px">Labo pas encore débloqué</div>
-      <div style="font-size:14px;color:var(--text2);line-height:1.5;margin-bottom:22px">Je te conseille de finir le <strong>Niveau 2</strong> avant de te lancer dans le Labo, pour bien poser les bases. Mais si tu es trop impatient, tu peux le débloquer dès maintenant !</div>
-      <button onclick="laboUnlockEarly()" style="width:100%;background:var(--blue);color:#fff;border:none;padding:13px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer;margin-bottom:10px">Débloquer le Labo maintenant</button>
-      <button onclick="document.getElementById('labo-early-unlock-overlay').remove()" style="width:100%;background:none;color:var(--text2);border:none;padding:8px;font-size:13px;cursor:pointer">Continuer ma progression</button>
-    </div>`;
-  document.body.appendChild(overlay);
-  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
-}
-
-function laboUnlockEarly() {
-  state.laboForceUnlocked = true;
-  saveState();
-  updateLaboNavVisibility();
-  updateNavIndicator();
-  const overlay = document.getElementById('labo-early-unlock-overlay');
-  if (overlay) overlay.remove();
-  showTab('shaker');
+  btn.style.display = isLaboUnlocked() ? '' : 'none';
 }
 
 // Affiche une fois le popup "Bravo, Labo débloqué !" quand le mode Guidé vient de débloquer le Labo
@@ -1865,7 +1809,6 @@ function checkLaboUnlockCelebration() {
   saveState();
   updateLaboNavVisibility();
   updateNavIndicator();
-  refreshSettingsIfOpen();
   const overlay = document.createElement('div');
   overlay.id = 'labo-unlock-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px)';
@@ -1892,7 +1835,6 @@ function checkProUnlockCelebration() {
   updateLaboNavVisibility();
   updateNavIndicator();
   render();
-  refreshSettingsIfOpen();
   const overlay = document.createElement('div');
   overlay.id = 'pro-unlock-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px)';
@@ -1916,7 +1858,6 @@ function checkTrainUnlockCelebration() {
   SETTINGS.showTrain = true;
   saveSettings();
   updateHeaderUI();
-  refreshSettingsIfOpen();
   const overlay = document.createElement('div');
   overlay.id = 'train-unlock-overlay';
   overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px)';
@@ -2013,7 +1954,6 @@ function checkNeckUnlockCelebration() {
   SETTINGS.showNeckBtn = true;
   saveSettings();
   updateHeaderUI();
-  refreshSettingsIfOpen();
   _showLevelUnlockOverlay('neck-unlock-overlay', '🎉', 'Niveau 3 terminé !',
     'Tu débloques le raccourci <strong>Mid/High</strong> dans le header : il déplace instantanément la zone d\'affichage du manche entre la case 5 (Mid) et la case 12 (High), pour explorer tes patterns ailleurs sur le manche.',
     'Compris', 'var(--blue)');
@@ -2027,7 +1967,6 @@ function checkStringUnlockCelebration() {
   SETTINGS.showStringBtn = true;
   saveSettings();
   updateHeaderUI();
-  refreshSettingsIfOpen();
   _showLevelUnlockOverlay('string-unlock-overlay', '🎉', 'Niveau 4 terminé !',
     'Tu débloques le raccourci <strong>Groupe de cordes</strong> dans le header : change instantanément le jeu de 4 cordes utilisé pour tes patterns (aigu/médium/grave), pour varier les zones du manche.',
     'Compris', 'var(--blue)');
@@ -2041,7 +1980,6 @@ function checkLoopExtUnlockCelebration() {
   SETTINGS.showLoopExtBtn = true;
   saveSettings();
   updateHeaderUI();
-  refreshSettingsIfOpen();
   _showLevelUnlockOverlay('loopext-unlock-overlay', '🎉', 'Niveau 5 terminé !',
     'Tu débloques le raccourci <strong>Loop étendu</strong> dans le header : il prolonge le pattern en pyramide (+1 à +4) au lieu de le boucler à l\'identique, pour des enchaînements plus longs et plus musicaux.',
     'Compris', 'var(--blue)');
@@ -2055,7 +1993,6 @@ function checkShuffleUnlockCelebration() {
   SETTINGS.showShuffleBtn = true;
   saveSettings();
   updateHeaderUI();
-  refreshSettingsIfOpen();
   _showLevelUnlockOverlay('shuffle-unlock-overlay', '🎉', 'Niveau 6 terminé !',
     'Tu débloques le mode <strong>Shuffle</strong> (raccourci SH dans le header) : il te propose des patterns aléatoires pour sortir de l\'ordre habituel. Attention, sa progression est <strong>indépendante</strong> — elle repart de 0% et ne compte pas dans ta progression par niveaux.',
     'Compris', 'var(--orange)');
@@ -2089,7 +2026,6 @@ function debugFillToLevel(n) {
   updateLaboNavVisibility();
   updateNavIndicator();
   render();
-  refreshSettingsIfOpen();
   try { if (navigator.vibrate) navigator.vibrate([20,30,20,30,60]); } catch(ex){}
   const prevLevelsMsg = n > 1 ? `Niveaux 1 à ${n - 1} à 100%, ` : '';
   alert(`🧪 Progression de test injectée : ${prevLevelsMsg}Niveau ${n} presque fini (une case à cocher). Coche-la pour déclencher la récompense du Niveau ${n}.`);
@@ -2137,15 +2073,6 @@ function setTempoPreset(key, val) {
 let settingsTab = 'son'; // onglet actif du panneau réglages
 
 let _tempoModified = false;
-// Reconstruit le panneau Réglages s'il est actuellement ouvert (même onglet), pour refléter
-// un changement d'état survenu pendant qu'il était affiché (ex: debugFillToLevel).
-function refreshSettingsIfOpen() {
-  const el = document.getElementById('settings-overlay');
-  if (!el) return;
-  el.remove();
-  openSettings(settingsTab);
-}
-
 function openSettings(tab) {
   if (document.getElementById('settings-overlay')) return;
   if (tab) settingsTab = tab;
@@ -2350,7 +2277,6 @@ function openSettings(tab) {
           <div class="hint">${SETTINGS.lightMode ? 'Lite — version simplifiée des patterns' : 'Pro — version complète des patterns'}</div>
         </div>
 
-        ${(!SETTINGS.guidedMode || state.loopExtUnlockedSeen) ? `
         <div class="group">
           <label class="group-label">Loop étendu</label>
           <div class="seg" id="seg-loop-ext">
@@ -2359,18 +2285,16 @@ function openSettings(tab) {
             `).join('')}
           </div>
           <div class="hint">−1 = retour même niveau · Base = pattern original · +1 à +4 = extension en pyramide. Affecte les tabs et la preview audio.</div>
-        </div>` : ''}
+        </div>
 
-        ${(!SETTINGS.guidedMode || state.stringUnlockedSeen) ? `
         <div class="group">
           <label class="group-label">Groupe de cordes</label>
           <div class="seg" id="seg-string-group" ${state.tab==='shaker'?'style="opacity:.3;pointer-events:none"':''}>
             ${(()=>{ const STRING_COL={DGBE:'#56864A',ADGB:'#1a7fa6',EADG:'#D4622E'}; return ['DGBE','ADGB','EADG'].map(g => { const active=SETTINGS.stringGroup===g; return `<button data-val="${g}" class="${active?'active':''}" onclick="setStringGroup('${g}')" style="${active?`background:${STRING_COL[g]};border-color:${STRING_COL[g]};color:#fff`:''}">${g}</button>`; }).join(''); })()}
           </div>
           <div class="hint">DGBE = version de base (cordes 1 à 4). ADGB et EADG déplacent le pattern vers les cordes graves.${state.tab==='shaker'?' <em>(non disponible en Shaker)</em>':''}</div>
-        </div>` : ''}
+        </div>
 
-        ${(!SETTINGS.guidedMode || state.neckUnlockedSeen) ? `
         <div class="group">
           <label class="group-label">Position du manche</label>
           <div class="seg" style="margin-bottom:8px">
@@ -2385,7 +2309,7 @@ function openSettings(tab) {
             </button>
           </div>
           <div class="hint">Choisir la section du manche pour jouer.</div>
-        </div>` : ''}
+        </div>
 
         <div class="group">
           <label class="group-label">Couleur des tablatures</label>
@@ -2423,17 +2347,6 @@ function openSettings(tab) {
           </div>
         </div>
 
-        <!-- ═══ TEMPORAIRE — à retirer avant publication ═══ -->
-        <div class="group">
-          <label class="group-label">🧪 Debug — Test niveaux</label>
-          <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px">
-            ${[1,2,3,4,5,6,7].map(n => `
-              <button onclick="debugFillToLevel(${n})" style="padding:10px 4px;border-radius:8px;border:1px solid var(--border);background:var(--surface);color:var(--text);font-size:13px;font-weight:700;cursor:pointer">N${n}</button>
-            `).join('')}
-          </div>
-          <div class="hint">Remplit tous les niveaux avant N à 100% et le niveau N presque fini (une case à cocher) pour tester le déblocage/la récompense. À retirer avant publication.</div>
-        </div>
-
       </div>
 
       <!-- ═══ PANE : HEADER — Personnalisation de la barre d'en-tête ═══ -->
@@ -2445,18 +2358,18 @@ function openSettings(tab) {
 
         <div class="group">
           ${[
-            { key:'showTrain',    label:'Mode entraînement',    hint:'Active le mode progressif', unlockFlag:'trainUnlockedSeen' },
+            { key:'showTrain',    label:'Mode entraînement',    hint:'Active le mode progressif' },
             { key:'showCountin',  label:'Décompte',             hint:'Décompte 4 temps avant la lecture' },
             { key:'showClick',    label:'Clic métronome',       hint:'Métronome avec clic audible' },
             { key:'showSubdivBtn',label:'Subdivision rythmique',hint:'Change la subdivision (croches, triolets, doubles croches, sextolets)' },
             { key:'showMetroSolo',label:'Métronome solo',       hint:'Démarre le métronome indépendamment' },
-            { key:'showShuffleBtn',  label:'Shuffle (SH)',       hint:'Bouton pour activer/désactiver le mode swing', unlockFlag:'shuffleUnlockedSeen' },
-            { key:'showStringBtn',   label:'Groupe de cordes',   hint:'Basculer DGBE · ADGB · EADG depuis le header', unlockFlag:'stringUnlockedSeen' },
-            { key:'showNeckBtn',     label:'Mid / High',         hint:'Basculer la position du manche depuis le header', unlockFlag:'neckUnlockedSeen' },
-            { key:'showLoopExtBtn',  label:'Loop étendu',        hint:'Cycler Base · −1 · +1 · +2 · +3 depuis le header', unlockFlag:'loopExtUnlockedSeen' },
+            { key:'showShuffleBtn',  label:'Shuffle (SH)',       hint:'Bouton pour activer/désactiver le mode swing' },
+            { key:'showStringBtn',   label:'Groupe de cordes',   hint:'Basculer DGBE · ADGB · EADG depuis le header' },
+            { key:'showNeckBtn',     label:'Mid / High',         hint:'Basculer la position du manche depuis le header' },
+            { key:'showLoopExtBtn',  label:'Loop étendu',        hint:'Cycler Base · −1 · +1 · +2 · +3 depuis le header' },
             { key:'showLightBtn',    label:'Lite / Pro',         hint:'Basculer Lite / Pro depuis le header' },
             { key:'showHeaderStats', label:'Stats streak',       hint:'Afficher la série, le record et le total' },
-          ].filter(item => !item.unlockFlag || !SETTINGS.guidedMode || state[item.unlockFlag]).map(item => `
+          ].map(item => `
           <div class="switch-row">
             <div>
               <div class="sr-label">${item.label}</div>
@@ -3285,9 +3198,6 @@ function toggleFavorite(key, event) {
 }
 
 function toggleParcoursCell(key, btn, color) {
-  // Mode Guidé : capturer le niveau débloqué AVANT le toggle, pour détecter un changement
-  // même si aucun popup de récompense ne se déclenche (ex: popup déjà vu lors d'un test précédent)
-  const _prevUnlockedLevel = SETTINGS.guidedMode ? getUnlockedLevel() : null;
   state.progress[key] = !state.progress[key];
   saveState();
   const done = !!state.progress[key];
@@ -3331,12 +3241,6 @@ function toggleParcoursCell(key, btn, color) {
       const dirPctEl = document.getElementById('dirpct-' + groupKey + '-' + dir);
       if (dirPctEl) dirPctEl.textContent = dpct > 0 ? dpct + '%' : '';
     }
-  }
-  // Mode Guidé : si le niveau débloqué a changé suite à ce toggle, forcer un re-render complet
-  // pour que les niveaux suivants (cartes verrouillées) se déverrouillent immédiatement à l'écran,
-  // même si aucun popup de récompense ne s'est déclenché ci-dessus (ex: déjà vu)
-  if (SETTINGS.guidedMode && getUnlockedLevel() !== _prevUnlockedLevel) {
-    render();
   }
 }
 

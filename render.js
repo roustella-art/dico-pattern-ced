@@ -766,9 +766,7 @@ function renderPatterns() {
 
   let lastLevel = null;
   let isFirstGroup = true;
-  let exerciseNumber = 0;
   sortedEntries.forEach(([key, pats]) => {
-    if (state.patternSort === 'progressif') exerciseNumber++;
     // Passer les gammes (qui seront affichées dans une section séparée)
     if (pats[0].cat === 'gamme') return;
 
@@ -790,7 +788,7 @@ function renderPatterns() {
         <div style="padding:12px 14px;display:flex;align-items:center;gap:8px">
           <span style="line-height:0">${lockIconSVG(18)}</span>
           <div style="flex:1;min-width:0">
-            <h2 style="font-size:14px;margin:0;font-weight:700;color:var(--text2)">${state.patternSort === 'progressif' ? 'Exercice ' + exerciseNumber : key}</h2>
+            <h2 style="font-size:14px;margin:0;font-weight:700;color:var(--text2)">${key}</h2>
             <div style="font-size:11px;color:var(--text2);opacity:.8">Termine le niveau ${unlockedLevel} pour débloquer</div>
           </div>
         </div>
@@ -812,7 +810,7 @@ function renderPatterns() {
       <div class="card-head" onclick="toggleCard('${key}')">
         <div style="flex:1;min-width:0">
           <div style="display:flex;align-items:center;gap:7px">
-            <h2 style="font-size:14px;margin:0;font-weight:700">${state.patternSort === 'progressif' ? 'Exercice ' + exerciseNumber : key}</h2>
+            <h2 style="font-size:14px;margin:0;font-weight:700">${key}</h2>
             <span style="color:var(--text);opacity:.3;font-size:13px;font-weight:300">·</span>
             <span style="font-size:13px;color:var(--text);opacity:.65;font-style:italic;font-weight:400">${base.name}</span>
           </div>

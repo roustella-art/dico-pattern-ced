@@ -1,11 +1,5 @@
 apply plugin: 'com.android.application'
 
-def keystorePropertiesFile = rootProject.file("keystore.properties")
-def keystoreProperties = new Properties()
-if (keystorePropertiesFile.exists()) {
-    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
-}
-
 android {
     namespace = "com.cedm4.dicopattern"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -22,21 +16,10 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
-    signingConfigs {
-        release {
-            if (keystorePropertiesFile.exists()) {
-                storeFile file("${project.projectDir}/${keystoreProperties['STORE_FILE']}")
-                storePassword keystoreProperties['STORE_PASSWORD']
-                keyAlias keystoreProperties['KEY_ALIAS']
-                keyPassword keystoreProperties['KEY_PASSWORD']
-            }
-        }
-    }
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
-            signingConfig keystorePropertiesFile.exists() ? signingConfigs.release : null
         }
     }
 }
