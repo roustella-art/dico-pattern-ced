@@ -1515,6 +1515,7 @@ function previewPlay(patId) {
   if (METRO.running) metroStop();
   if (typeof stopShaker === 'function' && typeof skIsPlaying !== 'undefined' && skIsPlaying) stopShaker();
   previewStop();
+  if (typeof maybeWarnSilentSwitch === 'function') maybeWarnSilentSwitch();
   const pat = PATTERNS.find(p => p.id === patId);
   if (!pat) return;
   // ── Loop étendu : utilise le tab étendu pour l'audio ─────────────────────────

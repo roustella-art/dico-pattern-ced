@@ -1858,6 +1858,38 @@ function laboUnlockEarly() {
   showTab('shaker');
 }
 
+// ── Avertissement switch silencieux ──────────────────────────────────────────
+// Le son de preview (Web Audio) ne joue pas quand le switch silencieux physique est activé —
+// affiche un pop-up explicatif la première fois qu'une preview démarre dans ce cas (1x/session).
+const IS_NATIVE_PLATFORM = !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform());
+let _silentSwitchWarnedThisSession = false;
+async function maybeWarnSilentSwitch() {
+  if (_silentSwitchWarnedThisSession) return;
+  if (!(IS_NATIVE_PLATFORM && window.Capacitor.Plugins.SilentSwitch)) return;
+  try {
+    const res = await window.Capacitor.Plugins.SilentSwitch.isSilent();
+    if (!res.isSilent) return;
+    _silentSwitchWarnedThisSession = true;
+    showSilentSwitchWarning();
+  } catch(e) { console.warn('maybeWarnSilentSwitch error:', e); }
+}
+function showSilentSwitchWarning() {
+  const existing = document.getElementById('silent-switch-overlay');
+  if (existing) existing.remove();
+  const overlay = document.createElement('div');
+  overlay.id = 'silent-switch-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9000;display:flex;align-items:center;justify-content:center;padding:20px;backdrop-filter:blur(2px)';
+  overlay.innerHTML = `
+    <div style="background:var(--card);border-radius:18px;max-width:380px;width:100%;padding:28px 24px 24px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.4)">
+      <div style="font-size:44px;margin-bottom:10px">🔇</div>
+      <div style="font-size:19px;font-weight:800;color:var(--text);margin-bottom:8px">Mode silencieux activé</div>
+      <div style="font-size:14px;color:var(--text2);line-height:1.5;margin-bottom:22px">Ton iPhone est en mode silencieux (petit interrupteur sur le côté) : tu n'entendras ni le clic du métronome ni les notes de la preview. Désactive-le pour profiter du son.</div>
+      <button onclick="document.getElementById('silent-switch-overlay').remove()" style="width:100%;background:var(--blue);color:#fff;border:none;padding:13px;border-radius:10px;font-size:15px;font-weight:700;cursor:pointer">Compris</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  overlay.addEventListener('click', e => { if (e.target === overlay) overlay.remove(); });
+}
+
 // Affiche une fois le popup "Bravo, Labo débloqué !" quand le mode Guidé vient de débloquer le Labo
 function checkLaboUnlockCelebration() {
   if (!SETTINGS.guidedMode || state.laboUnlockedSeen || !isLaboUnlocked()) return;
